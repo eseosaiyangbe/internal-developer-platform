@@ -77,8 +77,8 @@ The work is divided into seven phases.
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Foundation and governance | Complete | Monorepo, root runbook, and root roadmap are in place |
-| 2. Workspace normalization | In progress | Startup contracts, env contracts, repo hygiene, and k8s-minded normalization are underway |
-| 3. Control plane hardening | Not started | Planned next after Phase 2 reaches a cleaner steady state |
+| 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
+| 3. Control plane hardening | In progress | App inventory verification and control-plane contract hardening have started |
 | 4. App integration and onboarding | Not started | Depends on a more trustworthy control plane |
 | 5. Operator workflows and incident drills | Not started | Depends on integrated workloads and stable observability paths |
 | 6. UX and demo polish | Not started | Should happen after operational flows are real |

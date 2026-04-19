@@ -516,6 +516,86 @@ Why it mattered:
 - validate the monitored-app inventory against the actual workspace state
 - decide whether the control-plane auth path stays demo-grade temporarily or gets hardened now
 
+---
+
+## Phase 3: Control Plane Inventory Reconciliation
+
+### Goal
+
+Start Phase 3 by making sure the control plane’s monitored app inventory matches the normalized workspace contracts instead of stale pre-normalization assumptions.
+
+### Commands
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '260,520p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,260p' Obervability-Stack/docs/README.md
+sed -n '1,260p' Obervability-Stack/README.md
+rg -n "browserUrl|primaryHealthEndpointId|runbooks|healthCheck|localStart|getMonitoredApp|monitoredApps" Obervability-Stack/ui-next -g '!**/node_modules/**' | sed -n '1,260p'
+sed -n '1,260p' Obervability-Stack/ui-next/lib/app-observability.ts
+sed -n '1,260p' 'Obervability-Stack/ui-next/app/api/apps/[appId]/overview/route.ts'
+sed -n '1,260p' Obervability-Stack/ui-next/app/services/page.tsx
+rg -n "memflip|foodpulse|opensis|swiftpay" Obervability-Stack/prometheus/prometheus.yml Obervability-Stack/ui-next/lib/monitored-apps.ts -g '!**/node_modules/**'
+sed -n '1,260p' Obervability-Stack/prometheus/prometheus.yml
+sed -n '1,220p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+git add Obervability-Stack/docs/WORKSPACE_APP_INVENTORY_AUDIT.md Obervability-Stack/docs/README.md Obervability-Stack/ui-next/lib/monitored-apps.ts Obervability-Stack/prometheus/prometheus.yml PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+git commit -m "Reconcile control plane app inventory"
+git push origin main
+```
+
+### Problems Encountered
+
+#### 1. Bracketed Next.js route paths need shell quoting
+
+Problem:
+
+- trying to read `ui-next/app/api/apps/[appId]/overview/route.ts` without quotes caused `zsh` glob expansion to fail again
+
+Why it mattered:
+
+- this is the same class of shell issue we hit earlier in the journey
+- it confirmed the inventory audit commands must keep quoting bracketed route paths
+
+### What We Learned
+
+- the control-plane inventory was broadly correct, but some metadata lagged behind Phase 2 normalization
+- `MemFlip` was the biggest mismatch:
+  - it had no browser URL in inventory
+  - its frontend probe still targeted `/` instead of the normalized proxied health path
+  - its primary endpoint was still backend-first
+- `FoodPulse` and `OpenSIS` mainly needed metadata polish rather than architectural changes
+
+### Fixes Applied
+
+#### 1. Reconciled monitored app metadata with workspace reality
+
+- `OpenSIS` now points operators to `./scripts/compose-start.sh`
+- `MemFlip` now exposes `http://localhost:8080` as its browser URL
+- `MemFlip` now treats the frontend proxied health path as the primary control-plane endpoint
+- `FoodPulse` now exposes `http://localhost` as its browser URL
+- `FoodPulse` now has a simple health-check runbook command
+
+#### 2. Reconciled Prometheus probing with the normalized MemFlip contract
+
+- blackbox probing for `MemFlip` frontend now hits `http://memflip-frontend/api/health`
+
+#### 3. Added an explicit inventory audit document
+
+- created `Obervability-Stack/docs/WORKSPACE_APP_INVENTORY_AUDIT.md`
+- linked it from the control-plane docs index
+
+### Why This Step Mattered
+
+- it makes the control plane a more trustworthy source of operator truth
+- it aligns dashboard links, probe targets, and runbook text with the actual workspace contracts
+- it turns the start of Phase 3 into concrete hardening work rather than just a status change
+
+### Follow-Up Work
+
+- continue Phase 3 with deeper control-plane doc reconciliation
+- validate whether app inventory metadata should remain hardcoded or move toward a more declarative config model
+- decide how to handle demo auth in the control plane
+
 ## Transition to App Discovery
 
 The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
