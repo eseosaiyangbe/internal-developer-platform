@@ -387,6 +387,18 @@ Why it mattered:
 
 - it was important to recognize that as a successful cleanup signal, not as a command failure
 
+#### 3. Git briefly reported an `index.lock` conflict during commit
+
+Problem:
+
+- the first commit attempt failed with `Unable to create .git/index.lock`
+- a follow-up check showed no lock file was actually present anymore
+
+Why it mattered:
+
+- this was another sign that parallel Git operations can create confusing transient states in this repo workflow
+- the safe response was to verify the lock state first, then retry the commit serially
+
 ### Fixes Applied
 
 #### 1. Normalized the core Compose-facing operator docs
