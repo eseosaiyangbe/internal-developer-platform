@@ -5697,3 +5697,96 @@ The MemFlip live audit passed:
 - synthetic user creation passed
 - synthetic game start, match, complete, leaderboard, and stats flow passed
 - backend metrics recorded the synthetic game flow
+
+---
+
+## Phase 5: Incident Drill Catalog
+
+### Why We Did This
+
+After building platform-facing operator runbooks for SwiftPay, MemFlip, OpenSIS, and FoodPulse, the next Phase 5 step was to connect those runbooks to intentional break/fix practice.
+
+Healthy apps are useful, but an operations lab becomes much more real when it can teach:
+
+- what to break
+- how to detect it
+- which evidence matters
+- how to recover safely
+- how the same thinking maps to Kubernetes later
+
+We added the first incident drill catalog as documentation only. We did not intentionally stop services during this step.
+
+### Commands Run
+
+```bash
+sed -n '1,260p' Obervability-Stack/docs/INCIDENT_MATRIX.md
+sed -n '1,180p' Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md
+sed -n '1,220p' PROJECT-ROADMAP.md
+git status --short
+sed -n '1,80p' Obervability-Stack/docs/README.md
+tail -n 220 JOURNEY-RUNBOOK.md
+rg -n "## Phase 5|Operator workflows|incident drills|Current Status|Deliverables|Success Criteria" PROJECT-ROADMAP.md
+sed -n '397,475p' PROJECT-ROADMAP.md
+git diff --check -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/INCIDENT_MATRIX.md Obervability-Stack/docs/INCIDENT_DRILLS.md
+rg -n "INCIDENT_DRILLS|Incident Drill Catalog|transaction worker|Redis Failover|Postgres Promotion|selected drills|drill catalog" Obervability-Stack/docs/INCIDENT_DRILLS.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/INCIDENT_MATRIX.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+./Obervability-Stack/scripts/devops-monitor.sh operator
+git diff --stat -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/INCIDENT_MATRIX.md Obervability-Stack/docs/INCIDENT_DRILLS.md
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/docs/INCIDENT_DRILLS.md`
+
+The catalog includes controlled drills for:
+
+- SwiftPay transaction worker failure
+- SwiftPay wallet service failure
+- SwiftPay RabbitMQ failure
+- MemFlip backend failure
+- MemFlip metrics-missing behavior
+- OpenSIS Vault failure
+- OpenSIS MariaDB failure
+- OpenSIS blackbox mismatch
+- FoodPulse Redis failover
+- FoodPulse Postgres promotion
+- FoodPulse app-healthy/topology-degraded behavior
+- control-plane probe or inventory drift
+
+### What We Updated
+
+We updated:
+
+- `Obervability-Stack/docs/README.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `Obervability-Stack/docs/INCIDENT_MATRIX.md`
+- `PROJECT-ROADMAP.md`
+- `JOURNEY-RUNBOOK.md`
+
+### Why This Matters
+
+This turns the Phase 5 runbooks into a training loop.
+
+The platform now has:
+
+- first-response workflow
+- symptom matrix
+- app operator runbooks
+- controlled drill catalog
+
+The remaining Phase 5 work is to execute selected drills for real, recover them, and record the evidence.
+
+### Validation
+
+The documentation checks passed with no whitespace errors.
+
+The operator baseline passed without intentionally breaking any workload:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+We intentionally did not run the break/fix drills in this checkpoint. The next step is to execute selected drills one at a time, capture evidence, recover, and record the outcome.

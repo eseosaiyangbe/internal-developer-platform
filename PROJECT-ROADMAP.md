@@ -80,7 +80,7 @@ The work is divided into seven phases.
 | 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
 | 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
 | 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
-| 5. Operator workflows and incident drills | In progress | Standard health workflow, first incident matrix, and all four app operator runbooks are now in place |
+| 5. Operator workflows and incident drills | In progress | Standard health workflow, incident matrix, app runbooks, and incident drill catalog are now in place |
 | 6. UX and demo polish | Not started | Should happen after operational flows are real |
 | 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
 
@@ -104,6 +104,7 @@ Phase 5 will be considered complete when:
 - common incident shapes have a documented first-response path
 - app-specific operator runbooks exist for each managed workload
 - drills and live audits are connected into one coherent operator story
+- selected drills have been executed, recovered, and recorded
 
 ---
 
@@ -453,7 +454,7 @@ Create a quick “operator first” view in the control plane:
 
 - incident matrix
 - operator runbooks
-- drill checklist
+- incident drill catalog
 - verification dashboard
 
 ### Success Criteria
@@ -469,6 +470,8 @@ Latest progress:
 - `./scripts/devops-monitor.sh operator` now provides a runnable operator-first entrypoint
 - the standard health workflow is documented
 - the first incident matrix is documented
+- all four managed workloads now have platform-facing operator runbooks
+- the first incident drill catalog is documented
 
 ---
 
