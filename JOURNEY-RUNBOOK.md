@@ -4509,3 +4509,75 @@ This removed a duplicated platform concern from the workspace.
 - a workload observed by `Obervability-Stack`
 
 That makes the repo simpler now and closer to the cluster shape we want later, where app repos own workloads and the control plane owns monitoring.
+
+## 2026-04-19 05:13 EDT - Collapse the duplicate `yelb-db` folders in FoodPulse
+
+### Objective
+
+Clean up the remaining duplicate-looking `yelb-db` structure in `FoodPulse` so the repo has:
+
+- one vendored app DB source at `yelb/yelb-db/`
+- one workspace-owned Postgres extension path under `postgres/`
+
+### Commands Run
+
+```bash
+find FoodPulse/yelb-db -maxdepth 2 -type f | sort && printf '\n---\n' && find FoodPulse/yelb/yelb-db -maxdepth 2 -type f | sort
+sed -n '1,220p' FoodPulse/yelb-db/02-create-replicator.sql && printf '\n---\n' && sed -n '1,220p' FoodPulse/yelb-db/03-pghba-override.sh && printf '\n---VENDORED---\n' && sed -n '1,220p' FoodPulse/yelb/yelb-db/Dockerfile && printf '\n---\n' && sed -n '1,220p' FoodPulse/yelb/yelb-db/README.md
+rg -n "yelb-db/02-create-replicator.sql|yelb-db/03-pghba-override.sh|./yelb-db|FoodPulse/yelb-db" FoodPulse Obervability-Stack WORKSPACE-SETUP-MATRIX.md JOURNEY-RUNBOOK.md -g '!**/node_modules/**'
+rmdir FoodPulse/yelb-db && echo removed-yelb-db-dir || ls -la FoodPulse/yelb-db
+rg -n "./yelb-db|FoodPulse/yelb-db|postgres/initdb|root-level duplicate copy|workspace-specific replication bootstrap" FoodPulse Obervability-Stack WORKSPACE-SETUP-MATRIX.md JOURNEY-RUNBOOK.md -g '!**/node_modules/**'
+bash -n FoodPulse/postgres/initdb/03-pghba-override.sh && source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml config >/tmp/foodpulse-db-cleanup.out && tail -n 40 /tmp/foodpulse-db-cleanup.out
+./Obervability-Stack/scripts/foodpulse-audit.sh
+```
+
+### Problem
+
+Even after the earlier cleanup, `FoodPulse` still had two folders that looked like competing database sources:
+
+- `FoodPulse/yelb/yelb-db/`
+- `FoodPulse/yelb-db/`
+
+What they actually were:
+
+- `FoodPulse/yelb/yelb-db/` was the vendored upstream application database source
+- `FoodPulse/yelb-db/` only held two workspace-specific replication bootstrap files:
+  - `02-create-replicator.sql`
+  - `03-pghba-override.sh`
+
+Why it mattered:
+
+- the directory names implied a duplicate app DB implementation
+- that makes the repo harder to understand and weakens the “vendored app code versus workspace platform glue” boundary
+
+### Fix
+
+Moved the workspace-owned replication bootstrap files to:
+
+- `FoodPulse/postgres/initdb/02-create-replicator.sql`
+- `FoodPulse/postgres/initdb/03-pghba-override.sh`
+
+Updated `FoodPulse/docker-compose.yml` so the Postgres primary now mounts:
+
+- `./yelb/yelb-db/init-yelb-db.sh`
+- `./postgres/initdb/02-create-replicator.sql`
+- `./postgres/initdb/03-pghba-override.sh`
+
+Then removed the now-empty root `FoodPulse/yelb-db/` directory.
+
+### Validation
+
+Validated successfully:
+
+- `bash -n FoodPulse/postgres/initdb/03-pghba-override.sh`
+- `docker compose -f FoodPulse/docker-compose.yml config`
+- `./Obervability-Stack/scripts/foodpulse-audit.sh`
+
+### Why This Mattered
+
+This makes the repo structure tell the truth more clearly:
+
+- `yelb/yelb-db/` is the vendored upstream app DB layer
+- `postgres/initdb/` is the workspace-specific bootstrap extension layer
+
+That is a much better boundary for future Kubernetes work than having a second root-level `yelb-db/` folder that looks like a duplicate implementation.
