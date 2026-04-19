@@ -6619,3 +6619,266 @@ kubectl exec -n foodpulse deploy/redis-haproxy -- redis-cli INFO replication
 ```
 
 The same lesson applies in Kubernetes: application readiness, Sentinel election state, HAProxy routing, and direct Redis node roles are separate signals. A good runbook verifies all of them before declaring recovery.
+
+---
+
+## Incident Drill: Control Plane Probe Drift
+
+### Goal
+
+Prove that operators can distinguish a real application outage from an observability/probe-layer outage.
+
+This drill was selected after one real drill per major workload because it ties the platform story together. A DevOps operator needs to know when the app is broken, when the monitoring path is broken, and when both are true.
+
+### Commands Run
+
+```bash
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh operator
+cd Obervability-Stack && docker compose ps blackbox-exporter prometheus devops-monitor-ui
+cd Obervability-Stack && docker compose stop blackbox-exporter
+./Obervability-Stack/scripts/devops-monitor.sh operator
+curl -fsS http://localhost:4000/api/apps/health | jq '{overallStatus, apps: [.apps[] | {appId, status, primary: .primaryEndpoint.status}]}'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="blackbox-http"}' | jq '.data.result'
+curl -fsSI http://localhost:8080/api/health
+curl -fsSI http://localhost:8081
+curl -fsSI http://localhost:8088
+curl -fsSI http://localhost:8090
+sleep 20 && curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="blackbox-http"}' | jq '[.data.result[] | {app: .metric.app, component: .metric.component, value: .value[1]}]'
+cd Obervability-Stack && docker compose ps blackbox-exporter prometheus devops-monitor-ui
+cd Obervability-Stack && docker compose start blackbox-exporter
+sleep 25 && curl -fsS http://localhost:9115/-/healthy
+sleep 25 && curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="blackbox-http"}' | jq '[.data.result[] | {app: .metric.app, component: .metric.component, value: .value[1]}]'
+sleep 25 && cd Obervability-Stack && docker compose ps blackbox-exporter prometheus devops-monitor-ui
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### Baseline
+
+Before the drill, the operator check passed:
+
+- `26/26` checks
+- all default observability services were running
+- Prometheus, Grafana, Loki, Alertmanager, Blackbox Exporter, Node Exporter, and the DevOps Monitor UI responded
+- the control plane returned all `4` monitored apps
+- inventory validation passed with `0` errors and `0` warnings
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse were all healthy
+
+The key observability services were running:
+
+- `blackbox-exporter`
+- `prometheus`
+- `devops-monitor-ui`
+
+### Trigger
+
+We stopped only the blackbox exporter:
+
+```bash
+cd Obervability-Stack
+docker compose stop blackbox-exporter
+```
+
+Docker stopped:
+
+- `blackbox-exporter`
+
+Prometheus and the DevOps Monitor UI stayed running.
+
+### Detection
+
+The first post-trigger operator check failed:
+
+```text
+FAIL Service not running: blackbox-exporter
+FAIL Blackbox Exporter health returned HTTP 000 from http://localhost:9115/-/healthy
+INFO Checks passed: 24/26
+FAIL Failures: 2
+```
+
+The control-plane app API still showed the apps as healthy:
+
+```json
+{
+  "apps": [
+    {
+      "appId": "opensis",
+      "status": "healthy",
+      "primary": "up"
+    },
+    {
+      "appId": "swiftpay",
+      "status": "healthy",
+      "primary": "up"
+    },
+    {
+      "appId": "memflip",
+      "status": "healthy",
+      "primary": "unknown"
+    },
+    {
+      "appId": "foodpulse",
+      "status": "healthy",
+      "primary": "up"
+    }
+  ]
+}
+```
+
+After waiting for a scrape interval, Prometheus reported all blackbox targets as down:
+
+```json
+[
+  {
+    "app": "foodpulse",
+    "component": "frontend",
+    "value": "0"
+  },
+  {
+    "app": "memflip",
+    "component": "backend",
+    "value": "0"
+  },
+  {
+    "app": "opensis",
+    "component": "frontend",
+    "value": "0"
+  },
+  {
+    "app": "swiftpay",
+    "component": "frontend",
+    "value": "0"
+  }
+]
+```
+
+That Prometheus view looked like a broad app outage, but direct host probes showed the apps were still reachable:
+
+```text
+MemFlip: HTTP 200
+SwiftPay: HTTP 200
+OpenSIS: HTTP 302
+FoodPulse: HTTP 200
+```
+
+### Important Observation
+
+This was not a multi-app outage.
+
+The shared probe service was down, so Prometheus could not execute the blackbox checks. That made monitored targets report `0`, but direct app health stayed good.
+
+The operator clue was the blast radius:
+
+- many unrelated app probes failed at the same time
+- direct host probes still worked
+- `blackbox-exporter` itself was stopped
+- Prometheus and the control-plane UI were still reachable
+
+That pattern points to probe-layer failure, not simultaneous failure across every workload.
+
+### Recovery
+
+We restarted the blackbox exporter:
+
+```bash
+cd Obervability-Stack
+docker compose start blackbox-exporter
+```
+
+Docker started:
+
+- `blackbox-exporter`
+
+After waiting one scrape window, direct blackbox health returned:
+
+```text
+Healthy
+```
+
+Prometheus blackbox targets returned to `1`:
+
+```json
+[
+  {
+    "app": "foodpulse",
+    "component": "frontend",
+    "value": "1"
+  },
+  {
+    "app": "memflip",
+    "component": "backend",
+    "value": "1"
+  },
+  {
+    "app": "opensis",
+    "component": "frontend",
+    "value": "1"
+  },
+  {
+    "app": "swiftpay",
+    "component": "frontend",
+    "value": "1"
+  }
+]
+```
+
+### Final Verification
+
+The full operator baseline passed after recovery:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+### Lessons
+
+This drill taught four useful platform lessons:
+
+- A monitoring-layer outage can make many app probes fail at once.
+- Direct app probes are the fastest way to separate app outage from probe outage.
+- Recovery proof needs both service health and a fresh Prometheus scrape.
+- Operators should suspect shared infrastructure when unrelated apps all appear to fail together.
+
+### Kubernetes Mapping
+
+In Kubernetes, the equivalent drill would be:
+
+```bash
+kubectl scale deployment/blackbox-exporter --replicas=0 -n observability
+kubectl get pods -n observability
+kubectl get servicemonitor -A
+kubectl port-forward -n observability svc/prometheus 9090:9090
+kubectl scale deployment/blackbox-exporter --replicas=1 -n observability
+kubectl rollout status deployment/blackbox-exporter -n observability
+```
+
+The same lesson applies in Kubernetes: pod readiness, ServiceMonitor configuration, NetworkPolicy, DNS, and app reachability can diverge. A strong operator workflow checks the probe layer before declaring every workload down.
+
+---
+
+## Phase 5 Closeout: Operator Workflows And Incident Drills
+
+Phase 5 is complete.
+
+We now have a real operations lab instead of just a set of runnable apps.
+
+The completed Phase 5 evidence includes:
+
+- a standard operator health workflow
+- a platform incident matrix
+- app-facing operator runbooks
+- an incident drill catalog
+- executed and recovered drills for MemFlip, SwiftPay, OpenSIS, FoodPulse, and the shared observability layer
+- documented command trails and recovery lessons for each real drill
+
+The executed drill set now covers:
+
+- simple backend outage
+- microservice dependency outage
+- secret-control-plane dependency outage
+- Redis failover/topology convergence
+- monitoring/probe-layer drift
+
+This is enough to move into Phase 6 with confidence. The next phase should make the experience feel polished, teachable, and demo-ready without losing the operational realism we just built.

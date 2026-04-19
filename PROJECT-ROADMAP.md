@@ -80,15 +80,15 @@ The work is divided into seven phases.
 | 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
 | 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
 | 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
-| 5. Operator workflows and incident drills | In progress | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and first four executed drills are now in place |
-| 6. UX and demo polish | Not started | Should happen after operational flows are real |
+| 5. Operator workflows and incident drills | Complete | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and five executed drills are now in place |
+| 6. UX and demo polish | In progress | Operational flows are real; next step is making the portfolio demo feel polished and teachable |
 | 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
 
 ## Current Focus
 
-We are currently in **Phase 5: Operator workflows and incident drills**.
+We are currently entering **Phase 6: UX and demo polish**.
 
-The working intent inside Phase 5 is:
+Phase 5 is complete. Its completed intent was:
 
 - turn the integrated apps into a teachable operations lab
 - define the standard first-response workflow for the workspace
@@ -98,7 +98,15 @@ The working intent inside Phase 5 is:
 
 ## Current Definition Of Done
 
-Phase 5 will be considered complete when:
+Phase 6 will be considered complete when:
+
+- the control-plane UI clearly tells the platform story
+- each app has a polished demo path and operator handoff path
+- the dashboard language is beginner-friendly without hiding real operational detail
+- stale UI duplicates and visual inconsistencies are removed
+- the project can be demoed end-to-end without needing verbal patch notes
+
+Previous Phase 5 completion criteria:
 
 - the standard health workflow is documented and runnable
 - common incident shapes have a documented first-response path
@@ -202,7 +210,7 @@ Examples:
 
 ### Current Status
 
-In progress.
+Complete.
 
 Already done:
 
@@ -472,7 +480,8 @@ Latest progress:
 - the first incident matrix is documented
 - all four managed workloads now have platform-facing operator runbooks
 - the first incident drill catalog is documented
-- first four real drills executed and recorded: MemFlip backend down, SwiftPay transaction worker down, OpenSIS Vault unavailable, and FoodPulse Redis failover
+- five real drills executed and recorded: MemFlip backend down, SwiftPay transaction worker down, OpenSIS Vault unavailable, FoodPulse Redis failover, and control-plane probe drift
+- Phase 5 closed after validating both workload failures and an observability-layer failure mode
 
 ---
 
