@@ -724,6 +724,67 @@ Result:
 - decide whether to surface auth mode more clearly inside the UI itself
 - continue Phase 3 documentation reconciliation in the control plane
 
+---
+
+## Phase 3: Auth UX And Guide Reconciliation
+
+### Goal
+
+Make the sign-in experience and the older authentication guide reflect the control-plane auth runtime we just hardened, instead of leaving the UI and docs in an aspirational or ambiguous state.
+
+### Commands
+
+```bash
+sed -n '1,260p' Obervability-Stack/docs/AUTHENTICATION_MULTI_TENANCY_GUIDE.md
+sed -n '260,560p' Obervability-Stack/docs/AUTHENTICATION_MULTI_TENANCY_GUIDE.md
+sed -n '1,260p' Obervability-Stack/ui-next/app/auth/signin/page.tsx
+sed -n '1,220p' Obervability-Stack/docs/AUTH_ACCESS_MODEL.md
+npm run type-check
+git add Obervability-Stack/docs/AUTHENTICATION_MULTI_TENANCY_GUIDE.md Obervability-Stack/ui-next/app/auth/signin/page.tsx JOURNEY-RUNBOOK.md
+git commit -m "Align auth docs and sign-in UX"
+git push origin main
+```
+
+### What We Changed
+
+#### 1. Surfaced auth runtime state in the sign-in UI
+
+- added visible auth-mode and demo-login status badges to the sign-in page
+- added an operator-mode message for environments where demo login is disabled
+
+#### 2. Reconciled the older auth guide with the current runtime
+
+- added a "Current Runtime Note" to `AUTHENTICATION_MULTI_TENANCY_GUIDE.md`
+- pointed readers to the new auth access model and live runtime files
+- corrected stale assumptions around:
+  - unconditional OAuth availability
+  - unconditional demo credentials
+  - the old `NEXTAUTH_URL` port
+  - the older "fully implemented" tone for broader multi-tenancy ideas
+
+### Verification
+
+```bash
+cd Obervability-Stack/ui-next
+npm run type-check
+```
+
+Result:
+
+- type-check completed successfully
+
+### Why This Step Mattered
+
+- it reduced the gap between what operators read, what they see, and what the control plane actually does
+- it turned auth mode from an environment-variable detail into an explicit part of the operator experience
+- it kept Phase 3 focused on trustworthiness, not just code changes
+
+### Follow-Up Work
+
+- continue reconciling deeper control-plane docs that still carry older assumptions
+- decide whether to expose auth/runtime status elsewhere in the UI beyond sign-in
+- move into control-plane reliability checks after the remaining doc drift is reduced
+
 ## Transition to App Discovery
 
 The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
