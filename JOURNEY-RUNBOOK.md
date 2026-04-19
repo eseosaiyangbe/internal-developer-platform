@@ -6966,3 +6966,152 @@ Continue Phase 6 by polishing the control-plane UX and app launch experience, es
 - demo-friendly service pages
 - FoodPulse visual polish
 - root docs alignment with the final UI experience
+
+---
+
+## Phase 6 UI Polish: FoodPulse And App Launch Cards
+
+### Goal
+
+Continue Phase 6 by making the live demo feel more intentional.
+
+This pass focused on two visible demo moments:
+
+- FoodPulse should look like a clean, owned app instead of an inherited demo UI.
+- The control plane should let operators launch managed apps directly from the services page.
+
+### Commands Run
+
+```bash
+git status --short
+find FoodPulse/ui -maxdepth 2 -type f | sort
+find Obervability-Stack/ui-next -maxdepth 2 -type f | sort | sed -n '1,160p'
+git diff -- FoodPulse/ui/src/App.jsx FoodPulse/ui/src/styles.css Obervability-Stack/ui-next/app/services/page.tsx
+cat FoodPulse/ui/package.json
+cat Obervability-Stack/ui-next/package.json
+sed -n '1,420p' Obervability-Stack/ui-next/app/services/page.tsx
+sed -n '1,280p' FoodPulse/ui/src/App.jsx
+npm run build
+npm run type-check
+npm run build
+docker compose up -d --build foodpulse-ui
+docker compose up -d --build devops-monitor-ui
+./Obervability-Stack/scripts/devops-monitor.sh operator
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+curl -fsS http://localhost:8090 | rg -n "FoodPulse|Welcome|Live Dining Board|Vote Split"
+curl -fsSI http://localhost:4000/services
+```
+
+### What We Changed
+
+FoodPulse UI now uses a cleaner board layout:
+
+- top status bar
+- centered welcome panel
+- colored restaurant cards
+- clean restaurant labels for category, neighborhood, price band, and energy score
+- vote buttons per restaurant
+- live vote split chart
+- compact stats row for page views, serving node, top pick, and total votes
+
+The previous progress-bar voting display was removed in favor of a chart and cleaner labels.
+
+The control-plane services page now supports direct app launching from managed-app cards:
+
+- cards with a configured browser URL are keyboard-focusable
+- pressing Enter or Space opens the primary app URL
+- the card has an accessible label such as `Open FoodPulse`
+- each card also has an explicit `Open <app>` button
+
+### Design Note
+
+The FoodPulse visual direction was adjusted away from default Inter styling and toward a more deliberate `Manrope` + `JetBrains Mono` pairing.
+
+That keeps the UI clean and practical while avoiding a generic dashboard feel.
+
+### Verification
+
+FoodPulse local production build passed:
+
+```text
+vite build
+29 modules transformed
+built in 653ms
+```
+
+Control-plane TypeScript check passed:
+
+```text
+tsc --noEmit
+```
+
+Control-plane production build passed:
+
+```text
+next build
+Compiled successfully
+Generating static pages using 9 workers (22/22)
+```
+
+The local production build printed expected environment warnings for:
+
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `DATABASE_URL`
+
+The build still completed. The database warning is expected in this local build path because the app falls back to JWT-only mode when `DATABASE_URL` is not set.
+
+### Runtime Rebuild
+
+We rebuilt and restarted the affected running services:
+
+```bash
+cd FoodPulse
+docker compose up -d --build foodpulse-ui
+
+cd ../Obervability-Stack
+docker compose up -d --build devops-monitor-ui
+```
+
+FoodPulse rebuild also recreated `foodpulse-api` because the Compose dependency graph includes the API image in the selected build set.
+
+### Final Verification
+
+The full operator check passed:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- all `4` monitored apps were healthy
+
+FoodPulse live audit passed:
+
+- `16/16` checks
+- frontend returned HTTP `200`
+- stats endpoint responded through the UI proxy
+- Prometheus blackbox target was healthy
+- `cluster-status.sh` reported a healthy lab
+
+The services page responded with the expected auth redirect:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fservices
+```
+
+### Why This Matters
+
+Phase 6 is about making the project easier to understand and demo.
+
+This pass improves the first impression in two places:
+
+- FoodPulse now looks like a deliberate resilience-lab app.
+- The control plane now behaves more like an app launcher, not only a health page.
+
+### Next Step
+
+Continue polishing the control-plane UX:
+
+- make app categories more visually distinct
+- tighten the services page story copy
+- add a clearer demo path from app card to operator runbook
+- revisit FoodPulse once we decide whether the existing layout should stay minimal or become more branded

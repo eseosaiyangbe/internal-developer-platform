@@ -550,6 +550,8 @@ Latest progress:
 - root `README.md` added as the project front door
 - `DEMO-WALKTHROUGH.md` added as the guided Phase 6 presenter script
 - Phase 6 now has a clearer path from control plane to apps, drills, runbook, and Kubernetes direction
+- FoodPulse now has a cleaner demo voting-board UI with colored restaurant labels and a live vote chart
+- the control-plane services page now lets operators open managed apps directly from the app cards
 
 ---
 

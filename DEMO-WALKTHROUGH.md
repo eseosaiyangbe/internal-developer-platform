@@ -63,6 +63,7 @@ Show:
 - health state
 - app categories
 - primary app URLs
+- clickable managed-app cards on the services page
 - operator guidance
 
 ### 2. Explain The Four Workloads
@@ -184,7 +185,7 @@ MemFlip:   http://localhost:8080
 Recommended Phase 6 flow:
 
 1. Open the control plane first.
-2. Open FoodPulse to show the modernized voting UI.
+2. Open FoodPulse from the services page to show the modernized voting UI.
 3. Open SwiftPay to show the flagship microservices app.
 4. Open OpenSIS to explain legacy modernization.
 5. Open MemFlip as the lightweight onboarding reference.
