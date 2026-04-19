@@ -5389,3 +5389,104 @@ The platform now has its first full app operator runbook.
 This matters because dashboard panels and live audits are good at saying what is happening, but runbooks teach the operator what to do next and why.
 
 The SwiftPay runbook also keeps the Kubernetes future in view by mapping Docker Compose operations to `kubectl` operations without forcing us to migrate yet.
+
+---
+
+## Phase 5: MemFlip Operator Runbook
+
+### Why We Did This
+
+After SwiftPay, we carried the same operator-runbook pattern into MemFlip.
+
+MemFlip is the right second workload because it is intentionally simpler:
+
+- one browser frontend
+- one backend API
+- Postgres and Redis dependencies
+- a synthetic game flow
+- direct backend metrics
+
+This gives us a clean operator contrast:
+
+- SwiftPay teaches complex microservice and async money-flow operations.
+- MemFlip teaches the smallest complete onboarding and browser-first validation path.
+
+### Commands Run
+
+```bash
+rg --files MemFlip Obervability-Stack/docs Obervability-Stack/scripts | sort
+git status --short
+sed -n '1,260p' MemFlip/docker-compose.yml
+sed -n '1,260p' Obervability-Stack/scripts/memflip-live-audit.sh
+sed -n '260,520p' Obervability-Stack/scripts/memflip-live-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/memflip-audit.sh
+sed -n '1,240p' MemFlip/README.md
+sed -n '1,240p' MemFlip/docs/local/02-compose.md
+sed -n '1,220p' MemFlip/docs/troubleshooting.md
+git diff --check -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/MEMFLIP_OPERATOR_RUNBOOK.md
+rg -n "MEMFLIP_OPERATOR_RUNBOOK|MemFlip Operator Runbook|memflip-live|localhost:8080|localhost:3101|game_scores_total|kubectl" Obervability-Stack/docs/MEMFLIP_OPERATOR_RUNBOOK.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+git diff --stat -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/MEMFLIP_OPERATOR_RUNBOOK.md
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh memflip
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/docs/MEMFLIP_OPERATOR_RUNBOOK.md`
+
+The runbook documents:
+
+- what MemFlip does
+- startup commands
+- health checks
+- ports and URLs
+- service roles
+- metrics to watch
+- logs to check
+- common failure scenarios
+- recovery commands
+- Kubernetes mapping
+- deeper MemFlip docs to consult
+
+### What We Updated
+
+We updated:
+
+- `Obervability-Stack/docs/README.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `PROJECT-ROADMAP.md`
+- `JOURNEY-RUNBOOK.md`
+
+### Why This Matters
+
+The platform now has app operator runbooks for both ends of the current workload spectrum:
+
+- a complex flagship microservices app
+- a simple onboarding/reference app
+
+That makes the next runbooks easier because the pattern is no longer theoretical. We can adapt it to OpenSIS for legacy-platform operations and FoodPulse for resilience/failover operations.
+
+### Validation
+
+The documentation checks passed with no whitespace errors.
+
+The MemFlip static audit passed:
+
+- `24/24` checks
+- compose aliases and control-plane inventory aligned
+- expected host ports documented
+- Prometheus blackbox targets present
+- backend `/health`, `/api/health`, and `/metrics` surfaces present
+
+The MemFlip live audit passed:
+
+- `34/34` checks
+- frontend proxy health passed
+- backend health passed
+- control plane saw MemFlip as healthy
+- synthetic user creation passed
+- synthetic game start, match, complete, leaderboard, and stats flow passed
+- backend metrics recorded the synthetic game flow
