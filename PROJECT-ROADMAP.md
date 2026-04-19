@@ -80,7 +80,7 @@ The work is divided into seven phases.
 | 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
 | 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
 | 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
-| 5. Operator workflows and incident drills | In progress | Standard health workflow and first incident matrix are now in place |
+| 5. Operator workflows and incident drills | In progress | Standard health workflow, first incident matrix, and first app operator runbook are now in place |
 | 6. UX and demo polish | Not started | Should happen after operational flows are real |
 | 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
 
@@ -94,6 +94,7 @@ The working intent inside Phase 5 is:
 - define the standard first-response workflow for the workspace
 - connect symptoms to the right app-specific drills and audits
 - move from app onboarding into documented diagnosis and recovery patterns
+- build one app operator runbook pattern that can be reused across SwiftPay, MemFlip, OpenSIS, and FoodPulse
 
 ## Current Definition Of Done
 
@@ -101,6 +102,7 @@ Phase 5 will be considered complete when:
 
 - the standard health workflow is documented and runnable
 - common incident shapes have a documented first-response path
+- app-specific operator runbooks exist for each managed workload
 - drills and live audits are connected into one coherent operator story
 
 ---

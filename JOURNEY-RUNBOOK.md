@@ -5313,3 +5313,79 @@ This is the point where the roadmap legitimately moves from Phase 4 into Phase 5
 
 The platform is no longer only teaching how apps join the control plane.
 It is now starting to teach how operators should respond when the platform looks wrong.
+
+---
+
+## Phase 5: SwiftPay Operator Runbook
+
+### Why We Did This
+
+After adding the shared operator workflow and incident matrix, the next useful step was to make the pattern concrete for one real app.
+
+SwiftPay is the right first workload because it has the richest operational story:
+
+- multiple services
+- a browser frontend
+- an API gateway
+- PostgreSQL, Redis, and RabbitMQ dependencies
+- async transaction processing
+- business metrics
+- circuit-breaker behavior
+
+This runbook becomes the template we can carry into MemFlip, OpenSIS, and FoodPulse.
+
+### Commands Run
+
+```bash
+rg --files SwiftPay Obervability-Stack/docs Obervability-Stack/scripts | sort
+git status --short
+sed -n '1,220p' PROJECT-ROADMAP.md
+sed -n '1,240p' Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md
+sed -n '1,240p' Obervability-Stack/docs/README.md
+sed -n '1,260p' Obervability-Stack/docs/OPERATOR_APP_MATRIX.md
+sed -n '1,240p' SwiftPay/docker-compose.yml
+sed -n '1,220p' Obervability-Stack/scripts/swiftpay-live-audit.sh
+sed -n '220,520p' SwiftPay/docker-compose.yml
+sed -n '220,520p' Obervability-Stack/scripts/swiftpay-live-audit.sh
+sed -n '1,220p' Obervability-Stack/scripts/swiftpay-audit.sh
+sed -n '1,180p' SwiftPay/docs/RUNBOOK.md
+sed -n '180,420p' SwiftPay/docs/RUNBOOK.md
+tail -n 180 JOURNEY-RUNBOOK.md
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/docs/SWIFTPAY_OPERATOR_RUNBOOK.md`
+
+The runbook documents:
+
+- what SwiftPay does
+- startup commands
+- health checks
+- ports and URLs
+- service roles
+- metrics to watch
+- logs to check
+- common failure scenarios
+- recovery commands
+- Kubernetes mapping
+- deeper SwiftPay docs to consult
+
+### What We Updated
+
+We updated:
+
+- `Obervability-Stack/docs/README.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `PROJECT-ROADMAP.md`
+- `JOURNEY-RUNBOOK.md`
+
+### Why This Matters
+
+The platform now has its first full app operator runbook.
+
+This matters because dashboard panels and live audits are good at saying what is happening, but runbooks teach the operator what to do next and why.
+
+The SwiftPay runbook also keeps the Kubernetes future in view by mapping Docker Compose operations to `kubectl` operations without forcing us to migrate yet.
