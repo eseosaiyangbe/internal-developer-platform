@@ -356,6 +356,199 @@ Results:
 
 ---
 
+## Phase 3: Control Plane Smoke Check Hardening
+
+### Goal
+
+Replace the stale `Obervability-Stack` health path with a real control-plane smoke check that works on macOS and Linux, validates the default Compose service set, and exercises the UI and API surface together.
+
+### Commands
+
+```bash
+sed -n '1,260p' Obervability-Stack/scripts/devops-monitor.sh
+rg -n "health|smoke|status|compose up|curl|localhost:4000|devops-monitor.sh" Obervability-Stack/README.md Obervability-Stack/docs -g '!**/node_modules/**'
+ls -la Obervability-Stack/scripts
+sed -n '1,240p' Obervability-Stack/scripts/README.md
+sed -n '1,280p' Obervability-Stack/scripts/health-check.sh
+sed -n '280,520p' Obervability-Stack/scripts/health-check.sh
+sed -n '220,380p' Obervability-Stack/scripts/devops-monitor.sh
+bash Obervability-Stack/scripts/health-check.sh
+nl -ba Obervability-Stack/scripts/health-check.sh | sed -n '1,80p'
+bash -n Obervability-Stack/scripts/health-check.sh
+sed -n '1,120p' Obervability-Stack/scripts/start.sh
+sed -n '1,220p' Obervability-Stack/scripts/start-full-stack.sh
+sed -n '1,240p' Obervability-Stack/ui-next/app/api/services/health/route.ts
+curl -fsS http://localhost:4000/api/services/health | head -c 600
+curl -fsS http://localhost:4000/api/apps | jq -r '.apps | length'
+curl -fsS http://localhost:4000/api/apps/health | jq -r '.apps | length'
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/apps/health/route.ts
+sed -n '1,240p' Obervability-Stack/ui-next/lib/health-api.ts
+```
+
+### What We Learned
+
+- The repo already had a health-check script and a `devops-monitor.sh health` entrypoint, so the best path was to repair and modernize that flow instead of adding a second competing command.
+- The existing `health-check.sh` was not just stale; it was broken:
+  - it had a syntax error in the `SCRIPT_DIR` line
+  - it assumed services like `cadvisor` and `promtail` were always directly checkable
+  - it used Linux-only commands like `free`, which do not exist on macOS
+- The Next.js control plane already exposes the right smoke-check APIs:
+  - `/api/services/health`
+  - `/api/apps`
+  - `/api/apps/health`
+- Those APIs are a better validation target than raw container checks alone because they prove the UI server and its backend integrations are actually functioning.
+
+### Problems Encountered
+
+#### 1. The legacy health script did not parse
+
+Problem:
+
+- `bash Obervability-Stack/scripts/health-check.sh` failed immediately
+- `bash -n` confirmed a syntax error caused by a broken `SCRIPT_DIR` command substitution
+
+Fix:
+
+- replaced the script with a new implementation instead of patching the broken one line by line
+
+Why it mattered:
+
+- a runbook command that cannot even parse is worse than a missing command because it creates false confidence in the docs
+
+#### 2. The old health model no longer matched the default Compose stack
+
+Problem:
+
+- the script expected `cadvisor` and `promtail` endpoints in ways that do not reflect the current default startup contract
+- `cadvisor` is profile-gated
+- `promtail` does not expose a public health endpoint in the current Compose setup
+
+Fix:
+
+- made the smoke check derive the default service set from `docker compose config --services`
+- treated `cadvisor` as optional and only checked it when it is actually running
+- removed the invalid `promtail` endpoint assumption from the smoke path
+
+Why it mattered:
+
+- this keeps the smoke check aligned with the real control-plane contract instead of a historical one
+
+#### 3. The old resource checks were Linux-only
+
+Problem:
+
+- the script used `free`, which breaks on macOS
+
+Fix:
+
+- added cross-platform resource checks:
+  - macOS memory via `vm_stat` and `sysctl`
+  - Linux memory via `free`
+
+Why it mattered:
+
+- this project now has an explicit cross-platform bootstrap story, so the smoke checks need to honor that too
+
+#### 4. macOS Bash does not support `mapfile`
+
+Problem:
+
+- the first rewrite of the smoke script used `mapfile`
+- the bundled macOS Bash on this machine does not provide that builtin
+
+Fix:
+
+- replaced `mapfile` with a `while read` loop that works on older Bash versions
+
+Why it mattered:
+
+- the smoke check needs to work on the same fresh macOS setup we just bootstrapped, not only on newer Linux shells
+
+#### 5. The documented wrapper script was not executable
+
+Problem:
+
+- `Obervability-Stack/scripts/devops-monitor.sh` was tracked without the executable bit
+- that made documented commands like `./scripts/devops-monitor.sh health` fail with `permission denied`
+
+Fix:
+
+- set the executable bit on both:
+  - `Obervability-Stack/scripts/devops-monitor.sh`
+  - `Obervability-Stack/scripts/health-check.sh`
+
+Why it mattered:
+
+- docs that tell contributors to run a script directly should match the actual file mode in Git
+
+#### 6. Grafana health validation was too strict on JSON formatting
+
+Problem:
+
+- the first body check looked for `"database":"ok"`
+- Grafana returned valid JSON with whitespace: `"database": "ok"`
+
+Fix:
+
+- changed the smoke check to use a regex body match that tolerates JSON whitespace
+
+Why it mattered:
+
+- we want failures to indicate real service problems, not harmless response formatting differences
+
+### Fixes Applied
+
+- replaced `Obervability-Stack/scripts/health-check.sh` with a new control-plane smoke check
+- made the new script:
+  - prepend the userland Docker paths used by our workstation bootstrap
+  - validate Docker access and Compose config
+  - inspect the live default Compose service set
+  - check public endpoints for Prometheus, Grafana, Loki, Alertmanager, Blackbox Exporter, Node Exporter, and the UI
+  - verify the control-plane API layer through `/api/services/health`, `/api/apps`, and `/api/apps/health`
+  - run cross-platform disk and memory checks
+- updated `Obervability-Stack/scripts/devops-monitor.sh` so:
+  - `health` runs the repaired smoke check via an absolute script path
+  - `smoke` is available as an alias
+  - startup output no longer advertises `cadvisor` as a default service
+- updated:
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+
+### Why This Step Mattered
+
+- it converts the control-plane verification flow from “best effort documentation” into an actual operator tool
+- it checks the exact surfaces we care about before the Kubernetes migration:
+  - container runtime health
+  - control-plane public endpoints
+  - control-plane API behavior
+  - workspace app inventory visibility
+
+### Follow-Up Work
+
+- decide whether to add a smaller `--quick` mode later, or keep one canonical smoke path
+- decide whether the macOS memory check should stay informational or evolve into a stronger thresholded check later
+
+### Verification
+
+```bash
+chmod +x Obervability-Stack/scripts/devops-monitor.sh Obervability-Stack/scripts/health-check.sh
+bash -n Obervability-Stack/scripts/health-check.sh
+bash -n Obervability-Stack/scripts/devops-monitor.sh
+./Obervability-Stack/scripts/health-check.sh
+./Obervability-Stack/scripts/devops-monitor.sh health
+curl -fsS http://localhost:3000/api/health
+```
+
+Results:
+
+- both scripts passed `bash -n`
+- both operator entrypoints completed successfully
+- the smoke check passed `26/26` checks on this Mac
+- Grafana confirmed the expected health payload
+
+---
+
 ## Phase 2: Observability-Stack Discovery
 
 ### Goal
