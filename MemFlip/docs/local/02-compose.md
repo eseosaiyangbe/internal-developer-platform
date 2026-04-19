@@ -28,6 +28,9 @@ Docker Compose is like a practice run before the big game. It lets you test your
 # Navigate to your project directory
 cd /path/to/your/humor-memory-game
 
+# Create your local env file
+cp .env.example .env
+
 # Build all container images
 docker-compose build
 ```
@@ -86,12 +89,12 @@ NAME                       IMAGE                           STATUS               
 game-app-laptop-demo_postgres_1   postgres:15-alpine              Up 13 minutes            5432/tcp
 game-app-laptop-demo_redis_1      redis:7-alpine                  Up 6 minutes             6379/tcp
 game-app-laptop-demo_backend_1    game-app-laptop-demo-backend    Up 13 minutes            0.0.0.0:3001->3001/tcp
-game-app-laptop-demo_frontend_1   game-app-laptop-demo-frontend   Up 6 minutes (healthy)   0.0.0.0:3000->80/tcp
+game-app-laptop-demo_frontend_1   game-app-laptop-demo-frontend   Up 6 minutes (healthy)   0.0.0.0:8080->80/tcp
 ```
 
 ### Step 3: Test Your Application in Browser
 
-Open your web browser and navigate to `http://localhost:3000`. You should see:
+Open your web browser and navigate to `http://localhost:8080`. You should see:
 
 - ✅ **Game interface loads** with the title "Humor Memory Game"
 - ✅ **Username input** and difficulty selection work
@@ -119,7 +122,7 @@ curl http://localhost:3001/health
 
 ```bash
 # Test frontend serves properly  
-curl http://localhost:3000/
+curl http://localhost:8080/
 ```
 
 **Expected Output:**
@@ -185,7 +188,7 @@ NAME                       IMAGE                           STATUS               
 humor-game-postgres        postgres:15-alpine              Up 13 minutes            5432/tcp
 humor-game-redis           redis:7-alpine                  Up 6 minutes             6379/tcp
 humor-game-backend         game-app-laptop-demo-backend    Up 13 minutes            0.0.0.0:3001->3001/tcp
-humor-game-frontend        game-app-laptop-demo-frontend   Up 6 minutes (healthy)   0.0.0.0:3000->80/tcp
+humor-game-frontend        game-app-laptop-demo-frontend   Up 6 minutes (healthy)   0.0.0.0:8080->80/tcp
 ```
 
 **Backend Health Check:**
@@ -218,7 +221,7 @@ humor-game-frontend        game-app-laptop-demo-frontend   Up 6 minutes (healthy
 
 Your Docker Compose application is working when:
 - ✅ All 4 containers show "Up" status in `docker-compose ps`
-- ✅ Frontend loads at `http://localhost:3000` without errors
+- ✅ Frontend loads at `http://localhost:8080` without errors
 - ✅ You can start a game and see emoji cards
 - ✅ API health endpoint returns success
 - ✅ Database connection works

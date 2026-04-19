@@ -20,7 +20,7 @@ It answers, for each repo:
 | `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Strongest candidate for early Service, Deployment, and probe mapping | Best flagship workload |
 | `OpenSIS` | `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap and secret rendering |
 | `FoodPulse` | `docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost` | `curl -I http://localhost` | `foodpulse-ui` | Good lab for StatefulSet-era concerns, but current failover logic is still drill-oriented | HA lab around Yelb |
-| `MemFlip` | `docker compose up -d` | none yet | `env/env.example` | frontend port is not published by default in current compose file | `curl -fsS http://localhost:3001/health` | `memflip-frontend`, `memflip-backend` | Frontend build output exists locally; treat source files, not generated assets, as the future image input contract | Backend port exposed, frontend relies on internal network only in current compose |
+| `MemFlip` | `cp .env.example .env && docker compose up -d` | none yet | `.env.example` at repo root, with deeper reference in `env/env.example` | `http://localhost:8080` | `curl -fsS http://localhost:8080/api/health` | `memflip-frontend`, `memflip-backend` | Frontend and backend are now expressed through a cleaner local service boundary that maps better to future Service and probe design | Lightweight onboarding app with a clearer local browser path |
 
 ## Alias Verification Against Control Plane
 
@@ -48,8 +48,8 @@ The following aliases match the monitored app inventory in:
 
 ### `MemFlip`
 
-- current frontend is not published to a host port in the active compose config
-- backend health is easier to verify than frontend reachability
+- frontend is now published locally at `http://localhost:8080`
+- backend health is still directly available on `http://localhost:3001/health`, but the preferred operator check is the user-facing proxied path
 - `frontend/dist` exists in the repo, but the long-term source of truth should stay the frontend source tree and Docker build path
 
 ### `Obervability-Stack`

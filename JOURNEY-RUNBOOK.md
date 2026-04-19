@@ -1389,3 +1389,151 @@ It gives us:
 
 - keep the roadmap status tracker current as we complete major phase milestones
 - use the Phase 2 definition of done to decide when to transition into control-plane hardening
+
+---
+
+## Phase 10: MemFlip Startup Contract Normalization
+
+### Goal
+
+Tighten the local startup and health contract for `MemFlip` so the active Docker Compose path matches the documented user journey and translates more cleanly into future Kubernetes service boundaries.
+
+### Commands
+
+```bash
+sed -n '1,260p' MemFlip/README.md
+sed -n '1,260p' MemFlip/env/env.example
+sed -n '1,260p' OpenSIS/.env.example
+sed -n '1,260p' SwiftPay/.env.example
+sed -n '1,260p' OpenSIS/scripts/compose-start.sh
+sed -n '1,260p' SwiftPay/scripts/validate.sh
+sed -n '1,280p' SwiftPay/docker-compose.yml
+sed -n '1,220p' SwiftPay/README.md
+rg -n "8080|8081|3000|3001|3007|health" MemFlip/README.md MemFlip/docs -g '!**/node_modules/**'
+sed -n '1,240p' MemFlip/frontend/nginx.conf
+sed -n '1,240p' MemFlip/backend/server.js
+rg -n "app\\.get\\('/health'|app\\.get\\('/api/health'|router\\.get\\('/health'|/api/health|/metrics" MemFlip/backend -g '!**/node_modules/**'
+sed -n '1,220p' MemFlip/docs/local/README.md
+sed -n '1,240p' MemFlip/docs/local/02-compose.md
+sed -n '1,220p' MemFlip/docs/local/user-guide.md
+docker compose --env-file .env.example config >/tmp/memflip-compose-config.out
+git diff --stat
+git status --short
+```
+
+### What We Learned
+
+- `MemFlip` documentation mostly assumes the local browser entrypoint is `http://localhost:8080`.
+- The active `docker-compose.yml` did not actually publish the frontend on a host port.
+- The frontend Nginx config already proxies `/api/*` to the backend container.
+- The backend already exposes both `/health` and `/api/health`.
+
+That means the user-facing health path already existed conceptually.
+The local Compose contract was simply lagging behind the intended architecture.
+
+### Problems Encountered
+
+#### 1. `MemFlip` docs and active Compose behavior disagreed
+
+Problem:
+
+- docs pointed users to `http://localhost:8080`
+- active Compose only exposed the backend on `3001`
+- frontend access depended on internal networking rather than the documented local browser path
+
+Fix:
+
+- published the frontend on `FRONTEND_HOST_PORT` with a default of `8080`
+- updated the main local docs to treat `http://localhost:8080` as the primary browser URL
+- updated the workspace setup matrix to use the proxied health check `http://localhost:8080/api/health`
+
+Why it mattered:
+
+- startup contracts should describe the real path users and operators take
+- this is also a better precursor to Kubernetes, where the frontend service and the user-facing health path matter more than direct container access
+
+#### 2. `MemFlip` lacked a root `.env.example`
+
+Problem:
+
+- there was a detailed `env/env.example`, but not a root `.env.example` aligned with Docker Compose conventions
+
+Fix:
+
+- added `MemFlip/.env.example`
+- kept it focused on the local Compose contract
+- left `env/env.example` as the deeper reference
+
+Why it mattered:
+
+- Phase 2 is trying to standardize repo-root startup expectations
+- a root `.env.example` is easier to copy into `.env` locally and easier to map later into Kubernetes ConfigMaps and Secrets
+
+#### 3. Live Compose rendering could not be verified in this shell
+
+Problem:
+
+- this environment does not have `docker` installed
+- running:
+
+```bash
+docker compose --env-file .env.example config
+```
+
+failed with:
+
+```text
+zsh:1: command not found: docker
+```
+
+Fix:
+
+- verified the file-level contract changes directly in the compose file and docs
+- documented the missing local Docker binary as a verification limitation for this session
+
+Why it mattered:
+
+- the repo changes are still valid and reviewable
+- but we should distinguish between “config reviewed” and “runtime validated”
+
+### Fixes Applied
+
+Files updated:
+
+- `MemFlip/docker-compose.yml`
+- `MemFlip/.env.example`
+- `MemFlip/README.md`
+- `MemFlip/docs/local/README.md`
+- `MemFlip/docs/local/02-compose.md`
+- `MemFlip/docs/local/user-guide.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+Behavioral improvements:
+
+- `MemFlip` now has a standard root env example
+- the frontend is explicitly published for local use on `8080` by default
+- the preferred operator health check is now the user-facing proxied route
+- workspace docs now reflect a cleaner frontend/backend boundary for `MemFlip`
+
+### Kubernetes-Minded Decisions
+
+We intentionally moved `MemFlip` toward a more Kubernetes-friendly shape:
+
+- browser entrypoint on a dedicated frontend port
+- health verification through the user-facing route
+- root env contract for future ConfigMap and Secret mapping
+- frontend and backend treated as separate concerns, even in local Compose
+
+### Why This Step Mattered
+
+This change removes a quiet but important mismatch:
+
+- the docs said one thing
+- the actual runtime contract said another
+
+Fixing that now makes local onboarding easier and avoids carrying a misleading Docker-only assumption into later Kubernetes work.
+
+### Follow-Up Work
+
+- finish the remaining Phase 2 startup and health contract cleanup across the workspace
+- start identifying which normalization gaps are still true blockers for Phase 3 control-plane hardening

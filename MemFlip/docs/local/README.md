@@ -30,6 +30,7 @@ This directory contains all documentation for local development, testing, and le
 
 ### Docker Compose (Simplest)
 ```bash
+cp .env.example .env
 docker-compose up -d
 # Access at http://localhost:8080
 ```
@@ -66,4 +67,3 @@ By following these guides, you will learn:
 
 - **[AWS Deployment](../aws/README.md)** - Production AWS infrastructure
 - **[Main Documentation](../README.md)** - Complete documentation hub
-

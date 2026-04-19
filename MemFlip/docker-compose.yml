@@ -108,8 +108,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       REACT_APP_API_BASE_URL: ${API_BASE_URL:-/api}
-    # ports:
-    #   - "3000:80"
+    ports:
+      - "${FRONTEND_HOST_PORT:-8080}:80"
     networks:
       frontend-network:
       observability-net:

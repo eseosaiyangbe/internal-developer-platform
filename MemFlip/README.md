@@ -19,6 +19,7 @@
 ### **I Just Want to See It Work (5 Minutes)**
 ```bash
 # Quick demo - no learning required
+cp .env.example .env
 docker-compose up -d
 # Open: http://localhost:8080
 ```
@@ -148,6 +149,7 @@ make verify
 
 ```bash
 # Quick local setup with Docker Compose
+cp .env.example .env
 docker-compose up -d
 curl http://localhost:3001/api/health
 

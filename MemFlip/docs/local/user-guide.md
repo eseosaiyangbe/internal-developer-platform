@@ -17,12 +17,12 @@ Complete guide on how to access, use, and interact with the deployed Humor Memor
 
 1. **Start the application**:
    ```bash
+   cp .env.example .env
    docker-compose up -d
    ```
 
 2. **Access the game**:
    - Open browser: `http://localhost:8080`
-   - Or: `http://localhost:3000` (if configured)
 
 3. **Verify services are running**:
    ```bash
@@ -154,8 +154,8 @@ Access your stats by clicking **"My Stats"** tab:
 ### Health Check
 
 ```bash
-# Check if backend is healthy
-curl http://localhost:3001/health
+# Check the user-facing health path through the frontend proxy
+curl http://localhost:8080/api/health
 
 # Expected response:
 # {"status":"ok","timestamp":"2024-01-01T00:00:00.000Z"}
@@ -326,4 +326,3 @@ If you encounter bugs or issues:
 - [Deployment Guide](./03-k8s-basics.md) - Deploy the application
 - [Troubleshooting](./08-troubleshooting.md) - Fix common issues
 - [Monitoring Guide](./05-observability.md) - Monitor application performance
-
