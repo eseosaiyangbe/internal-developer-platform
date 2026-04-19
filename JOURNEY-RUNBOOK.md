@@ -4581,3 +4581,142 @@ This makes the repo structure tell the truth more clearly:
 - `postgres/initdb/` is the workspace-specific bootstrap extension layer
 
 That is a much better boundary for future Kubernetes work than having a second root-level `yelb-db/` folder that looks like a duplicate implementation.
+
+## 2026-04-19 05:40 EDT - Rebrand the FoodPulse runtime layer from Yelb to FoodPulse
+
+### Objective
+
+Rename the workspace-facing `FoodPulse` runtime from `yelb` to `foodpulse` without doing a reckless full rewrite of the vendored upstream source tree.
+
+The boundary for this change was deliberate:
+
+- rename the runtime surfaces operators and users actually touch
+- keep the vendored upstream source tree under `FoodPulse/yelb/` for now
+- preserve compatibility fallbacks for old `YELB_*` local env files while standardizing on `FOODPULSE_*`
+
+### Commands Run
+
+```bash
+git status --short
+source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml config >/tmp/foodpulse-compose.out && tail -n 20 /tmp/foodpulse-compose.out
+bash -n FoodPulse/scripts/start.sh FoodPulse/scripts/cluster-status.sh FoodPulse/scripts/pg-failover-drill.sh FoodPulse/scripts/redis-failover-drill.sh FoodPulse/postgres/replica-entrypoint.sh
+source ~/.zprofile >/dev/null 2>&1; ./FoodPulse/scripts/start.sh
+rg -n "yelb|YELB" FoodPulse --glob '!FoodPulse/yelb/deployments/**' --glob '!FoodPulse/yelb/README*' --glob '!FoodPulse/yelb/**/README*' --glob '!FoodPulse/yelb/**/*.md'
+rg -n "platform:" FoodPulse/docker-compose.yml
+source ~/.zprofile >/dev/null 2>&1; ./FoodPulse/scripts/start.sh
+git diff --stat -- FoodPulse
+```
+
+### Problems Encountered
+
+#### 1. Full repo-wide rename would have been too risky
+
+`FoodPulse` still contains hundreds of `yelb` references inside vendored upstream material.
+
+Why that mattered:
+
+- many are historical deployment examples or upstream code symbols
+- a blind global replace would have created a large, hard-to-review fork
+- that kind of rewrite would make future upstream comparison or selective borrowing much harder
+
+#### 2. Building the rebranded runtime exposed an Apple Silicon emulation failure
+
+After switching the runtime to build from local source, `foodpulse-appserver` failed while the compose stack still forced every service to `platform: linux/amd64`.
+
+Observed failure:
+
+- the Ruby `pg` gem native extension crashed the compiler inside the emulated `amd64` build with an internal compiler error
+
+Why it mattered:
+
+- this Mac is Apple Silicon
+- forcing the entire stack through `amd64` emulation creates avoidable fragility and startup latency
+- that is exactly the wrong direction if we want a clean path toward Kubernetes later
+
+#### 3. The vendored UI toolchain is not really multi-arch
+
+After removing global `amd64` forcing, the appserver built natively, but the legacy Angular UI failed because:
+
+- `phantomjs-prebuilt` has no `linux/arm64` binary
+- the UI build still pulls a very old PhantomJS-dependent toolchain
+
+Why it mattered:
+
+- the runtime rename worked conceptually, but it surfaced real modernization debt in the vendored UI
+- we needed a pragmatic runtime fix instead of pretending the old toolchain is modern
+
+### Fixes Applied
+
+#### Runtime rebrand
+
+Renamed the workspace-owned runtime layer across:
+
+- `FoodPulse/docker-compose.yml`
+- `FoodPulse/.env.example`
+- `FoodPulse/scripts/start.sh`
+- `FoodPulse/scripts/cluster-status.sh`
+- `FoodPulse/scripts/pg-failover-drill.sh`
+- `FoodPulse/scripts/redis-failover-drill.sh`
+- `FoodPulse/postgres/replica-entrypoint.sh`
+- `FoodPulse/haproxy/haproxy.cfg`
+- `FoodPulse/haproxy/haproxy-redis.cfg`
+- `FoodPulse/haproxy/haproxy-redis.cfg.template.production`
+- `FoodPulse/README.md`
+
+Key runtime changes:
+
+- service names changed from `yelb-*` to `foodpulse-*`
+- operator env vars changed from `YELB_*` to `FOODPULSE_*`
+- browser/runtime branding changed from `Yelb` to `FoodPulse`
+- startup and drill scripts now prefer `FOODPULSE_*` while still accepting old `YELB_*` fallbacks
+
+#### Native-first platform correction
+
+Removed blanket `platform: linux/amd64` forcing from the stack so:
+
+- `foodpulse-appserver`
+- Postgres
+- Redis
+- Sentinel
+- HAProxy data-plane services
+
+can run natively on Apple Silicon and other multi-arch developer machines.
+
+That fixed the appserver compiler crash by taking the hot path off full emulation.
+
+#### UI containment fix
+
+The legacy UI remains special-cased:
+
+- `foodpulse-ui` was pinned back to `platform: linux/amd64`
+
+Why:
+
+- the vendored UI still depends on old x64-only PhantomJS binaries
+- isolating emulation to the UI is far better than forcing the whole stack into `amd64`
+
+### Validation
+
+Successful checks during this slice:
+
+- `bash -n` passed for the renamed helper scripts
+- `docker compose -f FoodPulse/docker-compose.yml config` passed after each compose edit
+- the appserver image successfully rebuilt once the full-stack `amd64` forcing was removed
+
+Live end-to-end validation is still tied to the legacy UI build finishing, because the rebrand intentionally switched the UI from a stale external image to a local source build so the `FoodPulse` branding can actually show up at runtime.
+
+### Why This Mattered
+
+This was more than a cosmetic rename.
+
+It clarified the real architecture boundary:
+
+- `FoodPulse` is the workspace-owned runtime and operator contract
+- `yelb/` is still the vendored upstream source tree
+
+It also surfaced two important platform truths early:
+
+- native-first multi-arch development matters on modern Macs
+- the vendored UI is the real modernization bottleneck, not the appserver or data plane
+
+That is valuable information for the later Kubernetes move, because it tells us where the actual risk lives instead of letting the old UI debt stay hidden behind prebuilt images.
