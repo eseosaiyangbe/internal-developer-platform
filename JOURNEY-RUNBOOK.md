@@ -6207,3 +6207,219 @@ kubectl rollout status deployment/transaction-service -n swiftpay
 ```
 
 The same lesson applies in Kubernetes: service DNS, pod readiness, Prometheus scrape status, and app-level synthetic transactions can disagree briefly during failure and recovery windows.
+
+---
+
+## Incident Drill: OpenSIS Vault Unavailable
+
+### Goal
+
+Prove that the OpenSIS live audit catches a secret-control-plane dependency outage even when the user-facing UI can still appear healthy.
+
+This drill was selected third because it teaches an important operator distinction: application reachability is not the same thing as dependency readiness.
+
+### Commands Run
+
+```bash
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+cd OpenSIS && docker compose ps vault vault-agent-app vault-agent-db opensis-ui opensis-db
+cd OpenSIS && docker compose stop vault
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+curl --max-time 5 -sS -o /tmp/opensis_vault_health.out -w 'vault_health_http=%{http_code}\n' http://localhost:8200/v1/sys/health
+sed -n '1,80p' /tmp/opensis_vault_health.out
+curl --max-time 5 -sS -o /tmp/opensis_ui.out -w 'opensis_ui_http=%{http_code}\n' http://localhost:8088
+sed -n '1,20p' /tmp/opensis_ui.out
+cd OpenSIS && docker compose ps vault vault-agent-app vault-agent-db opensis-ui opensis-db
+cd OpenSIS && docker compose logs --tail=120 vault vault-agent-app vault-agent-db opensis-ui opensis-db
+curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="opensis") | {status, endpoints: [.endpoints[] | {id, status, probeSuccess, lastChecked}]}'
+curl --max-time 5 -sS -o /tmp/opensis_ui_head.out -w 'opensis_ui_head_http=%{http_code}\n' -I http://localhost:8088
+sed -n '1,20p' /tmp/opensis_ui_head.out
+cd OpenSIS && docker compose start vault
+cd OpenSIS && docker compose ps vault vault-agent-app vault-agent-db opensis-ui opensis-db
+curl -fsS http://localhost:8200/v1/sys/health
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+curl -sS http://localhost:8200/v1/sys/health
+cd OpenSIS && docker compose ps --all vault vault-bootstrap vault-agent-app vault-agent-db
+rg -n "vault-bootstrap|sys/health|vault operator unseal|VAULT_TOKEN|unseal" OpenSIS Obervability-Stack PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+cd OpenSIS && docker compose up vault-bootstrap
+curl -fsS http://localhost:8200/v1/sys/health
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### Baseline
+
+Before the drill, OpenSIS live audit passed:
+
+- `18/18` checks
+- OpenSIS responded on `localhost:8088`
+- the root page returned HTML with OpenSIS branding
+- Vault health responded
+- Vault reported initialized and unsealed
+- control plane saw OpenSIS as healthy
+- Prometheus blackbox target health was up
+
+The relevant services were running:
+
+- `opensis-db`
+- `opensis-ui`
+- `vault`
+- `vault-agent-app`
+- `vault-agent-db`
+
+### Trigger
+
+We stopped only Vault:
+
+```bash
+cd OpenSIS
+docker compose stop vault
+```
+
+Docker stopped:
+
+- `vault`
+
+The OpenSIS UI, database, and Vault agents stayed running.
+
+### Detection
+
+The first post-trigger OpenSIS live audit failed at the Vault dependency check:
+
+```text
+curl: (7) Failed to connect to localhost port 8200
+FAIL OpenSIS Vault health endpoint is unreachable
+```
+
+Direct Vault health also failed:
+
+```text
+vault_health_http=000
+curl: (7) Failed to connect to localhost port 8200
+```
+
+The control plane still reported OpenSIS as healthy because its app health model currently tracks the OpenSIS UI endpoint:
+
+```json
+{
+  "status": "healthy",
+  "endpoints": [
+    {
+      "id": "opensis-ui",
+      "status": "up",
+      "probeSuccess": 1
+    }
+  ]
+}
+```
+
+That was the main point of the drill: the general app dashboard can correctly say the UI is reachable while the app-specific live audit catches a deeper dependency outage.
+
+### Important Observation
+
+Stopping Vault sealed it during shutdown:
+
+```text
+Vault shutdown triggered
+core: marked as sealed
+core: pre-seal teardown starting
+core: vault is sealed
+```
+
+After `docker compose start vault`, Vault came back as a running container, but the first recovery audit still failed because Vault returned HTTP `503`.
+
+That was not a false alarm. The bootstrap logs showed the real state:
+
+```text
+Vault status: initialized=true sealed=true
+Unsealing Vault...
+Vault unsealed successfully.
+Vault is initialized and unsealed.
+Vault bootstrap completed successfully.
+```
+
+Host `curl` to `localhost:8088` intermittently returned HTTP `000` during the incident window, but the app-specific audit and control-plane probe both showed the UI path reachable. The durable incident signal was the Vault health failure, not the transient host-curl result.
+
+### Recovery
+
+We first started Vault:
+
+```bash
+cd OpenSIS
+docker compose start vault
+```
+
+Docker started:
+
+- `vault-volume-init`
+- `vault`
+
+The container became healthy, but Vault was still sealed from the application perspective. The correct repo-native recovery step was to rerun the one-shot bootstrap job:
+
+```bash
+cd OpenSIS
+docker compose up vault-bootstrap
+```
+
+The bootstrap job:
+
+- confirmed Vault was reachable
+- found `initialized=true sealed=true`
+- unsealed Vault
+- reloaded OpenSIS Vault policies
+- recreated AppRoles
+- regenerated AppRole credentials
+- exited successfully
+
+Direct Vault health then returned:
+
+```json
+{
+  "initialized": true,
+  "sealed": false,
+  "standby": false
+}
+```
+
+### Final Verification
+
+OpenSIS live audit passed after recovery:
+
+- `18/18` checks
+- Vault health endpoint responded
+- Vault reported initialized
+- Vault reported unsealed
+- control plane saw OpenSIS as healthy
+- all OpenSIS blackbox targets were up
+
+The full operator baseline also passed:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+### Lessons
+
+This drill taught four useful platform lessons:
+
+- OpenSIS UI reachability does not prove Vault readiness.
+- `opensis-live` is required because it checks dependency health beyond the control-plane UI endpoint.
+- A restarted Vault container can be Docker-healthy while still sealed from the application perspective.
+- Recovery for this local lab is `docker compose start vault` followed by `docker compose up vault-bootstrap` when Vault restarts sealed.
+
+### Kubernetes Mapping
+
+In Kubernetes, the equivalent drill would be:
+
+```bash
+kubectl scale statefulset/vault --replicas=0 -n vault
+kubectl scale statefulset/vault --replicas=1 -n vault
+kubectl get pods -n vault
+kubectl logs -n vault vault-0
+kubectl exec -n vault vault-0 -- vault status
+```
+
+The same lesson applies in Kubernetes: pod readiness, service reachability, Vault seal state, and user-facing OpenSIS UI behavior are related but not identical signals. A serious runbook must verify the dependency state directly.
