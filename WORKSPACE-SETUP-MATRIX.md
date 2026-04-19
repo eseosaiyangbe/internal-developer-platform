@@ -1,0 +1,75 @@
+# Workspace Setup Matrix
+
+## Purpose
+
+This file is the normalization contract for local setup.
+
+It answers, for each repo:
+
+- how to start it locally
+- what env file or env contract exists
+- what URL to open
+- what health endpoint to check
+- what `observability-net` alias the control plane expects
+
+## Setup Matrix
+
+| Repo | Primary Start Command | Optional Helper | Env Contract | Main Local URL | Health Check | `observability-net` Alias / Aliases | Notes |
+|---|---|---|---|---|---|---|---|
+| `Obervability-Stack` | `docker compose up -d` | `./devops-monitor.sh start` | `env.example`, `docker-compose.env.example`, `ui-next/env.example` | `http://localhost:4000` | `curl -fsS http://localhost:4000/` | n/a, this repo owns the network too | Control plane repo |
+| `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Best flagship workload |
+| `OpenSIS` | `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Includes Vault bootstrap and secret rendering |
+| `FoodPulse` | `docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost` | `curl -I http://localhost` | `foodpulse-ui` | HA lab around Yelb |
+| `MemFlip` | `docker compose up -d` | none yet | `env/env.example` | frontend port is not published by default in current compose file | `curl -fsS http://localhost:3001/health` | `memflip-frontend`, `memflip-backend` | Backend port exposed, frontend relies on internal network only in current compose |
+
+## Alias Verification Against Control Plane
+
+The following aliases match the monitored app inventory in:
+
+`Obervability-Stack/ui-next/lib/monitored-apps.ts`
+
+| App ID | Expected Alias | Repo Status |
+|---|---|---|
+| `opensis` | `opensis-ui` | matches `OpenSIS/docker-compose.yaml` |
+| `swiftpay` | `swiftpay-*` service aliases | matches `SwiftPay/docker-compose.yml` |
+| `memflip` | `memflip-frontend`, `memflip-backend` | matches `MemFlip/docker-compose.yml` |
+| `foodpulse` | `foodpulse-ui` | matches `FoodPulse/docker-compose.yml` |
+
+## Known Gaps
+
+### `OpenSIS`
+
+- no committed `.env.example` existed before Phase 2 normalization
+
+### `FoodPulse`
+
+- no committed `.env.example` existed before Phase 2 normalization
+- no top-level `README.md` existed before Phase 2 normalization
+
+### `MemFlip`
+
+- current frontend is not published to a host port in the active compose config
+- backend health is easier to verify than frontend reachability
+
+### `Obervability-Stack`
+
+- control plane docs still need reconciliation with actual current ports and behavior
+
+## Recommended Startup Order For Workspace Work
+
+When validating the full platform locally, use this order:
+
+1. create the shared Docker network if needed
+2. start `Obervability-Stack`
+3. start `SwiftPay`
+4. start `OpenSIS`
+5. start `FoodPulse`
+6. start `MemFlip`
+7. verify probes, logs, and health from the control plane
+
+Why this order:
+
+- the control plane should be available before app verification starts
+- `SwiftPay` is the richest first app for validating service-level observability
+- `OpenSIS` and `FoodPulse` add platform and resilience complexity afterward
+- `MemFlip` is the lightest app and easiest to add late

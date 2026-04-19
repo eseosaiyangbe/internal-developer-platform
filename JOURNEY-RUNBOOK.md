@@ -821,6 +821,146 @@ This gives the project both operational memory and strategic direction.
 
 ---
 
+## Phase 12: Phase 2 Workspace Normalization - First Slice
+
+### Goal
+
+Start Phase 2 by creating clear root-level workspace contracts and fixing the most obvious setup/documentation gaps.
+
+### Why We Did This
+
+Before hardening the control plane, we need the workspace itself to be predictable.
+
+That means:
+
+- clear platform architecture at the root
+- clear repo setup expectations at the root
+- explicit alias verification
+- missing env templates filled in
+- obvious junk removed where safe
+
+### Commands Used
+
+Baseline discovery:
+
+```bash
+find . -maxdepth 1 -mindepth 1 -type f | sort
+rg -n "observability-net|aliases:|ports:|docker compose|docker-compose|compose-start|precheck|healthcheck" Obervability-Stack/docker-compose.yml SwiftPay/docker-compose.yml MemFlip/docker-compose.yml FoodPulse/docker-compose.yml OpenSIS/docker-compose.yaml OpenSIS/scripts/compose-start.sh Obervability-Stack/ui-next/lib/monitored-apps.ts | sed -n '1,260p'
+find . -path '*/.env.example' -o -path '*/env.example' -o -path '*/docker-compose.env.example' | sort
+find MemFlip -path 'MemFlip/~' -o -path 'MemFlip/frontend/dist' | sort
+```
+
+Detailed alias and contract extraction:
+
+```bash
+nl -ba Obervability-Stack/ui-next/lib/monitored-apps.ts | sed -n '1,320p'
+nl -ba SwiftPay/docker-compose.yml | sed -n '150,390p'
+nl -ba MemFlip/docker-compose.yml | sed -n '60,155p'
+nl -ba FoodPulse/docker-compose.yml | sed -n '1,365p'
+nl -ba OpenSIS/docker-compose.yaml | sed -n '240,385p'
+```
+
+Cleanup and missing-contract discovery:
+
+```bash
+git ls-files | rg '\.DS_Store$|(^|/)~/'
+rg -n "MYSQL_ROOT_PASSWORD|MYSQL_DATABASE|MYSQL_USER|MYSQL_PASSWORD|APP_ENV|GRAFANA_ADMIN_PASSWORD" OpenSIS/docker-compose.yaml OpenSIS/docs OpenSIS/scripts | sed -n '1,200p'
+rg -n "YELB_DB_SERVER|YELB_REDIS_SERVER|YELB_REDIS_PASSWORD|YELB_DB_USER|YELB_DB_PASSWORD|PG_REPLICATOR_PASSWORD|POSTGRES_EXPORTER_DSN|GF_ADMIN_USER|GF_ADMIN_PASSWORD" FoodPulse/docker-compose.yml FoodPulse/scripts FoodPulse/monitoring FoodPulse/haproxy | sed -n '1,240p'
+sed -n '1,240p' OpenSIS/docs/02-local-compose-guide.md
+find OpenSIS -maxdepth 2 \( -name '.env' -o -name '.env.example' -o -name '*example*' \) | sort
+git ls-files FoodPulse/command.sh MemFlip/~/.cloudflared/config.yml
+```
+
+Verification after edits:
+
+```bash
+git status --short
+sed -n '1,220p' WORKSPACE-ARCHITECTURE.md
+sed -n '1,240p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,220p' FoodPulse/README.md
+sed -n '1,120p' FoodPulse/.env.example
+sed -n '1,120p' OpenSIS/.env.example
+```
+
+### Files Added
+
+- `WORKSPACE-ARCHITECTURE.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+- `FoodPulse/README.md`
+- `FoodPulse/.env.example`
+- `OpenSIS/.env.example`
+
+### Files Removed
+
+- `MemFlip/~/.cloudflared/config.yml`
+
+### What We Learned
+
+#### 1. The alias model is already stronger than the docs
+
+The control plane inventory in `Obervability-Stack/ui-next/lib/monitored-apps.ts` already matched the real Docker aliases in:
+
+- `SwiftPay`
+- `OpenSIS`
+- `FoodPulse`
+- `MemFlip`
+
+That was important because it meant we were documenting an existing contract, not inventing a new one.
+
+#### 2. `FoodPulse` and `OpenSIS` both lacked committed env templates
+
+This made local setup less predictable than it should be.
+
+We fixed that by adding:
+
+- `FoodPulse/.env.example`
+- `OpenSIS/.env.example`
+
+#### 3. `FoodPulse` lacked a top-level README
+
+This was a real normalization gap because the repo had no clean canonical entrypoint.
+
+We fixed that by adding:
+
+- `FoodPulse/README.md`
+
+#### 4. `MemFlip/~/.cloudflared/config.yml` was confirmed as stray repo noise
+
+That file was tracked and did not belong in the source tree or platform story.
+
+We removed it.
+
+### Why These Changes Mattered
+
+These changes made the workspace easier to reason about in three ways:
+
+1. root-level platform understanding now exists
+2. repo startup and alias expectations are now explicit
+3. missing setup contracts in app repos were replaced with real examples
+
+### Deferred Cleanup Items
+
+These were identified but not changed in this slice:
+
+- `FoodPulse/command.sh` still exists as a scratch/history file
+- `FoodPulse/scripts/pg-failover-drill.sh` still needs a trust/readability review
+- `MemFlip/frontend/dist` still exists and may be generated output rather than source
+- `Obervability-Stack` docs still need reconciliation with actual ports and behavior
+
+### Result
+
+Phase 2 is now active and has produced its first concrete artifacts.
+
+The workspace now has:
+
+- a root architecture summary
+- a root setup matrix
+- explicit alias verification
+- env templates for missing repos
+- one obvious junk file removed safely
+
+---
+
 ## Phase 9: Flatten Nested Repos Into One Main Repository
 
 ### Goal
