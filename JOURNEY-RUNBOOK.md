@@ -5991,3 +5991,219 @@ kubectl rollout status deployment/backend -n humor-game
 ```
 
 The same operator lesson applies in Kubernetes: pod/service readiness, ingress behavior, and Prometheus/blackbox state may not update at exactly the same moment.
+
+---
+
+## Incident Drill: SwiftPay Transaction Worker Down
+
+### Goal
+
+Prove that the platform can detect and recover from a SwiftPay transaction-service outage.
+
+This drill was selected second because it moves the incident practice from a simple backend outage into a microservices money-flow path.
+
+The expected learning goal was to observe async processing failure. The actual failure happened earlier: transfer creation returned HTTP `500` because the API gateway could not resolve the stopped transaction-service container.
+
+### Commands Run
+
+```bash
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+cd SwiftPay && docker compose ps transaction-service api-gateway wallet-service rabbitmq
+cd SwiftPay && docker compose stop transaction-service
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+curl -fsS http://localhost:4000/api/apps/swiftpay/business | jq '.metrics'
+cd SwiftPay && docker compose ps transaction-service api-gateway wallet-service rabbitmq
+cd SwiftPay && docker compose logs --tail=120 api-gateway transaction-service rabbitmq
+curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="swiftpay") | {status, endpoints: [.endpoints[] | {id, status, probeSuccess, lastChecked}]}'
+curl --max-time 5 -sS -o /tmp/swiftpay_tx_health.out -w 'transaction_health_http=%{http_code}\n' http://localhost:3008/health
+sed -n '1,80p' /tmp/swiftpay_tx_health.out
+cd SwiftPay && docker compose start transaction-service
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+curl --max-time 10 -fsS http://localhost:3008/health | jq '.status'
+cd SwiftPay && docker compose ps transaction-service api-gateway wallet-service rabbitmq
+sleep 30; ./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+sleep 30; curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="swiftpay") | {status, endpoints: [.endpoints[] | {id, status, probeSuccess, lastChecked}]}'
+sleep 30; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="swiftpay-transaction-service"}' | jq '.data.result'
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### Baseline
+
+Before the drill, SwiftPay live audit passed:
+
+- `44/44` checks
+- gateway health passed
+- frontend health passed
+- control plane saw SwiftPay as healthy
+- all five SwiftPay Prometheus metric jobs were up
+- synthetic transfer completed successfully
+- completed-transfer metrics were present
+
+The relevant services were healthy:
+
+- `swiftpay-api-gateway-1`
+- `swiftpay-rabbitmq-1`
+- `swiftpay-transaction-service-1`
+- `swiftpay-wallet-service-1`
+
+### Trigger
+
+We stopped only the transaction service:
+
+```bash
+cd SwiftPay
+docker compose stop transaction-service
+```
+
+Docker stopped:
+
+- `swiftpay-transaction-service-1`
+
+The gateway, RabbitMQ, and wallet service stayed up.
+
+### Detection
+
+The first post-trigger SwiftPay live audit failed during synthetic transfer creation:
+
+```text
+curl: (22) The requested URL returned error: 500
+FAIL Synthetic transfer request failed
+```
+
+The API gateway logged the root cause:
+
+```text
+Transaction failed: getaddrinfo ENOTFOUND transaction-service
+```
+
+Direct transaction service health failed:
+
+```text
+transaction_health_http=000
+curl: (7) Failed to connect to localhost port 3008
+```
+
+The control plane refreshed shortly after and reported SwiftPay as degraded:
+
+```json
+{
+  "status": "degraded",
+  "endpoints": [
+    {
+      "id": "swiftpay-transaction-service",
+      "status": "down",
+      "probeSuccess": 0
+    }
+  ]
+}
+```
+
+### Important Observation
+
+This was not a queue-backlog incident.
+
+Because the transaction API service itself was stopped, the gateway could not create the transaction request at all. That means:
+
+- no pending transfer was created
+- queue depth stayed at `0`
+- pending transaction metrics stayed at `0`
+- the failure showed up as gateway-to-service dependency failure
+
+That is a useful distinction for operators:
+
+- worker logic broken after request acceptance can create queue or pending pressure
+- service unavailable before request acceptance can produce gateway `500` errors instead
+
+### Recovery
+
+We restarted the transaction service:
+
+```bash
+cd SwiftPay
+docker compose start transaction-service
+```
+
+Docker waited for dependencies and started:
+
+- `swiftpay-redis-1`
+- `swiftpay-postgres-1`
+- `swiftpay-wallet-service-1`
+- `swiftpay-rabbitmq-1`
+- `swiftpay-transaction-service-1`
+
+Direct health recovered quickly:
+
+```bash
+curl --max-time 10 -fsS http://localhost:3008/health | jq '.status'
+```
+
+Returned:
+
+```json
+"healthy"
+```
+
+### Post-Recovery Observation
+
+The first post-recovery SwiftPay live audit still failed `39/44`.
+
+The direct service was healthy and synthetic transfer completed, but control-plane and Prometheus checks still had stale state:
+
+- control plane had not yet marked SwiftPay healthy
+- Prometheus had not yet shown all SwiftPay metric jobs up
+- completed-transfer metric checks had not yet caught the fresh sample
+
+After waiting for the next probe and scrape interval, SwiftPay live audit passed:
+
+- `44/44` checks
+
+The control plane then showed all SwiftPay endpoints up, including:
+
+```json
+{
+  "id": "swiftpay-transaction-service",
+  "status": "up",
+  "probeSuccess": 1
+}
+```
+
+Prometheus also reported:
+
+```json
+{
+  "job": "swiftpay-transaction-service",
+  "value": "1"
+}
+```
+
+### Final Verification
+
+The full operator baseline passed after recovery:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+### Lessons
+
+This drill taught four useful platform lessons:
+
+- SwiftPay can fail in the gateway-to-service path before a queue backlog exists.
+- A stopped transaction service makes synthetic transfer creation fail with HTTP `500`.
+- Direct service health recovers before Prometheus and control-plane state necessarily refresh.
+- Recovery verification needs both immediate direct checks and delayed probe/scrape checks.
+
+### Kubernetes Mapping
+
+In Kubernetes, the equivalent drill would be:
+
+```bash
+kubectl scale deployment/transaction-service --replicas=0 -n swiftpay
+kubectl scale deployment/transaction-service --replicas=1 -n swiftpay
+kubectl rollout status deployment/transaction-service -n swiftpay
+```
+
+The same lesson applies in Kubernetes: service DNS, pod readiness, Prometheus scrape status, and app-level synthetic transactions can disagree briefly during failure and recovery windows.
