@@ -702,6 +702,75 @@ test -x Obervability-Stack/ui-next/node_modules/.bin/tsx && echo yes || echo no
 
 - decide whether inventory validation should eventually be folded into the broader smoke-check path or stay as its own explicit control-plane command
 
+---
+
+## Phase 4 Bridge: SwiftPay Onboarding Audit
+
+### Goal
+
+Start the first real app-onboarding bridge by turning `SwiftPay`'s control-plane integration contract into a runnable audit.
+
+### Commands
+
+```bash
+sed -n '1,260p' SwiftPay/docker-compose.yml
+sed -n '1,260p' Obervability-Stack/prometheus/prometheus.yml
+sed -n '1,260p' Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts
+rg -n "swiftpay|business metrics|queue|wallet|transaction|api-gateway|auth-service|notification-service" Obervability-Stack/ui-next/lib Obervability-Stack/ui-next/app -g '!**/node_modules/**'
+rg -n "swiftpay:pending_transactions|swiftpay:pending_amount|swiftpay:transaction_queue_depth|swiftpay:transaction_failure_rate_5m|swiftpay:wallet_failed_transfer_rate_5m|swiftpay:wallet_circuit_breaker_state|pending_transactions|queue_depth|circuit_breaker" SwiftPay Obervability-Stack -g '!**/node_modules/**'
+rg -n "swiftpay-frontend|swiftpay-api-gateway|swiftpay-auth-service|swiftpay-wallet-service|swiftpay-transaction-service|swiftpay-notification-service" SwiftPay/docker-compose.yml SwiftPay/docs Obervability-Stack/prometheus/prometheus.yml Obervability-Stack/ui-next/lib/monitored-apps.ts -g '!**/node_modules/**'
+sed -n '1,260p' Obervability-Stack/prometheus/recording_rules.yml
+```
+
+### What We Learned
+
+- `SwiftPay` is already the deepest app integration in the control plane, so it is the right place to start Phase 4 bridge work.
+- The integration contract currently spans several files:
+  - `SwiftPay/docker-compose.yml`
+  - `Obervability-Stack/ui-next/lib/monitored-apps.ts`
+  - `Obervability-Stack/prometheus/prometheus.yml`
+  - `Obervability-Stack/prometheus/recording_rules.yml`
+  - `Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts`
+  - `SwiftPay/docs/observability-runbook.md`
+- That makes it easy for drift to creep in unless we validate the whole chain together.
+
+### Fixes Applied
+
+- added `Obervability-Stack/scripts/swiftpay-audit.sh`
+- updated `Obervability-Stack/scripts/devops-monitor.sh` with a `swiftpay` command
+- updated:
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+  - `PROJECT-ROADMAP.md`
+
+### Why This Step Mattered
+
+- it gives the flagship workload a real onboarding audit instead of relying on scattered human checks
+- it creates a pattern we can later adapt for `OpenSIS`, `FoodPulse`, and `MemFlip`
+- it moves the roadmap forward without skipping the reliability discipline we want before Kubernetes
+
+### Follow-Up Work
+
+- decide whether the next Phase 4 slice should validate live SwiftPay metrics end to end or extend the same audit pattern to another app
+
+### Verification
+
+```bash
+chmod +x Obervability-Stack/scripts/swiftpay-audit.sh
+bash -n Obervability-Stack/scripts/swiftpay-audit.sh
+bash -n Obervability-Stack/scripts/devops-monitor.sh
+./Obervability-Stack/scripts/swiftpay-audit.sh
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay
+```
+
+Results:
+
+- both entrypoints completed successfully
+- the SwiftPay audit passed with:
+  - `Checks passed: 52/52`
+  - `Failures: 0`
+
 ### Verification
 
 ```bash

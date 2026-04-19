@@ -287,6 +287,7 @@ Started:
 - control-plane smoke checks now verify runtime health and API surfaces
 - local UI auth runtime now supports both demo login and database-backed login
 - monitored app inventory now has a runnable validation path
+- SwiftPay now has a dedicated onboarding audit path to validate the flagship integration contract
 
 Expected entry condition:
 
