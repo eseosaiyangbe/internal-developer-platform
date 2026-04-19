@@ -6882,3 +6882,87 @@ The executed drill set now covers:
 - monitoring/probe-layer drift
 
 This is enough to move into Phase 6 with confidence. The next phase should make the experience feel polished, teachable, and demo-ready without losing the operational realism we just built.
+
+---
+
+## Phase 6 Demo Front Door
+
+### Goal
+
+Start Phase 6 by giving the project a clear front door and a guided demo path.
+
+Phase 5 proved the operational substance. Phase 6 needs to make that substance easier to understand quickly.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '488,560p' PROJECT-ROADMAP.md
+git diff -- FoodPulse/ui/src/App.jsx FoodPulse/ui/src/styles.css Obervability-Stack/ui-next/app/services/page.tsx
+ls -1
+sed -n '1,220p' README.md
+rg --files | rg 'DEMO|demo|README|OPERATOR|RUNBOOK|ROADMAP'
+sed -n '1,220p' WORKSPACE-ARCHITECTURE.md
+sed -n '1,220p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,180p' WORKSTATION-BOOTSTRAP.md
+sed -n '1,180p' Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md
+```
+
+### What We Found
+
+There was no root `README.md`.
+
+That meant the project had strong internal docs, but no single front-door document for someone arriving fresh from GitHub.
+
+The existing supporting docs were already strong:
+
+- `WORKSPACE-ARCHITECTURE.md` explains the platform model
+- `WORKSPACE-SETUP-MATRIX.md` explains startup contracts, ports, health checks, and aliases
+- `WORKSTATION-BOOTSTRAP.md` explains macOS/Linux tool setup
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md` explains the first-response workflow
+
+### What We Changed
+
+We added:
+
+- `README.md`
+- `DEMO-WALKTHROUGH.md`
+
+The root README now explains:
+
+- what the workspace is
+- what each repo does
+- the platform story
+- quick-start direction
+- operator entry points
+- executed incident drills
+- key documentation links
+- current Phase 6 status
+
+The demo walkthrough now provides:
+
+- a pre-demo checklist
+- the story arc for a live walkthrough
+- workload talking points
+- app-specific audit choices
+- incident drill catalog handoff
+- journey runbook handoff
+- Kubernetes direction
+- a five-minute version
+- demo safety notes
+
+### Why This Matters
+
+The project is now easier to evaluate from the outside.
+
+Before this step, a reviewer had to infer the project story from several deep docs. Now the repo opens with a clear explanation of the platform and a guided path for showing it.
+
+### Next Step
+
+Continue Phase 6 by polishing the control-plane UX and app launch experience, especially:
+
+- app card navigation
+- app category/story labels
+- demo-friendly service pages
+- FoodPulse visual polish
+- root docs alignment with the final UI experience

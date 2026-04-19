@@ -541,6 +541,16 @@ Create demo flows:
 - someone new can understand the workspace quickly
 - a live walkthrough feels coherent and intentional
 
+### Current Status
+
+In progress.
+
+Latest progress:
+
+- root `README.md` added as the project front door
+- `DEMO-WALKTHROUGH.md` added as the guided Phase 6 presenter script
+- Phase 6 now has a clearer path from control plane to apps, drills, runbook, and Kubernetes direction
+
 ---
 
 ## Phase 7: Production-Style Maturity And Portfolio Packaging
