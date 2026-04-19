@@ -758,6 +758,69 @@ git push --force-with-lease
 
 ---
 
+## Phase 11: Establish Project Roadmap
+
+### Goal
+
+Define a solid execution roadmap for the whole workspace now that:
+
+- the monorepo is established
+- the author identity is correct
+- the initial repo discovery is complete
+
+### Why We Did This
+
+We now have enough context to stop thinking in repo-by-repo fragments and start operating with a platform plan.
+
+Without a roadmap, the project would drift into opportunistic fixes instead of building toward a coherent end state.
+
+### Work Performed
+
+- created a root roadmap document:
+  - `PROJECT-ROADMAP.md`
+
+### Roadmap Focus
+
+The roadmap defines the project as a multi-app platform engineering lab built around:
+
+- `Obervability-Stack` as control plane
+- `SwiftPay` as flagship app
+- `OpenSIS` as legacy-platform case
+- `FoodPulse` as resilience lab
+- `MemFlip` as lightweight demo app
+
+It organizes the work into these major phases:
+
+1. foundation and governance
+2. workspace normalization
+3. control plane hardening
+4. app integration and onboarding
+5. operator workflows and incident drills
+6. UX and demo polish
+7. production-style maturity and portfolio packaging
+
+### Immediate Recommendation Captured In The Roadmap
+
+The recommended next execution step is:
+
+- start with workspace normalization
+
+Reason:
+
+- it reduces chaos before platform integration work begins
+
+### Result
+
+The workspace now has:
+
+- a living journey notebook
+- a formal execution roadmap
+- a rooted monorepo structure
+
+This gives the project both operational memory and strategic direction.
+
+---
+
 ## Phase 9: Flatten Nested Repos Into One Main Repository
 
 ### Goal
