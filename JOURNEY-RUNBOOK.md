@@ -4338,3 +4338,174 @@ It made `FoodPulse` more intentional in the ways that matter operationally:
 - less ambiguity about what is runtime code versus historical scaffolding
 
 That gives us a cleaner repo now and reduces future migration debt when we carry this workload into Kubernetes.
+
+## 2026-04-19 05:00 EDT - Remove duplicate observability from FoodPulse
+
+### Objective
+
+Remove the embedded observability stack from `FoodPulse` so the repo focuses on the application and HA lab, while the central `Obervability-Stack` remains the single monitoring layer for the workspace.
+
+### Commands Run
+
+```bash
+rg -n "FoodPulse/monitoring|prometheus|grafana|alertmanager|blackbox|postgres-exporter|redis-exporter|9095|3010|9096|8410|Prometheus|Grafana|Alertmanager" FoodPulse Obervability-Stack WORKSPACE-SETUP-MATRIX.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md -g '!**/node_modules/**'
+sed -n '1,260p' FoodPulse/docker-compose.yml
+sed -n '1,240p' FoodPulse/README.md
+sed -n '1,260p' Obervability-Stack/scripts/foodpulse-audit.sh
+sed -n '1,320p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+sed -n '1,260p' FoodPulse/.env.example
+sed -n '1,260p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,240p' WORKSPACE-SETUP-MATRIX.md
+sed -n '240,340p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+rg -n "8410|HAPROXY_STATS|/stats|8404|8405" FoodPulse Obervability-Stack WORKSPACE-SETUP-MATRIX.md JOURNEY-RUNBOOK.md -g '!**/node_modules/**'
+sed -n '1,240p' FoodPulse/haproxy/haproxy.cfg
+sed -n '1,240p' FoodPulse/haproxy/haproxy-redis.cfg
+find FoodPulse/monitoring -maxdepth 4 -type f | sort
+rg -n "cp \\.env\\.example \\.env && docker compose up -d|cp \\.env\\.example \\.env && \\./scripts/start\\.sh|Prometheus|Grafana|Alertmanager|9095|3010|9096|8410|monitoring/" Obervability-Stack/ui-next/lib/monitored-apps.ts WORKSPACE-SETUP-MATRIX.md FoodPulse/README.md JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md -g '!**/node_modules/**'
+rm -rf FoodPulse/monitoring
+bash -n FoodPulse/scripts/start.sh && bash -n FoodPulse/scripts/stop.sh && bash -n Obervability-Stack/scripts/foodpulse-audit.sh && bash -n Obervability-Stack/scripts/foodpulse-live-audit.sh
+source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml config >/tmp/foodpulse-no-obs.out && tail -n 40 /tmp/foodpulse-no-obs.out
+./FoodPulse/scripts/start.sh
+source ~/.zprofile >/dev/null 2>&1; docker ps --format '{{.Names}}' | rg '^foodpulse-(prometheus|grafana|alertmanager|postgres-exporter|redis-exporter|blackbox-exporter)$' || true
+./Obervability-Stack/scripts/foodpulse-audit.sh
+./Obervability-Stack/scripts/foodpulse-live-audit.sh
+curl -i http://localhost:8090/api/getstats
+source ~/.zprofile >/dev/null 2>&1; docker logs --tail=120 foodpulse-yelb-ui
+source ~/.zprofile >/dev/null 2>&1; docker logs --tail=120 foodpulse-yelb-appserver
+curl -fsS http://localhost:8090/api/getstats
+```
+
+### Problems
+
+#### 1. FoodPulse still carried a second monitoring stack
+
+Problem:
+
+- `FoodPulse/docker-compose.yml` still defined:
+  - Prometheus
+  - Grafana
+  - Alertmanager
+  - blackbox-exporter
+  - postgres-exporter
+  - redis-exporter
+- the repo also still had a full `FoodPulse/monitoring/` tree
+
+Why it mattered:
+
+- the workspace already has `Obervability-Stack` as the central monitoring plane
+- leaving a second stack inside `FoodPulse` created duplication, extra ports, and extra operator confusion
+
+Fix:
+
+- removed the observability services from `FoodPulse/docker-compose.yml`
+- removed the related env variables from `FoodPulse/.env.example`
+- deleted the `FoodPulse/monitoring/` tree
+
+#### 2. HAProxy still exposed stats and metrics frontends that only existed for the deleted local monitoring stack
+
+Problem:
+
+- both HAProxy configs still exposed:
+  - stats UI on `8404`
+  - Prometheus exporter endpoint on `8405`
+- `pg-haproxy` also still published the stats port to the host
+
+Fix:
+
+- removed those frontends from:
+  - `FoodPulse/haproxy/haproxy.cfg`
+  - `FoodPulse/haproxy/haproxy-redis.cfg`
+- removed the host stats port from `FoodPulse/docker-compose.yml`
+
+Why it mattered:
+
+- once the local Prometheus/Grafana stack was gone, these surfaces were just leftover observability baggage
+
+#### 3. FoodPulse startup left old observability containers behind as orphans
+
+Problem:
+
+- a plain `docker compose up` can leave removed services running as orphan containers
+- on a workstation that had already started the old FoodPulse stack, the deleted observability containers would remain alive until explicitly removed
+
+Fix:
+
+- updated:
+  - `FoodPulse/scripts/start.sh`
+  - `FoodPulse/scripts/stop.sh`
+- both now use `--remove-orphans`
+
+Why it mattered:
+
+- this ensures the repo cleanup actually takes effect on existing machines
+
+#### 4. Rebuilding the appserver could leave `yelb-ui` pointing at a dead upstream IP
+
+Problem:
+
+- after removing the local monitoring stack and rerunning startup, `foodpulse-yelb-ui` briefly returned `404` for `/api/getstats`
+- nginx logs showed it was still trying to reach the old `yelb-appserver` container IP after the appserver had been recreated
+
+Fix:
+
+- updated `FoodPulse/scripts/start.sh` to force-recreate `yelb-ui` after rebuilding `yelb-appserver`
+
+Why it mattered:
+
+- without that step, a valid appserver rebuild could still leave the FoodPulse UI in a broken state
+
+#### 5. The control-plane audits still expected FoodPulse to own Prometheus and Grafana
+
+Problem:
+
+- `Obervability-Stack/scripts/foodpulse-audit.sh` still checked for local Prometheus/Grafana/Alertmanager containers and ports
+- `Obervability-Stack/scripts/foodpulse-live-audit.sh` still tried to hit FoodPulse’s deleted monitoring endpoints
+
+Fix:
+
+- rewrote the static audit to verify:
+  - the local browser URL
+  - the control-plane inventory contract
+  - the absence of a local Prometheus/Grafana/Alertmanager stack
+- rewrote the live audit to verify:
+  - FoodPulse UI health
+  - FoodPulse proxied stats endpoint
+  - control-plane app health
+  - central Prometheus blackbox visibility
+
+Also updated:
+
+- `Obervability-Stack/ui-next/lib/monitored-apps.ts`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+### Validation
+
+Validated successfully:
+
+- `bash -n FoodPulse/scripts/start.sh`
+- `bash -n FoodPulse/scripts/stop.sh`
+- `bash -n Obervability-Stack/scripts/foodpulse-audit.sh`
+- `bash -n Obervability-Stack/scripts/foodpulse-live-audit.sh`
+- `docker compose -f FoodPulse/docker-compose.yml config`
+- `./FoodPulse/scripts/start.sh`
+- `./Obervability-Stack/scripts/foodpulse-audit.sh`
+- `./Obervability-Stack/scripts/foodpulse-live-audit.sh`
+
+Runtime validation confirmed:
+
+- no `foodpulse-prometheus`, `foodpulse-grafana`, `foodpulse-alertmanager`, `foodpulse-postgres-exporter`, `foodpulse-redis-exporter`, or `foodpulse-blackbox-exporter` containers remained
+- `GET http://localhost:8090/api/getstats` returned live app telemetry again after the `yelb-ui` recreation fix
+- the control plane still saw `FoodPulse` as healthy via `/api/apps/health`
+- central Prometheus still reported healthy FoodPulse blackbox targets
+
+### Why This Mattered
+
+This removed a duplicated platform concern from the workspace.
+
+`FoodPulse` is now back to being what it should be:
+
+- a resilience and failover lab
+- a stateful application target
+- a workload observed by `Obervability-Stack`
+
+That makes the repo simpler now and closer to the cluster shape we want later, where app repos own workloads and the control plane owns monitoring.
