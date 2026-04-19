@@ -79,30 +79,29 @@ The work is divided into seven phases.
 | 1. Foundation and governance | Complete | Monorepo, root runbook, and root roadmap are in place |
 | 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
 | 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
-| 4. App integration and onboarding | In progress | Control-plane handoff is complete enough to focus on richer workload onboarding |
-| 5. Operator workflows and incident drills | Not started | Depends on integrated workloads and stable observability paths |
+| 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
+| 5. Operator workflows and incident drills | In progress | Standard health workflow and first incident matrix are now in place |
 | 6. UX and demo polish | Not started | Should happen after operational flows are real |
 | 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
 
 ## Current Focus
 
-We are currently in **Phase 4: App integration and onboarding**.
+We are currently in **Phase 5: Operator workflows and incident drills**.
 
-The working intent inside Phase 4 is:
+The working intent inside Phase 5 is:
 
-- build richer onboarding and operator views on top of the now-trustworthy control plane
-- keep the workload contracts aligned with the future Kubernetes model
-- turn the validated workload patterns into repeatable onboarding stories instead of one-off fixes
-- preserve the new operator audit flow as the guardrail while app-specific work expands
-- land the reusable onboarding template and operator app matrix as the first shared Phase 4 deliverables
+- turn the integrated apps into a teachable operations lab
+- define the standard first-response workflow for the workspace
+- connect symptoms to the right app-specific drills and audits
+- move from app onboarding into documented diagnosis and recovery patterns
 
 ## Current Definition Of Done
 
-Phase 4 will be considered complete when:
+Phase 5 will be considered complete when:
 
-- onboarding flows are clear across the supported workloads
-- workload-specific operator checks are documented and runnable
-- the control plane exposes enough app-specific value that the next bottleneck becomes workflow polish rather than basic integration trust
+- the standard health workflow is documented and runnable
+- common incident shapes have a documented first-response path
+- drills and live audits are connected into one coherent operator story
 
 ---
 
@@ -375,16 +374,21 @@ Extract a reusable pattern:
 
 ### Current Status
 
-In progress.
+Complete.
 
 Latest progress:
 
 - static-plus-live audits now exist across all managed workloads
 - the control-plane side has enough trust to shift into operator-facing onboarding artifacts
 - the reusable onboarding template and operator app matrix are now part of the Phase 4 deliverable set
+- the dashboard now includes a SwiftPay operator guide so the flagship microservices app has response guidance alongside its money-flow signals
 - the dashboard now includes an OpenSIS-specific operator guide so the control plane explains first-response actions, not just health state
 - the dashboard now includes a FoodPulse failover guide so the resilience lab is represented as an operator workflow, not just a health probe
 - the dashboard now includes a MemFlip onboarding guide so the simplest browser-first workload is fully represented as a reusable platform pattern
+
+Phase 4 closeout note:
+
+- the next bottleneck is now workflow polish and incident handling rather than basic integration trust
 
 ---
 
@@ -453,6 +457,16 @@ Create a quick “operator first” view in the control plane:
 ### Success Criteria
 
 - we can intentionally break parts of the workspace and recover them using documented procedures
+
+### Current Status
+
+In progress.
+
+Latest progress:
+
+- `./scripts/devops-monitor.sh operator` now provides a runnable operator-first entrypoint
+- the standard health workflow is documented
+- the first incident matrix is documented
 
 ---
 

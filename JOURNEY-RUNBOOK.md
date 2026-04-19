@@ -5172,3 +5172,144 @@ The control plane now explains:
 - MemFlip as the clean onboarding reference
 
 That gives us a much stronger handoff into Phase 5, because the dashboard now contains operator-oriented guidance for all the main workload stories instead of only generic health state.
+
+---
+
+## Phase 4 Correction: SwiftPay Operator Guidance
+
+### Why We Did This
+
+SwiftPay already had the strongest workload-specific dashboard section through `SwiftPay Money Flow`.
+
+That section was useful because it explained:
+
+- pending transactions
+- pending amount
+- queue depth
+- completed transfers
+- wallet circuit state
+- failure rates
+
+But it was not the same thing as an operator guide.
+
+The missing piece was first-response guidance:
+
+- what to check when the gateway is down
+- what to do when queue depth rises
+- how to interpret a flat completed-transfer signal
+- why an open wallet circuit is a downstream-protection event
+
+The user called this out before we moved deeper into Phase 5, and that was the right correction.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '1,260p' SwiftPay/docs/observability-runbook.md
+sed -n '1,280p' Obervability-Stack/scripts/swiftpay-live-audit.sh
+rg -n "SwiftPay Money Flow|MemFlip Onboarding Guide|FoodPulse Failover Guide|OpenSIS Operator Guide|get.*OperatorSummary|swiftpayMetrics" Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '480,660p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '740,850p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '360,450p' PROJECT-ROADMAP.md
+```
+
+### What We Changed
+
+We extended:
+
+- `Obervability-Stack/ui-next/app/dashboard/page.tsx`
+
+The new SwiftPay operator panel adds:
+
+- live SwiftPay overview fetching through `/api/apps/swiftpay/overview`
+- an operator summary driven by both app health and business metrics
+- quick checks for:
+  - gateway path
+  - async worker path
+  - positive completed-transfer signal
+  - wallet circuit protection
+- first-response command blocks
+- failure interpretation guidance
+
+We also updated:
+
+- `PROJECT-ROADMAP.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+
+### Why This Matters
+
+This closes the gap in the Phase 4 dashboard pattern.
+
+The control plane now gives operator-style guidance for:
+
+- SwiftPay
+- OpenSIS
+- FoodPulse
+- MemFlip
+
+That makes the Phase 5 handoff cleaner because the flagship app is no longer treated as "metrics only" while the other workloads have explicit operator guidance.
+
+---
+
+## Phase 5: Operator Workflow Entry Point And Incident Matrix
+
+### Why We Did This
+
+At this point, the current bottleneck is no longer app onboarding.
+
+We now have:
+
+- static and live audits across the managed workloads
+- operator-oriented dashboard guidance for the main workload stories
+- a reusable onboarding template
+- an operator-facing app matrix
+
+That means the next useful step is to give operators one standard first-response workflow and one small incident vocabulary instead of making them remember a different starting pattern for every app.
+
+### Commands Run
+
+```bash
+sed -n '1,220p' PROJECT-ROADMAP.md
+sed -n '300,520p' PROJECT-ROADMAP.md
+git status --short
+rg -n "Phase 5|operator workflow|incident|drill|runbook" JOURNEY-RUNBOOK.md Obervability-Stack/docs -g '!**/node_modules/**'
+sed -n '260,520p' Obervability-Stack/scripts/devops-monitor.sh
+sed -n '1,260p' Obervability-Stack/scripts/health-check.sh
+sed -n '1,220p' Obervability-Stack/scripts/inventory-audit.sh
+curl -fsS http://localhost:4000/api/apps/health | jq .
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/scripts/operator-first-check.sh`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `Obervability-Stack/docs/INCIDENT_MATRIX.md`
+
+We also updated:
+
+- `Obervability-Stack/scripts/devops-monitor.sh`
+- `Obervability-Stack/scripts/README.md`
+- `Obervability-Stack/docs/README.md`
+- `PROJECT-ROADMAP.md`
+
+### Why These Changes Matter
+
+The new `operator` command gives the workspace one repeatable first-response entrypoint:
+
+- smoke-check the control plane
+- validate the monitored app inventory
+- print the workspace app-health snapshot
+
+The new docs establish the first real Phase 5 artifacts:
+
+- the standard health workflow
+- the first incident matrix
+
+### Outcome
+
+This is the point where the roadmap legitimately moves from Phase 4 into Phase 5.
+
+The platform is no longer only teaching how apps join the control plane.
+It is now starting to teach how operators should respond when the platform looks wrong.
