@@ -549,6 +549,114 @@ Results:
 
 ---
 
+## Phase 3: Local Auth Runtime Alignment
+
+### Goal
+
+Fix the local `Obervability-Stack` login path so the sign-in page and the actual auth backend agree about demo access, and so database-backed local auth has a real SQLite path inside the UI container.
+
+### Commands
+
+```bash
+sed -n '1,220p' Obervability-Stack/ui-next/lib/auth-runtime.ts
+sed -n '1,220p' Obervability-Stack/ui-next/env.example
+sed -n '1,240p' Obervability-Stack/docs/AUTH_ACCESS_MODEL.md
+rg -n "AUTH_MODE|ENABLE_DEMO_LOGIN|NEXT_PUBLIC_AUTH_MODE|NEXT_PUBLIC_ENABLE_DEMO_LOGIN" Obervability-Stack/docker-compose.yml Obervability-Stack/ui-next/env.example Obervability-Stack/ui-next/app/auth/signin/page.tsx Obervability-Stack/ui-next/lib/auth-runtime.ts Obervability-Stack/ui-next/lib/auth.ts
+sed -n '1,240p' Obervability-Stack/ui-next/app/auth/signin/page.tsx
+sed -n '300,350p' Obervability-Stack/docker-compose.yml
+sed -n '1,260p' Obervability-Stack/ui-next/lib/auth.ts
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/auth/register/route.ts
+sed -n '1,220p' Obervability-Stack/ui-next/prisma/schema.prisma
+sed -n '1,240p' Obervability-Stack/ui-next/lib/prisma-server.ts
+cat Obervability-Stack/ui-next/package.json
+docker exec devops-monitor-ui sh -lc 'pwd; ls -la; ls -la prisma 2>/dev/null || true; printenv | grep -E "AUTH_MODE|ENABLE_DEMO_LOGIN|DATABASE_URL|NEXT_PUBLIC_AUTH_MODE|NEXT_PUBLIC_ENABLE_DEMO_LOGIN|NEXTAUTH_URL|NEXTAUTH_SECRET" | sort || true'
+docker exec devops-monitor-ui sh -lc 'DATABASE_URL=file:./dev.db node -e '\''const { PrismaClient } = require("@prisma/client"); const prisma = new PrismaClient(); prisma.user.count().then(async (c) => { console.log("user_count=" + c); await prisma.$disconnect(); }).catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });'\'''
+curl -sS -o /tmp/register.json -w '%{http_code}\n' -X POST http://localhost:4000/api/auth/register -H 'Content-Type: application/json' -d '{"name":"Test User","email":"test.user@example.com","password":"password123"}' && cat /tmp/register.json
+```
+
+### What We Learned
+
+- The sign-in page was accurately showing the live container build state: `database` auth mode, but demo login disabled.
+- The root cause was not just runtime configuration drift:
+  - `docker-compose.yml` was not passing `AUTH_MODE`, `ENABLE_DEMO_LOGIN`, `NEXT_PUBLIC_AUTH_MODE`, `NEXT_PUBLIC_ENABLE_DEMO_LOGIN`, or `DATABASE_URL`
+  - the sign-in page is a client component, so the `NEXT_PUBLIC_*` values also need to be present at image build time, not just container runtime
+- The UI container already includes a usable Prisma SQLite file under the app bundle, and querying it with `DATABASE_URL=file:./dev.db` returned `user_count=3`.
+- Registration was failing with a `500` because the live container had no `DATABASE_URL` configured.
+
+### Problems Encountered
+
+#### 1. Runtime and build-time auth state were diverging
+
+Problem:
+
+- Next.js client code reads `NEXT_PUBLIC_*` auth flags at build time
+- the auth backend reads server env at runtime
+- the container had neither set correctly
+
+Fix:
+
+- added auth-related build args and runtime env vars for the UI image and container
+
+Why it mattered:
+
+- otherwise the sign-in page could keep saying “demo disabled” even after the backend started accepting demo credentials
+
+#### 2. The local database path was missing from the container env
+
+Problem:
+
+- Prisma-backed registration and login were trying to start without `DATABASE_URL`
+
+Fix:
+
+- set the local UI container database path to `file:./dev.db`
+
+Why it mattered:
+
+- this aligns the container with the bundled Prisma SQLite file that already exists in the image
+
+### Fixes Applied
+
+- updated `Obervability-Stack/docker-compose.yml` so `devops-monitor-ui` now passes:
+  - `DATABASE_URL`
+  - `AUTH_MODE`
+  - `ENABLE_DEMO_LOGIN`
+  - `NEXT_PUBLIC_AUTH_MODE`
+  - `NEXT_PUBLIC_ENABLE_DEMO_LOGIN`
+- added matching build args in `Obervability-Stack/docker-compose.yml` so the Next.js client bundle sees the same auth flags at image build time
+- updated `Obervability-Stack/ui-next/Dockerfile` so the builder and runner stages both receive the local auth/runtime values needed for the Dockerized local path
+
+### Verification
+
+```bash
+docker compose -f Obervability-Stack/docker-compose.yml build devops-monitor-ui
+docker compose -f Obervability-Stack/docker-compose.yml up -d devops-monitor-ui
+docker compose -f Obervability-Stack/docker-compose.yml config | rg -n "DATABASE_URL|AUTH_MODE|ENABLE_DEMO_LOGIN|NEXT_PUBLIC_AUTH_MODE|NEXT_PUBLIC_ENABLE_DEMO_LOGIN"
+docker exec devops-monitor-ui sh -lc 'printenv | grep -E "AUTH_MODE|ENABLE_DEMO_LOGIN|DATABASE_URL|NEXT_PUBLIC_AUTH_MODE|NEXT_PUBLIC_ENABLE_DEMO_LOGIN|NEXTAUTH_URL|NEXTAUTH_SECRET" | sort'
+curl -sS -o /tmp/register2.json -w '%{http_code}\n' -X POST http://localhost:4000/api/auth/register -H 'Content-Type: application/json' -d '{"name":"Test User","email":"test.user@example.com","password":"password123"}' && cat /tmp/register2.json
+```
+
+Additional verification:
+
+- queried the bundled Prisma SQLite database inside the running container with `DATABASE_URL=file:./dev.db` and confirmed it already contained users
+- completed a credentials callback flow for:
+  - `demo@example.com` / `demo123`
+  - `test.user@example.com` / `password123`
+- both returned a dashboard redirect URL and a `next-auth.session-token` cookie, confirming successful login
+
+Results:
+
+- the UI container now has the correct auth env vars at runtime
+- database-backed registration returned `201`
+- demo login works
+- database-backed local login works
+
+### Follow-Up Work
+
+- reduce the Docker build warnings about using `ARG`/`ENV` for auth-related values by splitting true secrets from non-secret local build flags more cleanly later
+
+---
+
 ## Phase 2: Observability-Stack Discovery
 
 ### Goal
