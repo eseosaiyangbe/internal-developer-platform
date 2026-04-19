@@ -101,6 +101,261 @@ This gave us the first map of the workspace and let us decide which repo to insp
 
 ---
 
+## Phase 3: Control Plane Reliability Checks
+
+### Goal
+
+Run the `Obervability-Stack` control plane the way a new operator would, validate the actual startup and health behavior, and harden the default path so it matches the docs and our future Kubernetes direction.
+
+### Commands
+
+```bash
+sed -n '1,260p' Obervability-Stack/docker-compose.yml
+docker context ls
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+docker network ls --format 'table {{.Name}}\t{{.Driver}}'
+echo "$PATH" && sed -n '1,220p' ~/.zprofile
+ls -la ~/.local/bin ~/.docker/cli-plugins 2>/dev/null
+find ~/.local ~/.docker -maxdepth 3 \( -name docker -o -name colima -o -name docker-compose -o -name limactl \) 2>/dev/null | sort
+which docker colima limactl 2>/dev/null || true
+export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
+which docker
+which colima
+which limactl
+docker version --format '{{.Client.Version}}'
+colima status
+docker context ls
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+docker network ls --format 'table {{.Name}}\t{{.Driver}}'
+docker compose -f Obervability-Stack/docker-compose.yml config
+rg -n "ui-next|next|4000|3000|observability-net|external:" Obervability-Stack/docker-compose.yml Obervability-Stack/docs/README.md Obervability-Stack/README.md Obervability-Stack/ui-next/env.example
+sed -n '260,520p' Obervability-Stack/docker-compose.yml
+docker network inspect observability-net >/dev/null 2>&1 || docker network create observability-net
+rg -n "docker compose up|--profile ui|devops-monitor-ui|localhost:4000|Quick Start|Getting Started" Obervability-Stack/README.md Obervability-Stack/docs/README.md Obervability-Stack/docs/*.md
+docker compose -f Obervability-Stack/docker-compose.yml up -d
+docker compose -f Obervability-Stack/docker-compose.yml ps
+curl -fsS -o /dev/null -w 'PROMETHEUS %{http_code}\n' http://localhost:9090/-/healthy
+curl -fsS -o /dev/null -w 'GRAFANA %{http_code}\n' http://localhost:3000/
+curl -fsS -o /dev/null -w 'LOKI %{http_code}\n' http://localhost:3100/ready
+curl -fsS -o /dev/null -w 'ALERTMANAGER %{http_code}\n' http://localhost:9093/-/healthy
+curl -fsS -o /dev/null -w 'BLACKBOX %{http_code}\n' http://localhost:9115/-/healthy
+curl -sS -o /dev/null -w 'UI %{http_code}\n' http://localhost:4000/ || true
+docker compose -f Obervability-Stack/docker-compose.yml --profile ui up -d devops-monitor-ui
+ls -la Obervability-Stack/ui-next/.dockerignore
+du -sh Obervability-Stack/ui-next/node_modules Obervability-Stack/ui-next/.next 2>/dev/null
+sed -n '1,260p' Obervability-Stack/ui-next/Dockerfile
+curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest | jq -r '.tag_name, (.assets[]?.browser_download_url)' | sed -n '1,20p'
+```
+
+### What We Learned
+
+- The local Docker runtime was healthy, but the shell used for command execution was not inheriting the userland `PATH` additions from `~/.zprofile`.
+- `Obervability-Stack/docker-compose.yml` was syntactically valid, but it still contained the obsolete top-level `version` field.
+- The shared external network requirement is real. `observability-net` did not exist yet on this machine, so the control plane needed that network created before app-to-control-plane connectivity could work.
+- A plain `docker compose up -d` successfully started the metrics stack:
+  - Prometheus
+  - Grafana
+  - Loki
+  - Alertmanager
+  - Blackbox Exporter
+  - Node Exporter
+  - Promtail
+- The default startup path did **not** start the Next.js UI, even though the docs described `http://localhost:4000` as part of the normal quick start.
+- The reason was structural, not transient: `devops-monitor-ui` was behind `profiles: ["ui"]`, so it was excluded from default startup.
+- Attempting to start the UI explicitly exposed a second gap:
+  - the Docker bootstrap story installed the Compose plugin
+  - but it did not install the `buildx` plugin
+  - the UI Dockerfile depends on BuildKit features via `RUN --mount=type=cache`
+- The UI build context was much larger than it should be because `ui-next` had no `.dockerignore`.
+- On this machine, `ui-next/node_modules` alone was about `740M`, which is exactly the kind of local-only artifact we do not want leaking into image build contexts.
+
+### Problems Encountered
+
+#### 1. The shell session could not see installed Docker tooling
+
+Problem:
+
+- `docker`, `colima`, and `limactl` existed under `~/.local/bin`
+- `docker-compose` existed under `~/.docker/cli-plugins`
+- but the active command environment did not include those paths
+
+Fix:
+
+- exported the userland paths explicitly before runtime checks:
+
+```bash
+export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
+```
+
+Why it mattered:
+
+- without that fix, every runtime check would have looked like a missing-tool problem instead of a real control-plane validation
+
+#### 2. The shared `observability-net` network was missing
+
+Problem:
+
+- the control plane expects an external Docker network named `observability-net`
+- a fresh machine did not have it yet
+
+Fix:
+
+- created it explicitly:
+
+```bash
+docker network inspect observability-net >/dev/null 2>&1 || docker network create observability-net
+```
+
+Why it mattered:
+
+- this is the network contract that lets the control plane see the application repos
+- it also maps cleanly to the future Kubernetes mental model of shared service discovery rather than localhost-only coupling
+
+#### 3. Default Compose startup did not include the UI
+
+Problem:
+
+- docs advertised `docker compose up -d` as the main quick start
+- docs also advertised the UI at `http://localhost:4000`
+- but `devops-monitor-ui` was behind a Compose profile and did not start by default
+
+Fix:
+
+- removed the `ui` profile gate from `devops-monitor-ui` so the default stack includes the UI
+
+Why it mattered:
+
+- the operator contract should be boring and predictable
+- this fix aligns the real startup path with the docs and makes the control plane feel closer to a Kubernetes deployment where the UI is a first-class control-plane component
+
+#### 4. UI image build failed because `buildx` was missing
+
+Problem:
+
+- starting the UI path triggered:
+
+```text
+Docker Compose requires buildx plugin to be installed
+```
+
+- and the build later failed with:
+
+```text
+the --mount option requires BuildKit
+```
+
+Fix:
+
+- added Docker `buildx` plugin installation to both bootstrap scripts
+- updated the workstation bootstrap guide to verify `docker buildx version`
+
+Why it mattered:
+
+- this was not just a one-machine quirk
+- it was a real bootstrap gap that would break onboarding for anyone trying to build the control-plane UI image
+
+#### 5. UI build context was bloated by local artifacts
+
+Problem:
+
+- `ui-next` had no `.dockerignore`
+- Docker sent hundreds of megabytes of local build context, including `node_modules`
+
+Fix:
+
+- added `Obervability-Stack/ui-next/.dockerignore`
+- excluded `node_modules`, `.next`, local env files, logs, coverage, and other local-only artifacts
+
+Why it mattered:
+
+- smaller image build contexts reduce build time and make the local-to-Kubernetes transition cleaner
+- they also lower the chance of accidental environment leakage into container builds
+
+#### 6. Compose emitted an obsolete schema warning
+
+Problem:
+
+- Compose warned that the top-level `version` field is obsolete
+
+Fix:
+
+- removed the obsolete `version` key from `Obervability-Stack/docker-compose.yml`
+
+Why it mattered:
+
+- it removes avoidable operator noise during startup
+- it keeps the Compose file closer to the modern format we want to normalize around before translating more of this into Kubernetes
+
+#### 7. The repo was set up to ignore its own `.dockerignore`
+
+Problem:
+
+- `Obervability-Stack/ui-next/.gitignore` explicitly ignored `.dockerignore`
+- that meant the new Docker build hygiene file would not be tracked by Git unless it was force-added
+
+Fix:
+
+- removed the `.dockerignore` ignore rule from `Obervability-Stack/ui-next/.gitignore`
+
+Why it mattered:
+
+- this makes the faster and safer build context a normal tracked part of the repo instead of a one-machine fix
+
+### Fixes Applied
+
+- removed the obsolete Compose `version` field from `Obervability-Stack/docker-compose.yml`
+- made `devops-monitor-ui` part of the default startup path in `Obervability-Stack/docker-compose.yml`
+- added `Obervability-Stack/ui-next/.dockerignore`
+- removed the conflicting `.dockerignore` ignore rule from `Obervability-Stack/ui-next/.gitignore`
+- added Docker `buildx` plugin installation to:
+  - `scripts/bootstrap-macos-userland.sh`
+  - `scripts/bootstrap-linux-userland.sh`
+- updated `WORKSTATION-BOOTSTRAP.md` to include Docker Buildx in the installed tool list and verification commands
+- clarified the direct Compose path in `Obervability-Stack/docs/README.md`
+
+### Verification
+
+```bash
+bash -n scripts/bootstrap-macos-userland.sh
+bash -n scripts/bootstrap-linux-userland.sh
+docker compose -f Obervability-Stack/docker-compose.yml config
+docker buildx version
+docker compose -f Obervability-Stack/docker-compose.yml build devops-monitor-ui
+docker compose -f Obervability-Stack/docker-compose.yml up -d devops-monitor-ui
+docker compose -f Obervability-Stack/docker-compose.yml ps
+curl -sS -o /dev/null -w 'UI %{http_code}\n' http://localhost:4000/
+```
+
+Results:
+
+- both bootstrap scripts passed `bash -n`
+- Compose config rendered cleanly without the obsolete schema warning
+- Docker now detects both plugins:
+  - Compose
+  - Buildx
+- the `devops-monitor-ui` image built successfully with BuildKit enabled
+- the final UI health check returned `200` from `http://localhost:4000/`
+
+### Remaining Notes
+
+- the UI image build still prints NextAuth and `DATABASE_URL` warnings during static generation when secure production env vars are not provided
+- those warnings did not block the image build or local runtime startup in this pass
+- they should be addressed later as part of a stricter production-env hardening slice
+
+### Why This Step Mattered
+
+- this is the first Phase 3 pass that exercised the real control plane instead of just reading code and docs
+- it turned abstract startup assumptions into verified runtime behavior
+- it removed friction that would otherwise hit every new contributor and every future Kubernetes packaging effort
+- it also tightened the operator contract for the control plane so the default path behaves the way the docs say it behaves
+
+### Follow-Up Work
+
+- add a small control-plane smoke-check section that validates both infrastructure endpoints and the UI/API surface together
+- decide whether the UI build should tolerate missing production auth/database env vars more quietly in local mode, or whether we want to keep the warnings loud
+
+---
+
 ## Phase 2: Observability-Stack Discovery
 
 ### Goal

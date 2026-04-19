@@ -17,6 +17,7 @@ Use this guide when:
 The bootstrap scripts are designed to prepare a workstation for the main workflows in this repo:
 
 - Docker and Docker Compose
+- Docker Buildx
 - Kubernetes CLI tooling
 - local Kubernetes tooling
 - Terraform
@@ -82,6 +83,7 @@ Run these commands after bootstrap:
 ```bash
 docker version
 docker compose version
+docker buildx version
 kubectl version --client
 helm version
 terraform version
@@ -115,6 +117,7 @@ That means these two checks matter:
 
 - `docker context ls`
 - `colima status`
+- `docker buildx version`
 
 ### Linux
 
@@ -128,6 +131,7 @@ That means these two checks matter:
 
 - `docker version`
 - `systemctl status docker` if Docker daemon access is failing
+- `docker buildx version`
 
 ## Why This Guide Exists
 

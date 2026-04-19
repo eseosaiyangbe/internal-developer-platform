@@ -156,6 +156,13 @@ install_docker_compose_plugin() {
   ln -sf "${DOCKER_PLUGINS_DIR}/docker-compose" "${LOCAL_BIN}/docker-compose"
 }
 
+install_docker_buildx_plugin() {
+  local url
+  url="$(github_asset_url docker/buildx "buildx-v.*\\.linux-${ARCH}$")"
+  download "${url}" "${DOCKER_PLUGINS_DIR}/docker-buildx"
+  chmod +x "${DOCKER_PLUGINS_DIR}/docker-buildx"
+}
+
 install_kubectl() {
   local version
   version="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
@@ -276,6 +283,7 @@ main() {
   echo "Installing Docker Engine and Compose tooling..."
   install_docker_engine
   install_docker_compose_plugin
+  install_docker_buildx_plugin
 
   echo "Installing Kubernetes and platform tooling..."
   install_kubectl

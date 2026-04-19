@@ -249,6 +249,13 @@ install_docker_compose_plugin() {
   ln -sf "${DOCKER_PLUGINS_DIR}/docker-compose" "${LOCAL_BIN}/docker-compose"
 }
 
+install_docker_buildx_plugin() {
+  local url
+  url="$(github_asset_url docker/buildx 'buildx-v.*\\.darwin-arm64$')"
+  download "${url}" "${DOCKER_PLUGINS_DIR}/docker-buildx"
+  chmod +x "${DOCKER_PLUGINS_DIR}/docker-buildx"
+}
+
 main() {
   ensure_path_setup
   sanitize_docker_config
@@ -256,6 +263,7 @@ main() {
   echo "Installing Docker CLI and local runtime tooling..."
   install_docker_cli
   install_docker_compose_plugin
+  install_docker_buildx_plugin
   install_lima
   install_colima
 
