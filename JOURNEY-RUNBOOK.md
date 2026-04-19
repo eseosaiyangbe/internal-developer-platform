@@ -4033,3 +4033,127 @@ We now have:
 - a resilience lab with HAProxy, replication, and local monitoring surfaces
 
 That shifts the next bottleneck from control-plane trust to richer app onboarding and workflow design, which is exactly the Phase 4 handoff we wanted.
+
+## 2026-04-19 04:35 EDT - Fix the main FoodPulse UI vote flow
+
+### Objective
+
+Repair the actual `FoodPulse` app interaction path so clicking restaurants in the main Yelb UI works again, not just the control-plane card that links to it.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '1,260p' FoodPulse/docker-compose.yml
+sed -n '1,260p' FoodPulse/yelb/yelb-appserver/yelb-appserver.rb
+sed -n '1,220p' FoodPulse/yelb/yelb-appserver/modules/restaurantsdbread.rb
+sed -n '1,220p' FoodPulse/yelb/yelb-appserver/modules/restaurantsdbupdate.rb
+sed -n '1,220p' FoodPulse/yelb/yelb-appserver/Dockerfile
+sed -n '1,200p' FoodPulse/.env.example
+curl -fsSL http://localhost:8090 | sed -n '1,220p'
+curl -fsSL http://localhost:8090/env.js | sed -n '1,120p'
+rg -n "env.js|YELB_APPSERVER_ENDPOINT|appserver|api/getvotes|api/outback|api/vote|base href|appserver" FoodPulse/yelb/yelb-ui FoodPulse/yelb -g '!**/node_modules/**'
+source ~/.zprofile >/dev/null 2>&1; docker logs --tail=120 foodpulse-yelb-ui
+source ~/.zprofile >/dev/null 2>&1; docker logs --tail=120 foodpulse-yelb-appserver
+ruby -c FoodPulse/yelb/yelb-appserver/yelb-appserver.rb
+ruby -c FoodPulse/yelb/yelb-appserver/modules/restaurantsdbread.rb
+ruby -c FoodPulse/yelb/yelb-appserver/modules/restaurantsdbupdate.rb
+source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml config >/tmp/foodpulse-compose.out && tail -n 20 /tmp/foodpulse-compose.out
+source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml up -d --build yelb-appserver yelb-ui
+curl -sS -o /tmp/fp-getvotes.out -w '%{http_code}\n' http://localhost:8090/api/getvotes && echo '---' && cat /tmp/fp-getvotes.out
+curl -sS -o /tmp/fp-vote.out -w '%{http_code}\n' http://localhost:8090/api/outback && echo '---' && cat /tmp/fp-vote.out
+source ~/.zprofile >/dev/null 2>&1; docker logs --tail=80 foodpulse-yelb-appserver
+curl -sS http://localhost:8090/api/getvotes
+curl -sS http://localhost:8090/api/getstats
+```
+
+### Problem
+
+The main `FoodPulse` UI loaded, but clicking restaurants felt broken because the backend vote endpoints were failing with `500`.
+
+The key symptom chain was:
+
+- `http://localhost:8090/api/getstats` returned `200`
+- `http://localhost:8090/api/getvotes` returned `500`
+- restaurant vote routes like `/api/outback` returned `500`
+- `foodpulse-yelb-appserver` logs showed:
+
+```text
+PG::ConnectionBad - FATAL: role "postgres" does not exist
+```
+
+### Root Cause
+
+The appserver was only partially normalized for this workspace.
+
+`FoodPulse` had already moved its Postgres bootstrap to the repo's env contract:
+
+- `YELB_DB_USER`
+- `YELB_DB_PASSWORD`
+- database name `yelbdatabase`
+
+But the vendored Yelb Ruby modules were still hardcoded to the upstream defaults:
+
+- user: `postgres`
+- password: `postgres_password`
+
+That meant the read and write paths behind the UI clicks were trying to authenticate as a role this repo does not create.
+
+There was a second deployment gap too:
+
+- `FoodPulse/docker-compose.yml` was still pulling `eseosaiyangbe/yelb-appserver:v2`
+- so even after fixing local source, the running service would not have changed unless the compose service used a local build
+
+### Fix
+
+Updated the vendored appserver code to honor the repo's environment contract:
+
+- added global DB settings in:
+  - `FoodPulse/yelb/yelb-appserver/yelb-appserver.rb`
+- replaced hardcoded Postgres credentials in:
+  - `FoodPulse/yelb/yelb-appserver/modules/restaurantsdbread.rb`
+  - `FoodPulse/yelb/yelb-appserver/modules/restaurantsdbupdate.rb`
+
+Updated the compose runtime so the fixed local source is what actually runs:
+
+- changed `FoodPulse/docker-compose.yml` so `yelb-appserver` builds from `./yelb/yelb-appserver`
+- passed:
+  - `YELB_DB_NAME`
+  - `YELB_DB_USER`
+  - `YELB_DB_PASSWORD`
+
+Updated the documented env contract:
+
+- added `YELB_DB_NAME` to `FoodPulse/.env.example`
+- documented the local-build expectation in `FoodPulse/README.md`
+
+### Validation
+
+Syntax and config checks passed:
+
+- `ruby -c FoodPulse/yelb/yelb-appserver/yelb-appserver.rb`
+- `ruby -c FoodPulse/yelb/yelb-appserver/modules/restaurantsdbread.rb`
+- `ruby -c FoodPulse/yelb/yelb-appserver/modules/restaurantsdbupdate.rb`
+- `docker compose -f FoodPulse/docker-compose.yml config`
+
+Runtime validation passed:
+
+- `GET http://localhost:8090/api/getvotes` returned `200`
+- `GET http://localhost:8090/api/outback` returned `200`
+- a follow-up `GET http://localhost:8090/api/getvotes` showed `outback` increment from `0` to `1`
+
+Observed healthy responses:
+
+```json
+[{"name": "outback", "value": 1},{"name": "bucadibeppo", "value": 0},{"name": "ihop", "value": 0}, {"name": "chipotle", "value": 0}]
+```
+
+### Why This Mattered
+
+This fixed the actual user-facing `FoodPulse` experience, not just the monitoring shell around it.
+
+It also moved the repo one step closer to a Kubernetes-friendly model:
+
+- app configuration now comes from explicit environment variables instead of hidden upstream constants
+- the running service now builds from workspace-owned source
+- the database contract is consistent between bootstrap, compose, and application code
