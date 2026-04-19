@@ -271,6 +271,18 @@ Why it mattered:
 - this made the "golden path" smoke test disagree with the actual published API gateway port
 - that kind of drift is exactly the sort of friction we want to remove before the Kubernetes migration
 
+#### 2. Parallel Git push raced ahead of the new commit
+
+Problem:
+
+- the first push attempt was kicked off in parallel with `git commit`
+- the push completed before the new commit existed locally, so it reported `Everything up-to-date`
+
+Why it mattered:
+
+- the local repo had the right fix, but the remote checkpoint did not yet contain it
+- the runbook should record the real Git sequence, not the idealized one
+
 ### Fixes Applied
 
 #### 1. Repointed Docker Compose validation to the actual gateway port
@@ -293,6 +305,7 @@ bash -n SwiftPay/scripts/validate.sh
 Result:
 
 - shell syntax check passed
+- a follow-up serial `git push origin main` successfully published commit `3aa210d`
 
 ### Why This Step Mattered
 
