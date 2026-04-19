@@ -552,6 +552,7 @@ Latest progress:
 - Phase 6 now has a clearer path from control plane to apps, drills, runbook, and Kubernetes direction
 - FoodPulse now has a cleaner demo voting-board UI with colored restaurant labels and a live vote chart
 - the control-plane services page now lets operators open managed apps directly from the app cards
+- the services dashboard is now simplified into managed app labels, with app-specific operator pages for latency, uptime, alerts, logs, and guidance
 
 ---
 

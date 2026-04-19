@@ -64,6 +64,7 @@ Show:
 - app categories
 - primary app URLs
 - clickable managed-app cards on the services page
+- app-specific operator pages for latency, uptime, alerts, recent logs, and guidance
 - operator guidance
 
 ### 2. Explain The Four Workloads
@@ -185,10 +186,11 @@ MemFlip:   http://localhost:8080
 Recommended Phase 6 flow:
 
 1. Open the control plane first.
-2. Open FoodPulse from the services page to show the modernized voting UI.
-3. Open SwiftPay to show the flagship microservices app.
-4. Open OpenSIS to explain legacy modernization.
-5. Open MemFlip as the lightweight onboarding reference.
+2. Open the Services page and explain that it is now a simple managed-app launch board.
+3. Click the FoodPulse label to show its operator page, then open the live app from there.
+4. Open SwiftPay to show the flagship microservices app and its operator page.
+5. Open OpenSIS to explain legacy modernization and its Vault/platform signals.
+6. Open MemFlip as the lightweight onboarding reference.
 
 ### 8. Close With Kubernetes Direction
 

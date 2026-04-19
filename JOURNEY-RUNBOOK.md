@@ -7115,3 +7115,186 @@ Continue polishing the control-plane UX:
 - tighten the services page story copy
 - add a clearer demo path from app card to operator runbook
 - revisit FoodPulse once we decide whether the existing layout should stay minimal or become more branded
+
+---
+
+## Phase 6 UI Polish: Simple Services Dashboard And App Detail Pages
+
+### Goal
+
+Simplify the managed-app dashboard and move detailed operational information onto app-specific pages.
+
+The user feedback was clear:
+
+- the dashboard had too much information
+- managed app labels should open a page specific to that app
+- each app page should include probe latency, uptime, alerts, recent logs, and operator guidance
+
+### Commands Run
+
+```bash
+git status --short
+find Obervability-Stack/ui-next/app -maxdepth 3 -type f | sort | sed -n '1,220p'
+sed -n '1,260p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,260p' Obervability-Stack/ui-next/lib/app-observability.ts
+sed -n '260,520p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+find Obervability-Stack/ui-next/app/api/apps -maxdepth 3 -type f -print -exec sed -n '1,200p' {} \;
+find Obervability-Stack/ui-next/components/ui -maxdepth 1 -type f -print | sort
+find Obervability-Stack/ui-next/lib/hooks -maxdepth 1 -type f -print -exec sed -n '1,220p' {} \;
+sed -n '420,900p' Obervability-Stack/ui-next/app/services/page.tsx
+npm run type-check
+git diff -- Obervability-Stack/ui-next/app/services/page.tsx 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+npm run build
+curl -fsS http://localhost:4000/api/apps/opensis/overview | jq '{app: .app.name, status: .health.status, endpoints: (.health.endpoints | length), alerts: (.alerts | length), logs: (.recentLogs | length), uptime: (.uptimeSeries | length), latency: (.latencySeries | length)}'
+curl -fsS http://localhost:4000/api/apps/swiftpay/overview | jq '{app: .app.name, status: .health.status, endpoints: (.health.endpoints | length), alerts: (.alerts | length), logs: (.recentLogs | length), uptime: (.uptimeSeries | length), latency: (.latencySeries | length)}'
+curl -fsS http://localhost:4000/api/apps/foodpulse/overview | jq '{app: .app.name, status: .health.status, endpoints: (.health.endpoints | length), alerts: (.alerts | length), logs: (.recentLogs | length), uptime: (.uptimeSeries | length), latency: (.latencySeries | length)}'
+curl -fsS http://localhost:4000/api/apps/memflip/overview | jq '{app: .app.name, status: .health.status, endpoints: (.health.endpoints | length), alerts: (.alerts | length), logs: (.recentLogs | length), uptime: (.uptimeSeries | length), latency: (.latencySeries | length)}'
+curl -fsSI http://localhost:4000/services
+curl -fsSI http://localhost:4000/services/opensis
+curl -fsSI http://localhost:4000/services/swiftpay
+curl -fsSI http://localhost:4000/services/foodpulse
+curl -fsSI http://localhost:4000/services/memflip
+node scripts/validate-monitored-apps.ts
+npx tsx scripts/validate-monitored-apps.ts
+docker compose up -d --build devops-monitor-ui
+curl -fsS http://localhost:4000/api/apps | jq '.apps[] | {id, category}'
+./Obervability-Stack/scripts/devops-monitor.sh operator
+curl -fsS http://localhost:4000/api/apps/foodpulse/overview | jq '{app: .app.name, status: .health.status, category: .app.category, uptime: (.uptimeSeries | length), latency: (.latencySeries | length)}'
+```
+
+### What We Changed
+
+The Services page now acts as a simple managed-app launch board.
+
+Instead of showing service-health cards, quick links, tabs, platform status cards, and app details all on the same page, it now focuses on:
+
+- app name
+- app category label
+- app health label
+- endpoint count
+- primary latency
+- click-through to the app operator page
+
+Each managed app now has a dedicated page:
+
+- `/services/opensis`
+- `/services/swiftpay`
+- `/services/foodpulse`
+- `/services/memflip`
+
+Each app page includes:
+
+- probe latency
+- uptime percentage from the last hour of blackbox samples
+- alert count
+- endpoint health count
+- probe target table
+- app-specific operator guide
+- first-response commands
+- recent alerts
+- recent logs
+- local start and health-check commands
+
+### Label Improvements
+
+The app categories now tell a clearer story:
+
+- OpenSIS: `Legacy Platform`
+- SwiftPay: `Microservices`
+- FoodPulse: `HA Lab`
+- MemFlip: `Demo App`
+
+To support this, FoodPulse and MemFlip were separated in `monitored-apps.ts`:
+
+- FoodPulse changed from `web-application` to `resilience-lab`
+- MemFlip changed from `web-application` to `demo-app`
+
+### Problem And Fix
+
+Problem: I initially ran the monitored-app validator with plain `node`:
+
+```bash
+node scripts/validate-monitored-apps.ts
+```
+
+That failed because the script is TypeScript/ES module shaped and imports `lib/monitored-apps` without a compiled extension.
+
+Fix: rerun it with the TypeScript runner:
+
+```bash
+npx tsx scripts/validate-monitored-apps.ts
+```
+
+That passed:
+
+```text
+Apps checked: 4
+Errors: 0
+Warnings: 0
+Inventory validation passed.
+```
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Next production build passed and showed the new route:
+
+```text
+/services
+/services/[appId]
+```
+
+As before, the local build printed expected warnings for missing production auth/database environment values:
+
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `DATABASE_URL`
+
+The build still completed successfully.
+
+All four app overview APIs returned healthy data with uptime and latency series:
+
+- OpenSIS: `healthy`, `uptimeSeries=60`, `latencySeries=60`
+- SwiftPay: `healthy`, `uptimeSeries=60`, `latencySeries=60`
+- FoodPulse: `healthy`, `uptimeSeries=60`, `latencySeries=60`
+- MemFlip: `healthy`, `uptimeSeries=60`, `latencySeries=60`
+
+The protected pages returned the expected auth redirects:
+
+```text
+/services -> /auth/signin?from=%2Fservices
+/services/opensis -> /auth/signin?from=%2Fservices%2Fopensis
+/services/swiftpay -> /auth/signin?from=%2Fservices%2Fswiftpay
+/services/foodpulse -> /auth/signin?from=%2Fservices%2Ffoodpulse
+/services/memflip -> /auth/signin?from=%2Fservices%2Fmemflip
+```
+
+After rebuilding `devops-monitor-ui`, the full operator check passed:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- all `4` monitored apps were healthy
+
+### Why This Matters
+
+This makes the control plane easier to explain.
+
+The top-level Services page is no longer trying to be everything. It is now the starting point.
+
+The app detail pages are where the operator depth lives. That is the right split for a teaching platform:
+
+- simple dashboard first
+- app-specific operational depth after click-through
+
+### Next Step
+
+Continue with the same pattern:
+
+- add a clearer link from each app detail page to its Markdown operator runbook
+- add small trend charts for uptime and latency
+- consider moving platform service health into a separate `/services/platform` page
