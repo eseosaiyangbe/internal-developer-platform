@@ -318,6 +318,113 @@ Result:
 - `SwiftPay` still has deeper documentation drift in older operational docs that reference `localhost:3000` or `http://localhost`
 - those should be cleaned in a later documentation sweep, but the primary startup contract is now normalized
 
+---
+
+## Phase 2: SwiftPay Operator Doc Reconciliation
+
+### Goal
+
+Clean the next layer of `SwiftPay` documentation drift so the operator-facing docs match the normalized Docker Compose contract and stop mixing host ports with container ports.
+
+### Commands
+
+```bash
+sed -n '1,260p' PROJECT-ROADMAP.md
+sed -n '1,260p' WORKSPACE-ARCHITECTURE.md
+sed -n '1,260p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,240p' FoodPulse/README.md
+sed -n '1,240p' OpenSIS/README.md
+rg -n "localhost|health|compose up|cluster-status|precheck|\\.env.example|8088|15672|3000|http://localhost" FoodPulse OpenSIS -g '!**/node_modules/**' -g '!**/vendor/**' | sed -n '1,260p'
+sed -n '1,260p' SwiftPay/docs/DEPLOYMENT.md
+sed -n '1,260p' SwiftPay/docs/RUNBOOK.md
+sed -n '1,240p' SwiftPay/docs/how-to-debug-this-system.md
+sed -n '1,220p' SwiftPay/docs/system-flow.md
+rg -n "proxy_pass|API_GATEWAY_URL|3000|api-gateway" SwiftPay/services/frontend SwiftPay/services/api-gateway -g '!**/node_modules/**' | sed -n '1,260p'
+sed -n '1,220p' SwiftPay/services/frontend/nginx.conf.template
+sed -n '1,240p' SwiftPay/services/frontend/Dockerfile
+rg -n "docker-compose|http://localhost|3000/health|3002/health|api-gateway:80|proxy_pass|port-forward|open http://localhost|metrics" SwiftPay/docs/DEPLOYMENT.md SwiftPay/docs/RUNBOOK.md SwiftPay/docs/how-to-debug-this-system.md SwiftPay/docs/system-flow.md
+git diff -- SwiftPay/docs/DEPLOYMENT.md SwiftPay/docs/RUNBOOK.md SwiftPay/docs/system-flow.md
+rg -n "docker-compose|http://localhost(?!:8081|:3007|:3008|:3004|:3003|:3001|:15672|:3000|:9090|:9093)|3002/health|3002/metrics|api-gateway:80" SwiftPay/docs/DEPLOYMENT.md SwiftPay/docs/RUNBOOK.md SwiftPay/docs/system-flow.md -P
+git status --short
+git add SwiftPay/docs/DEPLOYMENT.md SwiftPay/docs/RUNBOOK.md SwiftPay/docs/system-flow.md JOURNEY-RUNBOOK.md
+git commit -m "Reconcile SwiftPay operator docs"
+git push origin main
+```
+
+### What We Learned
+
+- `FoodPulse` and `OpenSIS` were not the next Phase 2 bottleneck; their top-level local contracts are reasonably aligned.
+- The remaining high-friction drift was concentrated in `SwiftPay`'s secondary operator docs.
+- Several `SwiftPay` docs were still mixing:
+  - Compose browser URL vs gateway host port
+  - host ports vs internal service ports
+  - `docker-compose` vs `docker compose`
+- `SwiftPay/services/frontend/nginx.conf.template` confirmed the real Compose-side upstream is `http://api-gateway:3000`, not `http://api-gateway:80`.
+
+### Problems Encountered
+
+#### 1. Operator docs were teaching the wrong mental model for local networking
+
+Problem:
+
+- `docs/RUNBOOK.md` still sent operators to `localhost:3000` for gateway health and `localhost:3002` for transaction health
+- the same doc implied nginx should proxy to `api-gateway:80`, which is not how the Compose frontend is configured
+- `docs/system-flow.md` still advertised Docker Compose at `http://localhost`
+
+Why it mattered:
+
+- these are the docs people reach for during failure investigation
+- if the runbook itself teaches the wrong ports, debugging becomes slower and more confusing than it should be
+
+#### 2. The no-match validation uses exit code `1` when it succeeds
+
+Problem:
+
+- the final `rg` validation command returned exit code `1`
+- in this case that meant it found no remaining forbidden patterns in the targeted docs
+
+Why it mattered:
+
+- it was important to recognize that as a successful cleanup signal, not as a command failure
+
+### Fixes Applied
+
+#### 1. Normalized the core Compose-facing operator docs
+
+- updated `SwiftPay/docs/DEPLOYMENT.md` to use `docker compose` consistently in the local section
+- updated Compose port-forward examples to use `localhost:8081` for the frontend and `localhost:3007` for gateway access
+- updated `SwiftPay/docs/RUNBOOK.md` to use the real host ports:
+  - gateway `3007`
+  - transaction service `3008`
+  - wallet `3001`
+  - auth `3004`
+  - notification `3003`
+- corrected the frontend proxy verification example to use `api-gateway:3000`
+- updated `SwiftPay/docs/system-flow.md` so the Docker Compose browser URL is `http://localhost:8081`
+
+### Verification
+
+```bash
+rg -n "docker-compose|http://localhost(?!:8081|:3007|:3008|:3004|:3003|:3001|:15672|:3000|:9090|:9093)|3002/health|3002/metrics|api-gateway:80" \
+  SwiftPay/docs/DEPLOYMENT.md SwiftPay/docs/RUNBOOK.md SwiftPay/docs/system-flow.md -P
+```
+
+Result:
+
+- ripgrep returned no matches
+- exit code `1` was expected for that "clean" result
+
+### Why This Step Mattered
+
+- it tightened the docs operators will actually use during break/fix work
+- it reinforced the Kubernetes-ready habit of separating browser entrypoints from service health endpoints
+- it reduced the amount of Docker-only confusion we would otherwise carry into Phase 3
+
+### Follow-Up Work
+
+- `SwiftPay` still has more historical docs that reference older host-port assumptions
+- those are now lower-risk because the main entry docs, deployment guide, runbook, and system-flow guide are aligned
+
 ## Transition to App Discovery
 
 The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
