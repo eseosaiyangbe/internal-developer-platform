@@ -7298,3 +7298,297 @@ Continue with the same pattern:
 - add a clearer link from each app detail page to its Markdown operator runbook
 - add small trend charts for uptime and latency
 - consider moving platform service health into a separate `/services/platform` page
+
+## Phase 6 UI Polish: Main Dashboard Simplified To Match The Services Pattern
+
+### Date
+
+2026-04-19
+
+### Goal
+
+The user could not see the simplified app-label experience on the dashboard.
+
+The root cause was that the previous change simplified `/services`, but the main `/dashboard` route still had the older overloaded layout with SwiftPay business metrics, OpenSIS charts, logs, alerts, and long operator-guide sections.
+
+We changed the actual dashboard route so it is now intentionally simple:
+
+- top-level health summary
+- firing alert count
+- light infrastructure signals
+- clean managed-app labels
+- click-through from each app label to `/services/<appId>`
+
+The deep operational content remains on the per-app pages:
+
+- `/services/opensis`
+- `/services/swiftpay`
+- `/services/foodpulse`
+- `/services/memflip`
+
+### Commands Run
+
+Checked whether the repo had pending changes:
+
+```bash
+git status --short
+```
+
+Confirmed the working directory:
+
+```bash
+pwd
+```
+
+Searched for the simplified Services page and the app detail page content:
+
+```bash
+rg -n "Choose an app to operate|Services|Managed|Probe latency|Operator Guide" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/lib
+```
+
+Checked the running observability stack containers:
+
+```bash
+docker compose ps
+```
+
+Inspected the existing dashboard implementation:
+
+```bash
+sed -n '430,500p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+```bash
+sed -n '1060,1140p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+```bash
+sed -n '1140,1340p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+```bash
+sed -n '1,120p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+Inspected more of the dashboard structure before replacing the overloaded page:
+
+```bash
+sed -n '120,260p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+```bash
+sed -n '900,1085p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+```bash
+sed -n '1340,1450p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+Checked package scripts:
+
+```bash
+sed -n '1,140p' Obervability-Stack/ui-next/package.json
+```
+
+Inspected the app health types and health hook so the simplified dashboard could use the right fields:
+
+```bash
+rg -n "export interface AppHealth|type AppHealth|interface AppHealth" Obervability-Stack/ui-next/lib/app-observability.ts Obervability-Stack/ui-next/lib -g '*.ts'
+```
+
+```bash
+sed -n '1,180p' Obervability-Stack/ui-next/lib/app-observability.ts
+```
+
+```bash
+sed -n '1,160p' Obervability-Stack/ui-next/lib/hooks/use-app-health.ts
+```
+
+Inspected monitored app metadata for category labels and descriptions:
+
+```bash
+sed -n '1,180p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+```
+
+Viewed the current runbook tail before appending this section:
+
+```bash
+tail -n 120 JOURNEY-RUNBOOK.md
+```
+
+Ran TypeScript after the dashboard rewrite:
+
+```bash
+npm run type-check
+```
+
+Reviewed the dashboard diff:
+
+```bash
+git diff -- Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Searched for Google font dependencies after the build failed:
+
+```bash
+rg -n "next/font|Inter|fontSans|className" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib -g '*.tsx' -g '*.ts'
+```
+
+```bash
+sed -n '1,120p' Obervability-Stack/ui-next/app/layout.tsx
+```
+
+```bash
+sed -n '1,160p' Obervability-Stack/ui-next/app/globals.css
+```
+
+Confirmed the Google font references were removed:
+
+```bash
+rg -n "next/font/google|fonts.googleapis.com" Obervability-Stack/ui-next
+```
+
+Re-ran TypeScript:
+
+```bash
+npm run type-check
+```
+
+Re-ran the production build:
+
+```bash
+npm run build
+```
+
+The sandbox blocked Turbopack/PostCSS process creation, so the same build was run again with approval outside the sandbox:
+
+```bash
+npm run build
+```
+
+Rebuilt and restarted the running UI container:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the rebuilt UI container is healthy:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Verified the app health API still reports all managed apps:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/health
+```
+
+Confirmed `/dashboard` is still protected by auth:
+
+```bash
+curl -fsS -I http://localhost:4000/dashboard
+```
+
+Checked the final working tree:
+
+```bash
+git status --short
+```
+
+### Changes Made
+
+Replaced the overloaded dashboard implementation in:
+
+```text
+Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+The dashboard now has:
+
+- a short hero explaining that deep operator work happens after selecting an app
+- four top-level cards: healthy apps, firing alerts, CPU, network
+- a simple managed-app label grid
+- clickable labels linking to each app operator page
+
+Removed the build-time Google Fonts dependency from:
+
+```text
+Obervability-Stack/ui-next/app/layout.tsx
+Obervability-Stack/ui-next/app/globals.css
+```
+
+### Problems And Fixes
+
+Problem: The user could not see the change on the dashboard.
+
+Cause: We had simplified `/services`, but the visible `/dashboard` route still used the old overloaded dashboard.
+
+Fix: Replace the main dashboard with the same app-label pattern and point every managed app label to its app-specific operator page.
+
+Problem: `npm run build` failed because Next tried to download Inter from Google Fonts:
+
+```text
+Failed to fetch `Inter` from Google Fonts.
+```
+
+Cause: The app used `next/font/google`, which requires a build-time network fetch.
+
+Fix: Remove the `next/font/google` import and remove the external `fonts.googleapis.com` CSS imports. This makes builds more reliable on new machines, restricted networks, and future lab environments.
+
+Problem: A later `npm run build` failed with a Turbopack/PostCSS sandbox error:
+
+```text
+creating new process
+binding to a port
+Operation not permitted
+```
+
+Cause: The local sandbox blocked Turbopack/PostCSS from spawning a helper process and binding a local port.
+
+Fix: Re-ran the same `npm run build` with approved elevated execution. The production build passed.
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed after removing the external font dependency and running outside the sandbox restriction.
+
+The Docker image rebuilt successfully and `devops-monitor-ui` restarted healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The app health API reported:
+
+- total apps: `4`
+- healthy apps: `4`
+- degraded apps: `0`
+- down apps: `0`
+- unknown apps: `0`
+
+The `/dashboard` route still correctly requires sign-in:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fdashboard
+```
+
+### Why This Matters
+
+This keeps the learning flow clean.
+
+The main dashboard is now the front door, not the whole encyclopedia. The learner sees app labels first, then clicks into OpenSIS, SwiftPay, FoodPulse, or MemFlip when they want probe latency, uptime, alerts, recent logs, and operator guidance.
+
+It also removes a hidden build dependency on Google Fonts, which is better for a DevOps training repo that should work on fresh laptops and restricted lab networks.
