@@ -218,9 +218,96 @@ Why it matters:
 
 - the repo is strong as a control plane, but auth maturity is below the surrounding product polish
 
+---
+
+## Phase 2: SwiftPay Startup Contract Normalization
+
+### Goal
+
+Bring `SwiftPay`'s local startup story back into alignment so the Docker Compose browser URL, API health URL, and validation helper all describe the same operator path.
+
+### Commands
+
+```bash
+sed -n '1,260p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,260p' SwiftPay/docs/SERVICES.md
+rg -n "3000|8081|health|validate\\.sh|api-gateway|frontend" SwiftPay/README.md SwiftPay/docs SwiftPay/docker-compose.yml -g '!**/node_modules/**' | sed -n '1,260p'
+sed -n '1,260p' OpenSIS/docs/02-local-compose-guide.md
+rg -n "\\.env.example|compose-start|8088|health|precheck|curl" OpenSIS/README.md OpenSIS/docs OpenSIS/docker-compose.yaml -g '!**/node_modules/**' | sed -n '1,260p'
+sed -n '1,220p' OpenSIS/scripts/precheck.sh
+sed -n '1,220p' SwiftPay/scripts/validate.sh
+sed -n '1,220p' SwiftPay/README.md
+sed -n '1,260p' SwiftPay/docker-compose.yml
+rg -n "validate\\.sh|localhost:3000|http://localhost|3007|8081|localhost:8081" SwiftPay/docs SwiftPay/README.md SwiftPay/scripts -g '!**/node_modules/**'
+bash -n SwiftPay/scripts/validate.sh
+git diff -- SwiftPay/scripts/validate.sh SwiftPay/README.md JOURNEY-RUNBOOK.md
+git status --short
+git add SwiftPay/scripts/validate.sh SwiftPay/README.md JOURNEY-RUNBOOK.md
+git commit -m "Normalize SwiftPay local validation contract"
+git push origin main
+```
+
+### What We Learned
+
+- `SwiftPay/docker-compose.yml` already exposes the real local contract:
+  - frontend at `http://localhost:8081`
+  - API gateway at `http://localhost:3007`
+- `WORKSPACE-SETUP-MATRIX.md` had already been normalized to that contract.
+- `SwiftPay/README.md` still described the old Compose path as `http://localhost` with API health on `http://localhost:3000/health`.
+- `SwiftPay/scripts/validate.sh` still defaulted to `http://localhost:3000`, which meant the documented smoke test was pointed at the wrong host port for Docker Compose.
+- `OpenSIS` looked comparatively clean, so `SwiftPay` was the right place to spend this normalization slice.
+
+### Problems Encountered
+
+#### 1. The validation helper's default could never reflect the real Compose gateway port
+
+Problem:
+
+- `BASE_URL` was initialized to `http://localhost:3000`
+- the environment case block then used `${BASE_URL:-...}`, so the Docker default could never switch to `3007`
+
+Why it mattered:
+
+- this made the "golden path" smoke test disagree with the actual published API gateway port
+- that kind of drift is exactly the sort of friction we want to remove before the Kubernetes migration
+
+### Fixes Applied
+
+#### 1. Repointed Docker Compose validation to the actual gateway port
+
+- changed `SwiftPay/scripts/validate.sh` to treat Docker Compose as `http://localhost:3007`
+- changed the script to initialize `BASE_URL` as empty so environment-specific defaults work correctly
+
+#### 2. Rewrote the main README Docker Compose path around the actual operator entrypoints
+
+- clarified that Compose users open the app at `http://localhost:8081`
+- clarified that gateway health is `http://localhost:3007/health`
+- added a note that `./scripts/validate.sh` validates the API gateway and core backend flows, not the frontend itself
+
+### Verification
+
+```bash
+bash -n SwiftPay/scripts/validate.sh
+```
+
+Result:
+
+- shell syntax check passed
+
 ### Why This Step Mattered
 
-This phase established that the observability repo should be the workspace hub.
+- it tightened the local contract for the flagship workload before we start harder platform work
+- it reduces confusion between user-facing URLs and service-facing URLs
+- it makes the Compose path feel more like a Kubernetes-style split between ingress/browser entry and service health entry
+
+### Follow-Up Work
+
+- `SwiftPay` still has deeper documentation drift in older operational docs that reference `localhost:3000` or `http://localhost`
+- those should be cleaned in a later documentation sweep, but the primary startup contract is now normalized
+
+## Transition to App Discovery
+
+The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
 
 ---
 
