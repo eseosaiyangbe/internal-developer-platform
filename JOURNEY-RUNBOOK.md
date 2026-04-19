@@ -4720,3 +4720,193 @@ It also surfaced two important platform truths early:
 - the vendored UI is the real modernization bottleneck, not the appserver or data plane
 
 That is valuable information for the later Kubernetes move, because it tells us where the actual risk lives instead of letting the old UI debt stay hidden behind prebuilt images.
+
+## 2026-04-19 05:55 EDT - Replace the legacy FoodPulse app with an owned modern application
+
+### Objective
+
+Turn `FoodPulse` into an application we actually own:
+
+- replace the inherited legacy UI and Ruby appserver with a modern UI/API stack
+- preserve the Redis, Sentinel, Postgres, and HAProxy lab topology
+- eliminate `yelb*` from the `FoodPulse` repo
+- keep the control-plane contract intact so the existing audits still work
+
+### Commands Run
+
+```bash
+find FoodPulse -maxdepth 3 -type d | sort
+rg --files FoodPulse | sort
+sed -n '1,260p' FoodPulse/docker-compose.yml
+sed -n '1,240p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+sed -n '1,220p' Obervability-Stack/scripts/foodpulse-audit.sh
+sed -n '1,260p' FoodPulse/yelb/yelb-db/init-yelb-db.sh
+sed -n '1,260p' FoodPulse/yelb/yelb-appserver/yelb-appserver.rb
+sed -n '1,260p' FoodPulse/yelb/yelb-ui/clarity-seed-newfiles/src/app/app.component.html
+sed -n '1,220p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,200p' FoodPulse/sentinel/sentinel-01.conf
+sed -n '1,160p' FoodPulse/redis/replica/redis.conf
+mkdir -p FoodPulse/api/src FoodPulse/ui/src FoodPulse/postgres/initdb
+rm -rf FoodPulse/yelb
+rg -n "yelb|YELB|odilia" FoodPulse
+npm install --package-lock-only
+npm ci
+npm run build
+bash -n FoodPulse/scripts/start.sh FoodPulse/scripts/stop.sh FoodPulse/scripts/cluster-status.sh FoodPulse/scripts/pg-failover-drill.sh FoodPulse/scripts/redis-failover-drill.sh FoodPulse/postgres/replica-entrypoint.sh
+docker compose -f FoodPulse/docker-compose.yml config
+cp FoodPulse/.env.example FoodPulse/.env
+./FoodPulse/scripts/start.sh
+docker compose -f FoodPulse/docker-compose.yml down --remove-orphans
+docker compose -f FoodPulse/docker-compose.yml down -v --remove-orphans
+docker logs --tail 120 foodpulse-api
+docker logs --tail 80 foodpulse-db
+docker exec -i foodpulse-db psql -U postgres -d foodpulse -c "SELECT venue_slug, count(*) FROM vote_events GROUP BY venue_slug ORDER BY venue_slug;"
+docker exec -i foodpulse-db psql -U postgres -d foodpulse <<'SQL'
+ALTER DATABASE foodpulse OWNER TO foodpulse;
+ALTER SCHEMA public OWNER TO foodpulse;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO foodpulse;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO foodpulse;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO foodpulse;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO foodpulse;
+SQL
+docker compose -f FoodPulse/docker-compose.yml restart foodpulse-api
+curl -fsS http://localhost:8090/api/getstats
+curl -fsS http://localhost:8090/api/venues
+curl -fsS -X POST http://localhost:8090/api/vote -H 'Content-Type: application/json' -d '{"venueSlug":"greenhouse-kitchen"}'
+curl -fsS http://localhost:8090/api/getvotes
+./Obervability-Stack/scripts/foodpulse-audit.sh
+./Obervability-Stack/scripts/foodpulse-live-audit.sh
+```
+
+### Problems Encountered
+
+#### 1. The new Compose file had a duplicate `external: true` key
+
+Observed failure:
+
+- `docker compose -f FoodPulse/docker-compose.yml config` failed with a YAML parse error
+
+Fix:
+
+- removed the duplicated `external` key from the `observability-net` definition
+
+#### 2. The first startup still carried forward old local database state
+
+Observed failure:
+
+- `foodpulse-api` restarted with `role "foodpulse" does not exist`
+
+Why it happened:
+
+- an older local Postgres volume predated the new owned app role and schema bootstrap
+
+Fix:
+
+- rewrote the database bootstrap into `FoodPulse/postgres/initdb/01-init-foodpulse.sh`
+- created the owned app role and owned database explicitly
+- reset the local FoodPulse volumes with `docker compose down -v --remove-orphans`
+
+#### 3. The API was still too eager at startup
+
+Observed failure:
+
+- even after the role existed, the API could still fail with `Connection terminated unexpectedly`
+
+Why it happened:
+
+- Postgres was still finishing bootstrap when the API tried its first dependency check
+
+Fix:
+
+- added a startup retry loop in `FoodPulse/api/src/index.js`
+- the API now waits and retries instead of crash-looping immediately
+
+#### 4. The app role could connect but could not read seeded tables
+
+Observed failure:
+
+- the API logged `permission denied for table venues`
+
+Fix:
+
+- granted ownership and table/sequence privileges to the `foodpulse` role
+- updated the bootstrap script so future resets get the same privileges automatically
+- applied the grant fix to the current local database too
+
+#### 5. The seeded price-band strings were corrupted
+
+Observed failure:
+
+- venue payloads showed values like `152` and `152$` instead of `$$` and `$$$`
+
+Why it happened:
+
+- shell expansion inside the init script treated `$$` as the current process ID
+
+Fix:
+
+- escaped the dollar signs in the bootstrap script
+- corrected the already-seeded rows in the running local database
+
+### Implementation Summary
+
+Owned app surface created:
+
+- `FoodPulse/ui`
+- `FoodPulse/api`
+
+Legacy runtime removed:
+
+- deleted the entire `FoodPulse/yelb` tree
+
+Infrastructure alignment updated:
+
+- `FoodPulse/docker-compose.yml`
+- `FoodPulse/redis/replica/redis.conf`
+- `FoodPulse/sentinel/sentinel-01.conf`
+- `FoodPulse/sentinel/sentinel-02.conf`
+- `FoodPulse/sentinel/sentinel-03.conf`
+- `FoodPulse/haproxy/haproxy-redis.cfg`
+- `FoodPulse/haproxy/haproxy-redis.cfg.template.production`
+
+Operator contract updated:
+
+- `FoodPulse/.env.example`
+- `FoodPulse/README.md`
+- `FoodPulse/scripts/start.sh`
+- `FoodPulse/scripts/cluster-status.sh`
+- `FoodPulse/scripts/pg-failover-drill.sh`
+- `FoodPulse/scripts/redis-failover-drill.sh`
+- `FoodPulse/command.sh`
+- `WORKSPACE-SETUP-MATRIX.md`
+- `WORKSPACE-ARCHITECTURE.md`
+
+### Validation
+
+Successful checks:
+
+- `npm ci` and `npm run build` in `FoodPulse/ui`
+- `npm ci` in `FoodPulse/api`
+- `bash -n` on the FoodPulse scripts and replica bootstrap
+- `docker compose -f FoodPulse/docker-compose.yml config`
+- `curl -fsS http://localhost:8090/api/getstats`
+- `curl -fsS http://localhost:8090/api/venues`
+- `curl -fsS http://localhost:8090/health`
+- `curl -fsS -X POST http://localhost:8090/api/vote -H 'Content-Type: application/json' -d '{"venueSlug":"greenhouse-kitchen"}'`
+- `curl -fsS http://localhost:8090/api/getvotes`
+- `./Obervability-Stack/scripts/foodpulse-audit.sh`
+- `./Obervability-Stack/scripts/foodpulse-live-audit.sh`
+
+### Why This Mattered
+
+This was the real ownership cutover for `FoodPulse`.
+
+The repo is no longer a rebranded wrapper around inherited application code.
+It now contains:
+
+- a modern app we own
+- a clearer UI/API boundary for future Kubernetes Services
+- explicit health and metrics surfaces
+- the same HA lab value underneath
+
+That makes `FoodPulse` much stronger both as a demo app and as a platform-engineering case study.

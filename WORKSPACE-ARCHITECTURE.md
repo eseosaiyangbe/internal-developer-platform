@@ -73,11 +73,11 @@ Role:
 
 Architecture style:
 
-- Yelb-based app stack
+- workspace-owned React frontend
+- workspace-owned Node API
 - Redis master/replica/Sentinel
 - Postgres primary/replicas
 - HAProxy routing
-- built-in monitoring stack
 
 Why it matters:
 
