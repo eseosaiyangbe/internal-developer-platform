@@ -382,6 +382,7 @@ Latest progress:
 - static-plus-live audits now exist across all managed workloads
 - the control-plane side has enough trust to shift into operator-facing onboarding artifacts
 - the reusable onboarding template and operator app matrix are now part of the Phase 4 deliverable set
+- the dashboard now includes an OpenSIS-specific operator guide so the control plane explains first-response actions, not just health state
 
 ---
 

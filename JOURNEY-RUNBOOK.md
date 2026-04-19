@@ -4985,3 +4985,65 @@ We also updated:
 This is the first Phase 4 slice that turns earlier audit work into a reusable onboarding model instead of repo-specific knowledge.
 
 That makes the platform story more transferable and gives us a cleaner bridge into Phase 5 incident and workflow work later.
+
+---
+
+## Phase 4: OpenSIS Operator Guide In The Control Plane
+
+### Why We Did This
+
+Phase 4 is not only about getting apps into the platform.
+It is also about making the platform useful once the app is there.
+
+The dashboard already had an OpenSIS-specific latency, uptime, logs, and alert view.
+What it did not yet have was the operator layer:
+
+- where to look first
+- which dependency matters next
+- which command to run before guessing
+
+That meant the control plane still depended too heavily on repo docs for first-response work.
+
+### Commands Run
+
+```bash
+rg -n "apps/\\[appId\\]|overview|runbook|opensis|vault|health" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/lib Obervability-Stack/ui-next/components -g '!**/node_modules/**'
+sed -n '1,240p' 'Obervability-Stack/ui-next/app/api/apps/[appId]/overview/route.ts'
+find Obervability-Stack/ui-next/app -maxdepth 4 | sort | rg '/apps|dashboard|services'
+sed -n '1,260p' Obervability-Stack/ui-next/lib/app-observability.ts
+sed -n '1,220p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '220,380p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '1,220p' OpenSIS/README.md
+sed -n '1,260p' OpenSIS/docs/06-architecture-reference.md
+sed -n '1,220p' OpenSIS/docs/04-operations-runbook.md
+sed -n '1,240p' OpenSIS/docs/05-troubleshooting-guide.md
+git diff -- Obervability-Stack/ui-next/app/dashboard/page.tsx | sed -n '1,260p'
+npm run type-check
+```
+
+### What We Changed
+
+We extended the main control-plane dashboard in:
+
+- `Obervability-Stack/ui-next/app/dashboard/page.tsx`
+
+The new dashboard slice adds:
+
+- an OpenSIS operator summary banner driven by the live OpenSIS overview state
+- dependency-oriented quick checks for:
+  - browser path
+  - Vault health
+  - MariaDB state
+  - the local wrapper startup path
+- first-response command blocks
+- guidance on how to interpret common OpenSIS failure shapes
+
+### Why This Matters
+
+This turns the control plane from "OpenSIS is up or down" into "here is how to respond when it is not healthy."
+
+That is a stronger Phase 4 outcome because:
+
+- the control plane now carries more of the operator workflow itself
+- the OpenSIS integration is more than charts and logs
+- the next Phase 5 incident work can build on a real operator panel instead of starting from scratch
