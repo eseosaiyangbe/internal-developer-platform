@@ -773,3 +773,103 @@ Findings:
 - nested Git repos removed
 - root is now the canonical repository location
 - remote wiring, commit, and push were the next steps
+
+### Follow-On Git Commands Used
+
+```bash
+git remote add origin https://github.com/eseosaiyangbe/DevOps-Easy-Learning.git
+git remote -v
+git add .
+git status --short | sed -n '1,120p'
+git commit -m "Initialize DevOps Easy Learning monorepo"
+git push -u origin main
+```
+
+### Additional Problems Encountered
+
+#### 2. `git status` was checked too early during staging
+
+What happened:
+
+- `git add .`
+- `git status --short`
+
+were launched in the same parallel batch once.
+
+Result:
+
+- the status output still showed everything as untracked
+- that output was stale, not authoritative
+
+Fix:
+
+- reran staging and status sequentially:
+
+```bash
+git add . && git status --short | sed -n '1,120p'
+```
+
+Lesson:
+
+- status checks should happen after staging completes, not beside it
+
+#### 3. GitHub push protection blocked the first push
+
+What happened:
+
+- the first push was rejected by GitHub repository rules
+- GitHub detected real-looking Slack Incoming Webhook URLs in imported files
+
+Blocked locations:
+
+- `FoodPulse/monitoring/alertmanager.yml`
+- `OpenSIS/k8s/FROM_SCRATCH_LOCAL_BOOTSTRAP.md`
+- `OpenSIS/k8s/base/observability/alertmanager/secret.yaml`
+- `Obervability-Stack/docs/NOTIFICATIONS_INTEGRATION.md`
+
+Commands used to inspect and sweep:
+
+```bash
+nl -ba FoodPulse/monitoring/alertmanager.yml | sed -n '1,80p'
+nl -ba Obervability-Stack/docs/NOTIFICATIONS_INTEGRATION.md | sed -n '140,180p'
+nl -ba OpenSIS/k8s/FROM_SCRATCH_LOCAL_BOOTSTRAP.md | sed -n '1376,1394p'
+nl -ba OpenSIS/k8s/base/observability/alertmanager/secret.yaml | sed -n '1,40p'
+rg -n "hooks\\.slack\\.com/services/" -S . | sed -n '1,120p'
+rg -n "T09BTEF6PBQ|B0A27R4269E|B0APQE1458C|Mam6XIKYlQotCOj3KQtq3Rb8|SxN9M6vz44dwQSLrMHN673CM" -S .
+```
+
+Fix:
+
+- replaced real webhook values with placeholders using the pattern:
+
+```text
+https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+```
+
+- amended the root commit to remove the secrets from commit history:
+
+```bash
+git add FoodPulse/monitoring/alertmanager.yml OpenSIS/k8s/FROM_SCRATCH_LOCAL_BOOTSTRAP.md OpenSIS/k8s/base/observability/alertmanager/secret.yaml
+git commit --amend --no-edit
+git add Obervability-Stack/docs/NOTIFICATIONS_INTEGRATION.md
+git commit --amend --no-edit
+git push -u origin main
+```
+
+Why it mattered:
+
+- this was not just a formatting problem
+- the remote would not accept the repository until secret-looking values were removed from commit history
+
+### Final Status
+
+- root repo initialized successfully
+- nested `.git` directories removed
+- remote `origin` configured
+- initial monorepo commit created
+- push protection issue resolved by redacting webhook values
+- `main` pushed successfully to:
+
+```text
+https://github.com/eseosaiyangbe/DevOps-Easy-Learning.git
+```
