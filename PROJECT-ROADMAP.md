@@ -279,7 +279,12 @@ If the hub is shaky, every downstream integration feels shaky.
 
 ### Current Status
 
-Not started.
+In progress.
+
+Started:
+
+- monitored app inventory reconciled against the normalized workspace
+- control-plane auth model shifted from demo-only posture toward explicit database mode with controlled demo fallback
 
 Expected entry condition:
 

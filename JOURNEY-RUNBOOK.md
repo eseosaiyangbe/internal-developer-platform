@@ -596,6 +596,134 @@ Why it mattered:
 - validate whether app inventory metadata should remain hardcoded or move toward a more declarative config model
 - decide how to handle demo auth in the control plane
 
+---
+
+## Phase 3: Control Plane Auth Hardening
+
+### Goal
+
+Move the control plane away from a pure hardcoded-demo auth posture and make database-backed auth the primary path, while keeping demo access as an explicit mode or fallback.
+
+### Commands
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/lib/auth-simple.ts
+sed -n '1,260p' Obervability-Stack/ui-next/prisma/schema.prisma
+rg -n "demo@example.com|demo123|auth-simple|NEXTAUTH|prisma|login|credentials|demo users|production" Obervability-Stack/ui-next Obervability-Stack/docs Obervability-Stack/README.md -g '!**/node_modules/**' | sed -n '1,260p'
+sed -n '1,280p' Obervability-Stack/ui-next/lib/auth.ts
+sed -n '1,260p' Obervability-Stack/ui-next/lib/prisma-server.ts
+sed -n '1,260p' Obervability-Stack/ui-next/prisma/seed.ts
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/auth/register/route.ts
+sed -n '1,220p' Obervability-Stack/ui-next/env.example
+sed -n '1,220p' Obervability-Stack/ui-next/app/page.tsx
+sed -n '1,220p' Obervability-Stack/ui-next/app/layout.tsx
+sed -n '1,260p' 'Obervability-Stack/ui-next/app/api/auth/[...nextauth]/route.ts'
+sed -n '1,320p' Obervability-Stack/ui-next/app/auth/signin/page.tsx
+sed -n '1,260p' Obervability-Stack/ui-next/app/auth/signup/page.tsx
+sed -n '1,220p' Obervability-Stack/ui-next/lib/auth-config-check.ts
+rg -n "@/lib/auth-simple|from \\\"@/lib/auth\\\"|from '@/lib/auth'" Obervability-Stack/ui-next -g '!**/node_modules/**' | sed -n '1,220p'
+sed -n '1,260p' Obervability-Stack/docs/PRODUCTION_SETUP.md
+sed -n '1,260p' Obervability-Stack/docs/AUTHENTICATION_MULTI_TENANCY_GUIDE.md
+npm ci
+npm run type-check
+git add Obervability-Stack/ui-next/lib/auth-runtime.ts Obervability-Stack/docs/AUTH_ACCESS_MODEL.md Obervability-Stack/ui-next/lib/auth.ts Obervability-Stack/ui-next/lib/auth-simple.ts Obervability-Stack/ui-next/app/page.tsx Obervability-Stack/ui-next/app/layout.tsx 'Obervability-Stack/ui-next/app/api/auth/[...nextauth]/route.ts' Obervability-Stack/ui-next/app/api/auth/register/route.ts Obervability-Stack/ui-next/app/auth/signin/page.tsx Obervability-Stack/ui-next/app/auth/signup/page.tsx Obervability-Stack/ui-next/env.example Obervability-Stack/docs/README.md Obervability-Stack/docs/PRODUCTION_SETUP.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+git commit -m "Harden control plane auth model"
+git push origin main
+```
+
+### Problems Encountered
+
+#### 1. The active auth path was not the strongest auth path in the repo
+
+Problem:
+
+- the app was still wired to `auth-simple.ts`
+- `auth-simple.ts` only supported hardcoded demo credentials
+- a stronger Prisma-backed auth path already existed in `auth.ts`, but it was not the active runtime path
+
+Why it mattered:
+
+- this kept the control plane in a prototype-grade auth posture
+- it also created duplication and ambiguity about which auth path was real
+
+#### 2. Validation was blocked at first by missing local dependencies
+
+Problem:
+
+- `npm run type-check` initially failed because `ui-next/node_modules` was not installed and `tsc` was missing
+
+Why it mattered:
+
+- this was a tooling gap, not an application-code failure
+- it meant we needed to install the app dependencies before trusting type-check results
+
+#### 3. TypeScript caught a real provider-array typing issue
+
+Problem:
+
+- after dependencies were installed, `tsc` failed because the providers array was inferred too narrowly around the credentials provider shape
+
+Why it mattered:
+
+- this was a real code-level issue introduced during hardening
+- it was exactly the sort of issue we wanted type-check to catch before commit
+
+### What We Changed
+
+#### 1. Promoted the stronger auth model into the active path
+
+- wired the app entrypoints to `ui-next/lib/auth.ts`
+- converted `ui-next/lib/auth-simple.ts` into a compatibility shim that re-exports from `auth.ts`
+
+#### 2. Added explicit auth runtime controls
+
+- created `ui-next/lib/auth-runtime.ts`
+- introduced:
+  - `AUTH_MODE`
+  - `ENABLE_DEMO_LOGIN`
+  - `NEXT_PUBLIC_AUTH_MODE`
+  - `NEXT_PUBLIC_ENABLE_DEMO_LOGIN`
+
+#### 3. Made auth behavior explicit instead of accidental
+
+- defaulted to database-backed auth
+- kept demo login as an explicit mode or fallback
+- enabled OAuth providers only when their credentials are actually configured
+- made registration create real Prisma-backed users in database mode
+- kept registration disabled in demo mode
+
+#### 4. Reconciled auth docs with the new runtime model
+
+- added `Obervability-Stack/docs/AUTH_ACCESS_MODEL.md`
+- updated the control-plane docs index
+- updated `PRODUCTION_SETUP.md`
+- updated the roadmap to reflect that auth hardening has started inside Phase 3
+
+### Verification
+
+```bash
+cd Obervability-Stack/ui-next
+npm ci
+npm run type-check
+```
+
+Result:
+
+- `npm ci` completed successfully
+- `npm run type-check` completed successfully after fixing the provider-array typing
+
+### Why This Step Mattered
+
+- it turned auth from a demo-only assumption into a deliberate runtime model
+- it reduced ambiguity inside the control plane codebase
+- it moved the hub repo closer to a real operator posture without giving up local demo convenience
+
+### Follow-Up Work
+
+- reconcile deeper auth and multi-tenancy docs that still describe a more aspirational architecture than the current runtime
+- decide whether to surface auth mode more clearly inside the UI itself
+- continue Phase 3 documentation reconciliation in the control plane
+
 ## Transition to App Discovery
 
 The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
