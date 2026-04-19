@@ -3383,3 +3383,158 @@ That is a much stronger Phase 3 outcome, and it sets us up to move into broader 
 
 - decide whether the SwiftPay business panel should later include one success-oriented metric so healthy activity is more visually obvious
 - use the same live-audit pattern for the next onboarded workload instead of relying on config-only checks
+
+---
+
+## Phase 15: SwiftPay Success Signal
+
+### Goal
+
+Add one positive SwiftPay business signal so a healthy successful transfer is visible in the control plane instead of reading like "all zeros".
+
+### Commands
+
+```bash
+rg -n "swiftpay:pending_transactions|swiftpay:pending_amount|swiftpay:transaction_queue_depth|wallet_circuit_breaker_state|transactionFailureRate|pendingTransactions|business" Obervability-Stack/prometheus Obervability-Stack/ui-next -g '!**/node_modules/**'
+sed -n '1,220p' Obervability-Stack/prometheus/recording_rules.yml
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts
+sed -n '1,180p' Obervability-Stack/ui-next/lib/hooks/use-swiftpay-business-metrics.ts
+sed -n '410,450p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '560,630p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=transactions_total{job="swiftpay-transaction-service",service="transaction-service",status="completed",type="transfer"}' | jq .
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=swiftpay_transaction_volume_dollars_total{job="swiftpay-transaction-service"}' | jq .
+curl -fsS http://localhost:3008/metrics | rg 'swiftpay_transaction_volume_dollars_total|transactions_total\\{|swiftpay_average_transaction_size_dollars'
+rg -n "swiftpay:pending_transactions|swiftpay:pending_amount|swiftpay:transaction_queue_depth|swiftpay:transaction_failure_rate_5m|swiftpay:wallet_failed_transfer_rate_5m|swiftpay:wallet_circuit_breaker_state" SwiftPay/docs/observability-runbook.md Obervability-Stack/scripts/swiftpay-audit.sh JOURNEY-RUNBOOK.md -g '!**/node_modules/**'
+sed -n '1,220p' SwiftPay/docs/observability-runbook.md
+bash -n Obervability-Stack/scripts/swiftpay-audit.sh
+bash -n Obervability-Stack/scripts/swiftpay-live-audit.sh
+npm run type-check
+docker compose -f Obervability-Stack/docker-compose.yml exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml
+docker compose -f Obervability-Stack/docker-compose.yml exec -T prometheus wget -qO- --post-data='' http://localhost:9090/-/reload
+curl -fsS http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name=="swiftpay_recording_rules") | .rules[] | select(.name=="swiftpay:completed_transfers_total")'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=transactions_total{job="swiftpay-transaction-service",service="transaction-service",status="completed",type="transfer"}' | jq .
+docker compose -f Obervability-Stack/docker-compose.yml up -d --build devops-monitor-ui
+docker compose -f Obervability-Stack/docker-compose.yml ps devops-monitor-ui
+curl -fsS http://localhost:4000/api/apps/swiftpay/business | jq .
+./Obervability-Stack/scripts/swiftpay-audit.sh
+./Obervability-Stack/scripts/swiftpay-live-audit.sh
+```
+
+### What We Learned
+
+- The most reliable positive signal already present in the live SwiftPay stack is the completed transfer counter:
+
+```text
+transactions_total{job="swiftpay-transaction-service",service="transaction-service",status="completed",type="transfer"}
+```
+
+- The more ambitious transaction-volume counter was not yet emitting samples in the live stack, so it was not the right choice for an operator-facing dashboard card.
+- Adding `swiftpay:completed_transfers_total` gives the dashboard an obvious healthy-activity signal without changing the meaning of the existing pending, failure, queue, or circuit-breaker metrics.
+- After rebuilding the UI and reloading Prometheus, the running business API returned:
+
+```json
+{
+  "app": "swiftpay",
+  "metrics": {
+    "pendingTransactions": 0,
+    "pendingAmount": 0,
+    "queueDepth": 0,
+    "completedTransfersTotal": 3,
+    "transactionFailureRate": 0,
+    "walletFailureRate": 0,
+    "walletCircuitBreakerState": 0
+  }
+}
+```
+
+That is a much clearer operator experience because the panel now shows both:
+
+- a healthy path with no backlog or failure
+- proof that real successful transfers have happened
+
+### Problems Encountered
+
+#### 1. TypeScript caught an existing safety gap in the inventory validator
+
+Problem:
+
+- `npm run type-check` failed with:
+
+```text
+scripts/validate-monitored-apps.ts(164,9): error TS18048: 'endpoint.kubernetes' is possibly 'undefined'.
+```
+
+Fix:
+
+- changed the namespace comparison to use optional chaining:
+
+```ts
+endpoint.kubernetes?.namespace
+```
+
+Why it mattered:
+
+- this was not part of the new SwiftPay metric directly
+- but Phase 3 is about trustworthiness, and leaving the type-check red would weaken that
+
+#### 2. The rebuilt UI API was hit too early once
+
+Problem:
+
+- right after `docker compose up -d --build devops-monitor-ui`, the first immediate `curl` returned:
+
+```text
+curl: (52) Empty reply from server
+```
+
+Fix:
+
+- waited for `devops-monitor-ui` to report healthy
+- then re-ran the API checks
+
+Why it mattered:
+
+- this was just startup timing, not a broken build
+- recording that distinction keeps the runbook honest for the next operator
+
+### What We Changed
+
+- added `swiftpay:completed_transfers_total` to `Obervability-Stack/prometheus/recording_rules.yml`
+- exposed `completedTransfersTotal` in:
+  - `Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts`
+  - `Obervability-Stack/ui-next/lib/hooks/use-swiftpay-business-metrics.ts`
+- added a `Completed Transfers` card to:
+  - `Obervability-Stack/ui-next/app/dashboard/page.tsx`
+- updated:
+  - `Obervability-Stack/scripts/swiftpay-audit.sh`
+  - `Obervability-Stack/scripts/swiftpay-live-audit.sh`
+  - `SwiftPay/docs/observability-runbook.md`
+- fixed a TypeScript safety issue in:
+  - `Obervability-Stack/ui-next/scripts/validate-monitored-apps.ts`
+
+### Validation
+
+Validated successfully:
+
+- `bash -n Obervability-Stack/scripts/swiftpay-audit.sh`
+- `bash -n Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- `npm run type-check`
+- `docker compose -f Obervability-Stack/docker-compose.yml exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml`
+- `./Obervability-Stack/scripts/swiftpay-audit.sh`
+- `./Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- live API response from `http://localhost:4000/api/apps/swiftpay/business`
+
+### Why This Mattered
+
+This change makes the SwiftPay control-plane view more truthful.
+
+Before:
+
+- a perfectly healthy successful transfer could still make the business panel look inert
+
+After:
+
+- operators can see the absence of backlog and failures
+- and they can also see clear evidence of successful business activity
+
+That is a better Phase 3 control-plane experience and gives us a cleaner pattern for other onboarded workloads later.
