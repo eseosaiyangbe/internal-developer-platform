@@ -1537,3 +1537,286 @@ Fixing that now makes local onboarding easier and avoids carrying a misleading D
 
 - finish the remaining Phase 2 startup and health contract cleanup across the workspace
 - start identifying which normalization gaps are still true blockers for Phase 3 control-plane hardening
+
+---
+
+## Phase 11: macOS Workstation Bootstrap
+
+### Goal
+
+Bootstrap this new Apple Silicon Mac mini with the toolchain needed to work on the monorepo.
+
+The target was not just “install some binaries.”
+The target was:
+
+- get the local container runtime working
+- get Kubernetes and infrastructure CLIs available
+- get cloud CLIs available
+- do it in a way that matches the constraints of this machine
+
+### Commands
+
+```bash
+uname -a
+uname -m
+which brew || true
+for t in git rg jq curl wget docker docker-compose kubectl helm kustomize kind k3d terraform aws az node npm python3 pip3 make yq cloudflared openssl; do printf '%-15s' "$t"; command -v "$t" || echo MISSING; done
+rg -n "Prerequisites|brew install|Docker Desktop|kubectl|helm|terraform|aws cli|AWS CLI|az |Azure CLI|cloudflared|k3d|kind|microk8s|multipass|jq|yq|node|npm|python|make|git" MemFlip OpenSIS SwiftPay FoodPulse Obervability-Stack -g 'README*' -g 'docs/**' -g 'scripts/**'
+xcode-select -p || true
+whoami
+echo $SHELL
+NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+curl -I -fsSL https://desktop.docker.com/mac/main/arm64/Docker.dmg
+curl -fsSL https://api.github.com/repos/abiosoft/colima/releases/latest | jq -r '.tag_name'
+curl -fsSL https://api.github.com/repos/lima-vm/lima/releases/latest | jq -r '.tag_name'
+bash -x ./scripts/bootstrap-macos-userland.sh
+source ~/.zprofile >/dev/null 2>&1; for t in docker docker-compose colima limactl kubectl helm kustomize kind k3d terraform node npm aws az yq cloudflared argocd; do printf '%-15s' "$t"; command -v "$t" || echo MISSING; done
+source ~/.zprofile >/dev/null 2>&1; docker --version
+source ~/.zprofile >/dev/null 2>&1; docker compose version
+source ~/.zprofile >/dev/null 2>&1; colima version
+source ~/.zprofile >/dev/null 2>&1; limactl --version
+source ~/.zprofile >/dev/null 2>&1; kubectl version --client=true
+source ~/.zprofile >/dev/null 2>&1; helm version --short
+source ~/.zprofile >/dev/null 2>&1; kustomize version
+source ~/.zprofile >/dev/null 2>&1; kind version
+source ~/.zprofile >/dev/null 2>&1; k3d version
+source ~/.zprofile >/dev/null 2>&1; terraform version | head -n 1
+source ~/.zprofile >/dev/null 2>&1; node --version
+source ~/.zprofile >/dev/null 2>&1; npm --version
+source ~/.zprofile >/dev/null 2>&1; aws --version
+source ~/.zprofile >/dev/null 2>&1; az version --output json | jq -r '."azure-cli"'
+source ~/.zprofile >/dev/null 2>&1; yq --version
+source ~/.zprofile >/dev/null 2>&1; cloudflared version
+source ~/.zprofile >/dev/null 2>&1; argocd version --client --short
+source ~/.zprofile >/dev/null 2>&1; colima start --runtime docker --cpu 4 --memory 8 --disk 60
+source ~/.zprofile >/dev/null 2>&1; docker context ls
+source ~/.zprofile >/dev/null 2>&1; docker context create colima --docker "host=unix://${HOME}/.colima/default/docker.sock" 2>/dev/null || true
+source ~/.zprofile >/dev/null 2>&1; docker context use colima
+source ~/.zprofile >/dev/null 2>&1; docker version
+source ~/.zprofile >/dev/null 2>&1; docker compose version
+source ~/.zprofile >/dev/null 2>&1; docker run --rm hello-world
+cat ~/.docker/config.json
+```
+
+### What We Learned
+
+- This machine is `darwin/arm64`.
+- It had Apple Command Line Tools already installed.
+- It did not have Homebrew.
+- It did not have admin rights for standard Homebrew installation.
+- Most of the project toolchain was missing:
+  - Docker
+  - Docker Compose
+  - kubectl
+  - helm
+  - kustomize
+  - kind
+  - k3d
+  - terraform
+  - aws
+  - az
+  - yq
+  - cloudflared
+  - npm
+
+### Problems Encountered
+
+#### 1. Homebrew could not be installed normally
+
+Problem:
+
+- standard Homebrew install failed because the user does not have admin rights on this machine
+
+Observed output:
+
+```text
+Need sudo access on macOS (e.g. the user raymond needs to be an Administrator)!
+```
+
+Fix:
+
+- switched from a system-level package-manager approach to a user-space bootstrap strategy
+- installed tools into `~/.local/bin`, `~/.local/opt`, `~/.docker/cli-plugins`, and local Python virtual environments
+
+Why it mattered:
+
+- this changed the entire workstation bootstrap design
+- it also made the resulting setup more portable for locked-down machines
+
+#### 2. The first bootstrap script runs exposed installer bugs
+
+Problems:
+
+- quoting bug in the Docker CLI version parser
+- pipefail interaction in GitHub asset selection
+- broken stale symlink at `~/.docker/cli-plugins/docker-compose`
+- Lima install assumed the wrong archive layout
+- AWS CLI download URL had drifted
+
+Fixes:
+
+- repaired the parser quoting
+- removed the fragile `head -n 1` asset-selection pattern
+- made downloads remove stale targets before writing
+- changed Lima installation to install the bundle structure, not just one guessed path
+- switched AWS CLI installation to a local Python virtual environment
+
+Why it mattered:
+
+- the installer needed to become robust before it could be trusted as a reusable bootstrap path
+
+#### 3. Colima could not start at first because `lima` was not on PATH
+
+Problem:
+
+- Lima was installed, but only `limactl` had been linked into `~/.local/bin`
+- Colima expected the `lima` wrapper binary as well
+
+Fix:
+
+- linked both `lima` and `limactl`
+- updated the bootstrap script to expose both
+
+Why it mattered:
+
+- Colima is the local Docker runtime strategy on this machine
+- without it, none of the Compose or k3d/kind workflows would be usable
+
+#### 4. Docker was still pointed at stale Docker Desktop leftovers
+
+Problems:
+
+- active Docker context was `desktop-linux`
+- `~/.docker/config.json` still had:
+
+```json
+"credsStore": "desktop"
+```
+
+- that caused image pulls to fail because the machine no longer had `docker-credential-desktop`
+
+Fixes:
+
+- created and switched to a `colima` Docker context
+- removed the stale Docker Desktop credential-helper setting
+- folded that cleanup into the bootstrap script itself
+
+Why it mattered:
+
+- installed binaries are not enough if Docker is still wired to dead local state
+
+#### 5. Colima came up, but registry pulls hit a VM DNS issue
+
+Problem:
+
+- `docker version` worked against the Colima socket
+- image pulls failed with DNS resolution errors inside the guest:
+
+```text
+lookup registry-1.docker.io on [::1]:53: read udp [::1]:...: read: connection refused
+```
+
+Fixes:
+
+- updated `~/.colima/default/colima.yaml` to set explicit DNS servers:
+  - `1.1.1.1`
+  - `8.8.8.8`
+- verified guest DNS directly with:
+
+```bash
+ssh -F ~/.colima/ssh_config colima 'cat /etc/resolv.conf && echo --- && getent hosts registry-1.docker.io || true'
+```
+
+- re-tested Docker Hub access with:
+
+```bash
+docker pull hello-world
+docker run --rm hello-world
+```
+
+Current state:
+
+- the toolchain is installed
+- Colima is running
+- Docker is pointed at Colima
+- the DNS fix is applied and working
+- Docker Hub pulls and container runs now succeed
+
+Why it mattered:
+
+- this is the remaining runtime sharp edge
+- local image pulls must work before we can rely on Compose or build workflows end to end
+
+### Fixes Applied
+
+Repo changes:
+
+- added `scripts/bootstrap-macos-userland.sh`
+
+Machine changes:
+
+- updated `~/.zprofile` to add:
+  - `~/.local/bin`
+  - `~/.docker/cli-plugins`
+- installed user-space toolchain:
+  - Docker CLI
+  - Docker Compose plugin
+  - Colima
+  - Lima
+  - kubectl
+  - helm
+  - kustomize
+  - kind
+  - k3d
+  - terraform
+  - Node.js + npm
+  - AWS CLI
+  - Azure CLI
+  - yq
+  - cloudflared
+  - argocd
+- switched Docker context to `colima`
+- removed stale `credsStore: desktop` from Docker config
+- set explicit DNS servers in the Colima profile
+
+### Verification Results
+
+Verified successfully:
+
+- `docker --version`
+- `docker compose version`
+- `colima version`
+- `limactl --version`
+- `kubectl version --client`
+- `helm version`
+- `kustomize version`
+- `kind version`
+- `k3d version`
+- `terraform version`
+- `node --version`
+- `npm --version`
+- `aws --version`
+- `az version`
+- `yq --version`
+- `cloudflared version`
+- `argocd version --client`
+- `docker version` against the Colima socket
+
+Not yet fully validated:
+
+- broader project-specific Compose stacks and Kubernetes cluster creation
+
+### Why This Step Mattered
+
+This machine bootstrap was necessary before deeper implementation work could continue.
+
+Without this toolchain:
+
+- we could not run Docker Compose stacks
+- we could not validate or build Kubernetes workflows
+- we could not work on Terraform-backed cloud paths
+- we could not treat this Mac as a real operator workstation for the project
+
+### Follow-Up Work
+
+- once pulls are healthy, move back to the remaining Phase 2 normalization work
