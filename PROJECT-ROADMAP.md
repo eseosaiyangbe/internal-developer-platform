@@ -94,6 +94,7 @@ The working intent inside Phase 4 is:
 - keep the workload contracts aligned with the future Kubernetes model
 - turn the validated workload patterns into repeatable onboarding stories instead of one-off fixes
 - preserve the new operator audit flow as the guardrail while app-specific work expands
+- land the reusable onboarding template and operator app matrix as the first shared Phase 4 deliverables
 
 ## Current Definition Of Done
 
@@ -371,6 +372,16 @@ Extract a reusable pattern:
 
 - each app has a credible platform story
 - adding a sixth app would feel structured, not improvised
+
+### Current Status
+
+In progress.
+
+Latest progress:
+
+- static-plus-live audits now exist across all managed workloads
+- the control-plane side has enough trust to shift into operator-facing onboarding artifacts
+- the reusable onboarding template and operator app matrix are now part of the Phase 4 deliverable set
 
 ---
 

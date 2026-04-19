@@ -4910,3 +4910,78 @@ It now contains:
 - the same HA lab value underneath
 
 That makes `FoodPulse` much stronger both as a demo app and as a platform-engineering case study.
+
+---
+
+## Phase 4: Onboarding Template And Operator Matrix
+
+### Why We Did This
+
+Phase 4 is supposed to make onboarding repeatable, visible, and useful.
+
+At this point we already had:
+
+- inventory validation
+- control-plane smoke checks
+- app-specific contract audits
+- app-specific live audits
+
+What we did not yet have was the shared operator layer that explains how a new or existing workload should fit into the platform without reverse-engineering four different examples.
+
+That gap would make a sixth app feel improvised, which is exactly what Phase 4 is meant to prevent.
+
+### Commands Run
+
+```bash
+sed -n '1,260p' PROJECT-ROADMAP.md
+git status --short
+rg -n "Phase 4|Phase 3|Current Focus|in progress|complete" JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md WORKSPACE-HYGIENE-CHECKLIST.md
+sed -n '300,430p' PROJECT-ROADMAP.md
+ls -1 Obervability-Stack/scripts
+sed -n '1,260p' Obervability-Stack/scripts/devops-monitor.sh
+sed -n '1,260p' Obervability-Stack/scripts/README.md
+sed -n '1,260p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,240p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,260p' Obervability-Stack/docs/WORKSPACE_APP_INVENTORY_AUDIT.md
+sed -n '1,260p' Obervability-Stack/docs/README.md
+tail -n 80 JOURNEY-RUNBOOK.md
+find Obervability-Stack/docs -maxdepth 1 -type f | sort
+```
+
+### What We Added
+
+We added two new Phase 4 documents:
+
+- `Obervability-Stack/docs/APP_ONBOARDING_TEMPLATE.md`
+- `Obervability-Stack/docs/OPERATOR_APP_MATRIX.md`
+
+We also updated:
+
+- `Obervability-Stack/docs/README.md`
+- `PROJECT-ROADMAP.md`
+
+### Why These Changes Matter
+
+`APP_ONBOARDING_TEMPLATE.md` captures the reusable app contract:
+
+- startup contract
+- browser contract
+- health contract
+- alias contract
+- inventory contract
+- metrics and logs expectations
+- Kubernetes-readiness lens
+
+`OPERATOR_APP_MATRIX.md` captures the operator-facing reality of the current managed workloads:
+
+- what each app demonstrates
+- how to start it
+- what health check matters most
+- which audit and live audit to run
+- why the app is interesting from a platform perspective
+
+### Outcome
+
+This is the first Phase 4 slice that turns earlier audit work into a reusable onboarding model instead of repo-specific knowledge.
+
+That makes the platform story more transferable and gives us a cleaner bridge into Phase 5 incident and workflow work later.
