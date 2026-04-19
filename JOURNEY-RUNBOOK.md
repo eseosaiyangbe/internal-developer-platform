@@ -677,6 +677,87 @@ This file is now the canonical journey notebook.
 
 ---
 
+## Phase 10: Correct Git Author Identity
+
+### Goal
+
+Replace the auto-detected local Git identity with the preferred project identity:
+
+- name: `Eseosa`
+- email: `e_raywhite@yahoo.com`
+
+### Why We Did This
+
+The first two monorepo commits were created with the local machine identity:
+
+```text
+Raymond <raymond@mac.home>
+```
+
+That was acceptable for a local commit to keep momentum moving, but not the right long-term author identity for the repository history.
+
+### Commands
+
+Inspect current authors:
+
+```bash
+git log --format='%h %an <%ae> %s' -n 5
+```
+
+Set the repo-local Git identity:
+
+```bash
+git config user.name "Eseosa"
+git config user.email "e_raywhite@yahoo.com"
+```
+
+### Problems Encountered
+
+#### 1. `HEAD~2` was not a valid upstream
+
+Initial attempted command:
+
+```bash
+git rebase -x 'git commit --amend --no-edit --reset-author' HEAD~2
+```
+
+Problem:
+
+- the repo only had two commits total
+- `HEAD~2` does not exist in that case
+
+Git error:
+
+```text
+fatal: invalid upstream 'HEAD~2'
+```
+
+Fix:
+
+- rerun the author reset from the root of history instead:
+
+```bash
+git rebase --root -x 'git commit --amend --no-edit --reset-author'
+```
+
+Why it mattered:
+
+- this reset the author metadata on both commits cleanly without needing interactive rebase
+
+### Result
+
+After the successful `--root` rebase, the existing commits were rewritten with the correct identity.
+
+### Follow-Up
+
+Because commit hashes changed, the branch had to be pushed again with history replacement semantics:
+
+```bash
+git push --force-with-lease
+```
+
+---
+
 ## Phase 9: Flatten Nested Repos Into One Main Repository
 
 ### Goal
