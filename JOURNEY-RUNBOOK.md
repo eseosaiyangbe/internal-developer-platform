@@ -1897,3 +1897,55 @@ Why:
 ### Follow-Up Work
 
 - when we have access to a Linux workstation or VM, run the script end to end and capture any Linux-specific issues in this runbook
+
+---
+
+## Phase 13: Root Bootstrap Guide
+
+### Goal
+
+Add one top-level workstation setup guide so new contributors know exactly where to start before diving into repo-specific docs.
+
+### Commands
+
+```bash
+git status --short
+sed -n '1,220p' PROJECT-ROADMAP.md
+ls -la scripts
+sed -n '1,320p' scripts/bootstrap-macos-userland.sh
+bash -n scripts/bootstrap-linux-userland.sh
+sed -n '1,260p' scripts/bootstrap-linux-userland.sh
+```
+
+### What We Changed
+
+- added `WORKSTATION-BOOTSTRAP.md`
+
+The new guide explains:
+
+- which bootstrap script to use on macOS
+- which bootstrap script to use on Linux
+- what gets installed
+- how to refresh the shell afterward
+- which verification commands to run
+- what Docker runtime model to expect per OS
+
+### Why This Mattered
+
+At this point the repo had:
+
+- a macOS bootstrap script
+- a Linux bootstrap script
+- a runbook history of how the Mac was bootstrapped
+
+But it still did not have one simple answer to:
+
+```text
+I’m new here. What do I run first?
+```
+
+This guide fixes that gap and makes the workstation setup story part of the root workspace contract.
+
+### Follow-Up Work
+
+- if we later add a Windows or WSL path, extend this guide instead of scattering setup notes across repos
