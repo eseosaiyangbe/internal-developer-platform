@@ -218,9 +218,9 @@ Already done:
 
 Still to do before moving on:
 
-- tighten any remaining fuzzy startup and health contracts repo by repo
-- decide whether any tracked generated assets should be removed, ignored, or simply documented
-- identify which remaining normalization gaps are true blockers for Phase 3
+- use a workspace hygiene checkpoint to separate true blockers from non-blocking historical residue
+- carry minor repo-specific documentation cleanup opportunistically instead of holding the roadmap open for perfection
+- transition into Phase 3 once the control-plane work clearly outweighs remaining normalization work
 
 ---
 

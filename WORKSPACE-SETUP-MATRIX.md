@@ -50,7 +50,7 @@ The following aliases match the monitored app inventory in:
 
 - frontend is now published locally at `http://localhost:8080`
 - backend health is still directly available on `http://localhost:3001/health`, but the preferred operator check is the user-facing proxied path
-- `frontend/dist` exists in the repo, but the long-term source of truth should stay the frontend source tree and Docker build path
+- `frontend/dist` may exist locally after frontend builds, but it is ignored and should be treated as generated output rather than repo source of truth
 
 ### `Obervability-Stack`
 

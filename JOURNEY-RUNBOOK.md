@@ -437,6 +437,85 @@ Result:
 - `SwiftPay` still has more historical docs that reference older host-port assumptions
 - those are now lower-risk because the main entry docs, deployment guide, runbook, and system-flow guide are aligned
 
+---
+
+## Phase 2: Workspace Hygiene Checkpoint
+
+### Goal
+
+Decide whether Phase 2 still has real blockers left, or whether the remaining work has shifted naturally into control-plane hardening.
+
+### Commands
+
+```bash
+rg -n "frontend/dist|generated|build output|Phase 2|Still to do before moving on|Known Gaps|remaining" PROJECT-ROADMAP.md WORKSPACE-SETUP-MATRIX.md WORKSPACE-ARCHITECTURE.md JOURNEY-RUNBOOK.md MemFlip/README.md MemFlip/docs -g '!**/node_modules/**'
+find MemFlip/frontend/dist -maxdepth 2 -type f | sed -n '1,80p'
+git ls-files MemFlip/frontend/dist MemFlip/~ FoodPulse/command.sh FoodPulse/scripts/pg-failover-drill.sh | sed -n '1,120p'
+rg -n "dist|build|nginx|COPY|frontend/dist|npm run build|config.js" MemFlip/frontend MemFlip/docker-compose.yml MemFlip/nginx MemFlip/README.md MemFlip/docs -g '!**/node_modules/**' | sed -n '1,260p'
+find MemFlip/frontend -maxdepth 2 \\( -name 'Dockerfile*' -o -name 'package.json' -o -name '.gitignore' -o -name 'README*' \\) | sort | sed -n '1,120p'
+sed -n '1,220p' MemFlip/docker-compose.yml
+sed -n '1,220p' MemFlip/frontend/Dockerfile
+sed -n '1,220p' MemFlip/frontend/package.json
+find MemFlip/frontend/src -maxdepth 2 -type f | sort | sed -n '1,80p'
+find MemFlip -maxdepth 2 -name '.gitignore' -o -name '.dockerignore' | sort | sed -n '1,120p'
+git check-ignore -v MemFlip/frontend/dist MemFlip/frontend/dist/index.html || true
+git status --short --untracked-files=all MemFlip/frontend | sed -n '1,120p'
+rg --files -g 'WORKSPACE-HYGIENE-CHECKLIST.md' -g 'PHASE-2*' -g '*CHECKLIST*'
+sed -n '1,120p' MemFlip/.gitignore
+sed -n '200,260p' PROJECT-ROADMAP.md
+git add WORKSPACE-HYGIENE-CHECKLIST.md PROJECT-ROADMAP.md WORKSPACE-SETUP-MATRIX.md JOURNEY-RUNBOOK.md
+git commit -m "Add workspace hygiene checkpoint"
+git push origin main
+```
+
+### What We Learned
+
+- `MemFlip/frontend/dist` exists on disk but is already ignored by `MemFlip/.gitignore`.
+- It is not a tracked artifact problem in the monorepo.
+- The actual source-of-truth path for MemFlip frontend runtime remains:
+  - frontend source in `frontend/src`
+  - frontend image build in `frontend/Dockerfile`
+- The remaining rough edges across the workspace are now mostly historical or deep-doc residue, not startup-contract blockers.
+
+### Problems Encountered
+
+#### 1. A likely blocker turned out to be a documented non-issue
+
+Problem:
+
+- `MemFlip/frontend/dist` looked like the strongest remaining candidate for a Phase 2 cleanup decision
+- once inspected closely, it was already ignored and therefore not a tracked monorepo hygiene problem
+
+Why it mattered:
+
+- this changed the decision from "keep cleaning repos" to "capture the checkpoint and move toward Phase 3"
+
+### Fixes Applied
+
+#### 1. Added an explicit workspace hygiene checkpoint
+
+- created `WORKSPACE-HYGIENE-CHECKLIST.md`
+- documented which repos are normalized enough
+- separated non-blocking residue from real blockers
+- clarified that the next meaningful risks are control-plane risks
+
+#### 2. Updated root workspace docs to reflect the new checkpoint
+
+- updated `PROJECT-ROADMAP.md` so the remaining Phase 2 items focus on transition rather than perfection
+- updated `WORKSPACE-SETUP-MATRIX.md` so the MemFlip generated-output note reflects the real ignored-state behavior
+
+### Why This Step Mattered
+
+- it gives the roadmap a clean handoff point instead of letting normalization drag on indefinitely
+- it makes Phase 2 completion a judgment call based on platform risk, not on infinite doc polishing
+- it protects the future Kubernetes migration from inheriting the wrong source-of-truth assumptions
+
+### Follow-Up Work
+
+- begin Phase 3 by hardening `Obervability-Stack`
+- validate the monitored-app inventory against the actual workspace state
+- decide whether the control-plane auth path stays demo-grade temporarily or gets hardened now
+
 ## Transition to App Discovery
 
 The observability discovery phase established that the control plane should be the workspace hub, which is why the next discovery step moved into `SwiftPay` as the flagship workload candidate.
