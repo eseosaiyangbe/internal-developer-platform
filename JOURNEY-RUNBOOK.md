@@ -6423,3 +6423,199 @@ kubectl exec -n vault vault-0 -- vault status
 ```
 
 The same lesson applies in Kubernetes: pod readiness, service reachability, Vault seal state, and user-facing OpenSIS UI behavior are related but not identical signals. A serious runbook must verify the dependency state directly.
+
+---
+
+## Incident Drill: FoodPulse Redis Failover
+
+### Goal
+
+Prove that FoodPulse can survive a Redis master failure through Sentinel promotion and that the operator workflow can verify the final Redis topology.
+
+This drill was selected fourth because it brings the incident-drill pattern into FoodPulse without using the higher-risk Postgres promotion drill. The Postgres drill is intentionally data-risk because it can leave the replication topology dirty, so Redis failover was the safer next learning step.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '398,480p' PROJECT-ROADMAP.md
+sed -n '35,90p' Obervability-Stack/docs/INCIDENT_DRILLS.md
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+rg --files FoodPulse | rg 'cluster-status|failover|drill|compose|README|RUNBOOK|docs'
+cd FoodPulse && docker compose ps
+sed -n '1,260p' FoodPulse/scripts/redis-failover-drill.sh
+sed -n '1,260p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,260p' FoodPulse/scripts/pg-failover-drill.sh
+sed -n '1,220p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+cd FoodPulse && ./scripts/redis-failover-drill.sh
+cd FoodPulse && ./scripts/redis-failover-drill.sh
+cd FoodPulse && ./scripts/cluster-status.sh
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+The first `redis-failover-drill.sh` attempt was cancelled before the stop prompt because the sandbox could not access the Colima Docker socket:
+
+```text
+permission denied while trying to connect to the docker API at unix:///Users/raymond/.colima/default/docker.sock
+```
+
+No Redis container had been stopped yet. The fix was to rerun the same script with Docker access approved, because this drill intentionally needs to inspect and stop/start containers.
+
+### Baseline
+
+Before the drill, FoodPulse live audit passed:
+
+- `16/16` checks
+- FoodPulse responded on `localhost:8090`
+- frontend returned HTTP `200`
+- stats endpoint responded through the UI proxy
+- control plane saw FoodPulse as healthy
+- Prometheus blackbox target health was up
+- `cluster-status.sh` reported a healthy lab
+
+The relevant services were running:
+
+- `foodpulse-api`
+- `foodpulse-ui`
+- `foodpulse-redis-master`
+- `foodpulse-redis-replica1`
+- `foodpulse-redis-replica2`
+- `foodpulse-redis-sentinel01`
+- `foodpulse-redis-sentinel02`
+- `foodpulse-redis-sentinel03`
+- `foodpulse-redis-haproxy`
+
+Baseline Redis roles were:
+
+```text
+foodpulse-redis-master: role:master
+foodpulse-redis-replica1: role:slave, master_host:redis-master
+foodpulse-redis-replica2: role:slave, master_host:redis-master
+redis-haproxy view: role:master
+```
+
+### Trigger
+
+The drill stopped the current Redis master:
+
+```bash
+cd FoodPulse
+./scripts/redis-failover-drill.sh
+```
+
+At the first prompt, we pressed Enter to stop:
+
+```text
+foodpulse-redis-master
+Waiting 15s for Sentinel failover...
+```
+
+### Detection
+
+After the master stopped, Sentinel promoted a replica:
+
+```text
+role:slave
+master_host:172.26.0.2
+role:master
+```
+
+HAProxy still routed to a Redis master:
+
+```text
+role:master
+```
+
+The app did not go down during this window. This drill is primarily a topology drill, so the important signal was not a failed UI probe; it was the Redis role transition reported by the failover script and `cluster-status.sh`.
+
+### Recovery
+
+At the second prompt, we pressed Enter to start the old master again:
+
+```text
+foodpulse-redis-master
+Waiting 10s for it to register with Sentinel...
+```
+
+The drill's immediate final output briefly looked ambiguous because the old master and promoted replica both reported `role:master`:
+
+```text
+role:master
+role:slave
+master_host:172.26.0.2
+role:master
+```
+
+We did not accept that as final recovery proof. We ran the normal operator status helper immediately afterward:
+
+```bash
+cd FoodPulse
+./scripts/cluster-status.sh
+```
+
+That follow-up check confirmed the topology had settled:
+
+```text
+foodpulse-redis-master:
+  role:slave
+  master_host:172.26.0.2
+foodpulse-redis-replica1:
+  role:slave
+  master_host:172.26.0.2
+foodpulse-redis-replica2:
+  role:master
+HAProxy view:
+  role:master
+```
+
+### Final Verification
+
+FoodPulse live audit passed after recovery:
+
+- `16/16` checks
+- frontend returned HTTP `200`
+- stats endpoint responded through the UI proxy
+- control plane saw FoodPulse as healthy
+- Prometheus blackbox target health was up
+- `cluster-status.sh` reported a healthy lab
+
+The full operator baseline also passed:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+### Problems And Fixes
+
+Problem: the first drill attempt could not access Docker from the sandbox.
+
+Fix: cancel before the destructive prompt and rerun the same script with Docker access approved.
+
+Problem: the immediate final output from the drill briefly appeared to show two Redis masters.
+
+Fix: do not trust the first post-start snapshot alone. Run `cluster-status.sh` after Sentinel has a moment to converge. The follow-up check confirmed one master and two replicas.
+
+### Lessons
+
+This drill taught four useful platform lessons:
+
+- FoodPulse can keep the application path healthy while Redis Sentinel promotes a new master.
+- The most important signal for this drill is topology state, not just HTTP reachability.
+- Recovery proof must include `cluster-status.sh`, because the script's immediate final output can catch Redis during convergence.
+- The old Redis master can rejoin as a replica, which is the expected local-lab outcome after failover.
+
+### Kubernetes Mapping
+
+In Kubernetes, the equivalent drill would be:
+
+```bash
+kubectl delete pod redis-master-0 -n foodpulse
+kubectl get pods -n foodpulse
+kubectl logs -n foodpulse -l app=redis-sentinel
+kubectl exec -n foodpulse deploy/redis-haproxy -- redis-cli INFO replication
+```
+
+The same lesson applies in Kubernetes: application readiness, Sentinel election state, HAProxy routing, and direct Redis node roles are separate signals. A good runbook verifies all of them before declaring recovery.
