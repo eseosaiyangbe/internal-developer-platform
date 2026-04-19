@@ -3538,3 +3538,239 @@ After:
 - and they can also see clear evidence of successful business activity
 
 That is a better Phase 3 control-plane experience and gives us a cleaner pattern for other onboarded workloads later.
+
+---
+
+## Phase 16: MemFlip Static And Live Audits
+
+### Goal
+
+Extend the control-plane audit pattern from `SwiftPay` to a second workload by making `MemFlip` runnable, coexistent, and verifiable through both static and live audits.
+
+### Commands
+
+```bash
+rg -n "memflip" Obervability-Stack/ui-next/lib/monitored-apps.ts Obervability-Stack/prometheus/prometheus.yml Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/scripts Obervability-Stack/README.md Obervability-Stack/docs/README.md PROJECT-ROADMAP.md -g '!**/node_modules/**'
+sed -n '1,220p' MemFlip/docker-compose.yml
+rg -n "health|metrics|leaderboard|score|game|/api" MemFlip/backend MemFlip/frontend/src MemFlip/docs MemFlip/README.md -g '!**/node_modules/**'
+docker compose -f MemFlip/docker-compose.yml ps
+sed -n '1,240p' MemFlip/backend/server.js
+sed -n '1,260p' MemFlip/backend/routes/game.js
+sed -n '1,260p' MemFlip/backend/routes/leaderboard.js
+sed -n '1,260p' MemFlip/backend/routes/scores.js
+sed -n '1,280p' MemFlip/frontend/src/scripts/game.js
+sed -n '1,280p' MemFlip/backend/middleware/metrics.js
+docker network inspect observability-net >/dev/null 2>&1 || docker network create observability-net
+docker compose -f MemFlip/docker-compose.yml up -d
+docker compose -f MemFlip/docker-compose.yml ps
+curl -fsS http://localhost:8080/api/health
+curl -fsS http://localhost:3101/health
+curl -fsSI http://localhost:8080
+curl -fsS http://localhost:4000/api/apps/health | jq '.summary, (.apps[] | select(.appId=="memflip"))'
+curl -fsS http://localhost:3101/metrics | rg 'game_scores_total|active_games_current|http_requests_total|app_health_status'
+curl -fsS 'http://localhost:9115/probe?target=http://memflip-frontend/api/health&module=http_2xx'
+docker logs --tail=100 humor-game-frontend
+docker inspect humor-game-frontend --format '{{json .NetworkSettings.Networks}}'
+curl -fsS http://localhost:4000/api/apps/health | jq '(.apps[] | select(.appId=="memflip"))'
+rg -n "localhost:3001|:3001|API_PORT|FRONTEND_HOST_PORT|backend port|8080" MemFlip/README.md MemFlip/docs/local MemFlip/.env.example WORKSPACE-SETUP-MATRIX.md WORKSPACE-ARCHITECTURE.md -g '!**/node_modules/**'
+sed -n '146,165p' MemFlip/README.md
+sed -n '1,220p' MemFlip/.env.example
+docker compose -f MemFlip/docker-compose.yml up -d --build backend
+curl -fsS -X POST http://localhost:8080/api/scores/user -H 'Content-Type: application/json' -d '{"username":"memflipaudit..."}'
+curl -fsS -X POST http://localhost:8080/api/game/start -H 'Content-Type: application/json' -d '{"username":"memflipaudit...","difficulty":"easy"}'
+curl -fsS -X POST http://localhost:8080/api/game/match -H 'Content-Type: application/json' -d '{"gameId":"...","card1Id":"...","card2Id":"...","matchTime":1000}'
+curl -fsS -X POST http://localhost:8080/api/game/complete -H 'Content-Type: application/json' -d '{"gameId":"...","timeElapsed":60000,"finalScore":0}'
+curl -fsS http://localhost:8080/api/leaderboard
+curl -fsS http://localhost:8080/api/scores/memflipaudit...
+curl -fsS http://localhost:3101/metrics | rg 'http_requests_total|game_scores_total|active_games_current'
+docker logs --tail=120 humor-game-backend
+sed -n '340,420p' MemFlip/backend/middleware/metrics.js
+sed -n '1,80p' MemFlip/backend/package.json
+chmod +x Obervability-Stack/scripts/memflip-audit.sh Obervability-Stack/scripts/memflip-live-audit.sh
+bash -n Obervability-Stack/scripts/memflip-audit.sh
+bash -n Obervability-Stack/scripts/memflip-live-audit.sh
+bash -n Obervability-Stack/scripts/devops-monitor.sh
+./Obervability-Stack/scripts/memflip-audit.sh
+./Obervability-Stack/scripts/memflip-live-audit.sh
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+```
+
+### What We Learned
+
+- `MemFlip` already had the right shape for onboarding:
+  - frontend proxy health at `http://localhost:8080/api/health`
+  - backend health at `http://localhost:3101/health`
+  - a real game flow through `/api/game/start`, `/api/game/match`, and `/api/game/complete`
+  - a backend metrics endpoint at `/metrics`
+- The control plane already knew how to blackbox-probe the `MemFlip` frontend and backend through:
+  - `http://memflip-frontend/api/health`
+  - `http://memflip-backend:3001/health`
+- Once the app was stable, `Obervability-Stack` correctly reported `MemFlip` as healthy.
+- A complete synthetic game flow works through the frontend proxy:
+  - create user
+  - start game
+  - derive a valid matching pair from returned cards
+  - submit a successful match
+  - complete the game
+  - fetch leaderboard and user stats
+- After the backend fixes, the metrics endpoint recorded:
+  - request counters for `/start`, `/match`, and `/complete`
+  - a `game_scores_total` sample for the synthetic completed game
+
+### Problems Encountered
+
+#### 1. `MemFlip` collided with `SwiftPay` on host port `3001`
+
+Problem:
+
+- `MemFlip` published its backend on host port `3001`
+- `SwiftPay` already used `3001` for the wallet service
+- starting both locally caused:
+
+```text
+Bind for 0.0.0.0:3001 failed: port is already allocated
+```
+
+Fix:
+
+- changed the published MemFlip backend port to:
+
+```text
+${BACKEND_HOST_PORT:-3101}:3001
+```
+
+- updated:
+  - `MemFlip/.env.example`
+  - `MemFlip/README.md`
+  - `WORKSPACE-SETUP-MATRIX.md`
+
+Why it mattered:
+
+- this is exactly the kind of local coexistence issue that breaks a multi-app platform story
+- fixing it now keeps the workspace usable as a shared lab instead of a one-app-at-a-time setup
+
+#### 2. MemFlip backend metrics code was wired incorrectly
+
+Problem:
+
+- the game routes called `updateGameMetrics`
+- but `MemFlip/backend/routes/game.js` did not import it
+- backend logs showed:
+
+```text
+updateGameMetrics is not defined
+```
+
+Fix:
+
+- imported `updateGameMetrics` from `../middleware/metrics`
+- also reset active-game gauge to `0` when the synthetic game completes
+
+Why it mattered:
+
+- without that fix, the live audit could prove the user flow but not the metrics flow
+- Phase 3 is about trust in the control plane and supporting app instrumentation
+
+#### 3. Express rate limiting complained about the frontend proxy
+
+Problem:
+
+- the backend runs behind nginx in the local Compose path
+- backend logs showed:
+
+```text
+ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+```
+
+Fix:
+
+- enabled proxy awareness in `MemFlip/backend/server.js`:
+
+```js
+app.set('trust proxy', 1);
+```
+
+Why it mattered:
+
+- this warning would create noise and eventually make operator debugging harder
+- it is also the correct local behavior for an app that is intentionally running behind a frontend proxy
+
+#### 4. `scores.js` referenced `database` without importing it
+
+Problem:
+
+- the achievements helper in `MemFlip/backend/routes/scores.js` called `database.query(...)`
+- but the file did not import `database`
+
+Fix:
+
+- added:
+
+```js
+const database = require('../models/database');
+```
+
+Why it mattered:
+
+- even though the route still returned a response, it emitted noisy errors during the synthetic user-stats flow
+- clean logs matter when we are building operator trust
+
+#### 5. We hit transient startup timing twice
+
+Problem:
+
+- the control plane briefly showed `MemFlip` as degraded before the frontend blackbox probe caught up
+- after rebuilding the backend, the frontend proxy briefly returned `502` while the backend was restarting
+
+Fix:
+
+- waited for the health checks and blackbox probes to settle
+- only then ran the final static and live audits
+
+Why it mattered:
+
+- these were timing issues, not structural breakages
+- recording that distinction prevents future operators from chasing false failures
+
+### What We Changed
+
+- updated `MemFlip/docker-compose.yml` so the backend publishes on `${BACKEND_HOST_PORT:-3101}`
+- updated `MemFlip/.env.example` and `MemFlip/README.md`
+- updated `WORKSPACE-SETUP-MATRIX.md`
+- fixed:
+  - `MemFlip/backend/server.js`
+  - `MemFlip/backend/routes/game.js`
+  - `MemFlip/backend/routes/scores.js`
+- added:
+  - `Obervability-Stack/scripts/memflip-audit.sh`
+  - `Obervability-Stack/scripts/memflip-live-audit.sh`
+- updated:
+  - `Obervability-Stack/scripts/devops-monitor.sh`
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+  - `PROJECT-ROADMAP.md`
+  - `JOURNEY-RUNBOOK.md`
+
+### Validation
+
+Validated successfully:
+
+- `bash -n Obervability-Stack/scripts/memflip-audit.sh`
+- `bash -n Obervability-Stack/scripts/memflip-live-audit.sh`
+- `bash -n Obervability-Stack/scripts/devops-monitor.sh`
+- `./Obervability-Stack/scripts/memflip-audit.sh`
+- `./Obervability-Stack/scripts/memflip-live-audit.sh`
+- `./Obervability-Stack/scripts/devops-monitor.sh memflip-live`
+
+### Why This Mattered
+
+This step proved that the audit pattern is no longer SwiftPay-specific.
+
+We now have the same control-plane shape for two workloads:
+
+- a static onboarding audit
+- a live operator audit
+- a documented runbook trail of the real issues encountered and fixed
+
+That is a stronger Phase 3 position and a much cleaner bridge into Phase 4 app onboarding.

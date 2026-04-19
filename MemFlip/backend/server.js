@@ -18,6 +18,9 @@ const { metricsMiddleware, metricsEndpoint, updateGameMetrics, syncExistingGameD
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// The frontend runs behind nginx in local Compose, so trust the first proxy hop.
+app.set('trust proxy', 1);
+
 // ========================================
 // MIDDLEWARE SETUP
 // ========================================

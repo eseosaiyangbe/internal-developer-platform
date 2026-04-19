@@ -75,7 +75,7 @@ services:
     #   - "${API_PORT:-3001}:${API_PORT:-3001}"
     # Backend port exposed only for debugging - remove in production
     ports:
-      - "3001:3001"
+      - "${BACKEND_HOST_PORT:-3101}:3001"
     networks:
       backend-network:
       frontend-network:

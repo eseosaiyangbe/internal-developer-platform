@@ -20,7 +20,7 @@
 ```bash
 # Quick demo - no learning required
 cp .env.example .env
-docker-compose up -d
+docker compose up -d
 # Open: http://localhost:8080
 ```
 **Perfect for**: Quick preview, testing, or just curious  
@@ -150,8 +150,8 @@ make verify
 ```bash
 # Quick local setup with Docker Compose
 cp .env.example .env
-docker-compose up -d
-curl http://localhost:3001/api/health
+docker compose up -d
+curl http://localhost:8080/api/health
 
 # Access the game
 # Open: http://localhost:8080

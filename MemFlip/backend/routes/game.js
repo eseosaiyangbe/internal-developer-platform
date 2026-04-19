@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const database = require('../models/database');
 const redisCache = require('../utils/redis');
 const { GameDataGenerator, gameConfig } = require('../utils/gameData');
+const { updateGameMetrics } = require('../middleware/metrics');
 const {
   validateGameStart,
   validateCardMatch,
@@ -371,6 +372,7 @@ router.post('/complete', validateGameComplete, async (req, res) => {
       // Record game accuracy
       const accuracy = (totalCardsMatched / gameSession.moves) * 100;
       updateGameMetrics.recordGameAccuracy(gameSession.difficulty, accuracy);
+      updateGameMetrics.setActiveGames(gameSession.difficulty, 0, 'active');
     } catch (metricsError) {
       console.warn('⚠️ Game completion metrics failed (non-critical):', metricsError.message);
       // Continue execution - metrics failure shouldn't break the game completion

@@ -95,6 +95,7 @@ The working intent inside Phase 3 is:
 - keep the local Docker control plane aligned with the future Kubernetes model
 - clear the remaining control-plane blockers before app onboarding work begins
 - validate the flagship workload against the live control plane, not just static config contracts
+- repeat the same audit pattern on at least one secondary workload so onboarding is not SwiftPay-specific
 
 ## Current Definition Of Done
 
@@ -104,6 +105,7 @@ Phase 3 will be considered complete when:
 - local operator access is explicit and actually usable
 - monitored app inventory is validated against the workspace contract
 - the flagship workload has at least one reproducible live integration audit through the control plane
+- at least one secondary workload has the same reproducible static-plus-live audit path
 - the next major bottleneck becomes app onboarding rather than control-plane reliability
 
 ---
