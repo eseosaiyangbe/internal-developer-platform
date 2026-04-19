@@ -1342,3 +1342,50 @@ We are trying to reduce those translation problems now instead of discovering th
 - continue Phase 2 by tightening startup and health contracts where they are still fuzzy
 - begin identifying which workloads are closest to having clean Kubernetes manifests already
 - start mapping `Obervability-Stack` assumptions from Docker aliases toward service-oriented discovery
+
+---
+
+## Phase 9: Roadmap Status Tracking
+
+### Goal
+
+Make the roadmap reflect current execution state, not just planned future phases.
+
+### Commands
+
+```bash
+sed -n '1,260p' PROJECT-ROADMAP.md
+git status --short
+tail -n 80 JOURNEY-RUNBOOK.md
+```
+
+### What We Changed
+
+- added a phase status tracker to `PROJECT-ROADMAP.md`
+- marked Phase 1 as complete
+- kept Phase 2 as in progress
+- marked Phases 3 through 7 as not started
+- added a current-focus section
+- added a practical definition of done for Phase 2
+- added explicit current-status sections for Phases 2 and 3
+
+### Why This Mattered
+
+The roadmap was already strong as a strategy document, but it did not yet answer the project-management question:
+
+```text
+Where are we right now?
+```
+
+Adding status tracking fixes that without flattening the roadmap into a checklist.
+
+It gives us:
+
+- a shared project state view
+- a cleaner handoff between phases
+- less ambiguity when deciding whether a task still belongs to Phase 2 or should move into Phase 3
+
+### Follow-Up Work
+
+- keep the roadmap status tracker current as we complete major phase milestones
+- use the Phase 2 definition of done to decide when to transition into control-plane hardening

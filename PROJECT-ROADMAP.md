@@ -72,6 +72,39 @@ The work is divided into seven phases.
 6. UX and demo polish
 7. Production-style maturity and portfolio packaging
 
+## Phase Status Tracker
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1. Foundation and governance | Complete | Monorepo, root runbook, and root roadmap are in place |
+| 2. Workspace normalization | In progress | Startup contracts, env contracts, repo hygiene, and k8s-minded normalization are underway |
+| 3. Control plane hardening | Not started | Planned next after Phase 2 reaches a cleaner steady state |
+| 4. App integration and onboarding | Not started | Depends on a more trustworthy control plane |
+| 5. Operator workflows and incident drills | Not started | Depends on integrated workloads and stable observability paths |
+| 6. UX and demo polish | Not started | Should happen after operational flows are real |
+| 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
+
+## Current Focus
+
+We are currently in **Phase 2: Workspace normalization**.
+
+The working intent inside Phase 2 is:
+
+- reduce repo drift
+- tighten startup, health, and env contracts
+- document the shared platform model clearly
+- make local decisions that translate cleanly into future Kubernetes resources
+
+## Current Definition Of Done
+
+Phase 2 will be considered complete when:
+
+- every repo has a trustworthy startup contract
+- every repo has a documented env contract
+- every monitored workload has a verified alias and health path
+- obvious junk, misleading scripts, and accidental files have been cleaned up or explicitly documented
+- the remaining work naturally shifts from normalization into control-plane hardening
+
 ---
 
 ## Phase 1: Foundation And Governance
@@ -96,7 +129,7 @@ Create the project spine so every future change has a place to live and a clear 
 
 ### Current Status
 
-Mostly complete.
+Complete.
 
 Already done:
 
@@ -104,11 +137,16 @@ Already done:
 - GitHub remote setup
 - nested `.git` removal
 - journey runbook creation
+- root workspace architecture summary
+- initial workspace setup matrix
 
 ### Remaining Work
 
-- add a lightweight architecture summary at the root
 - define naming conventions for apps, networks, environments, and dashboards
+
+Roadmap note:
+
+- the remaining naming cleanup can continue as part of later phases without blocking Phase 1 completion
 
 ---
 
@@ -160,6 +198,29 @@ Examples:
 - every app has a documented startup contract
 - every app has a documented observability alias
 - no hidden surprise files are required to run the system
+
+### Current Status
+
+In progress.
+
+Already done:
+
+- root workspace architecture summary added
+- repo setup matrix added
+- `FoodPulse/README.md` added
+- `FoodPulse/.env.example` added
+- `OpenSIS/.env.example` added
+- accidental `MemFlip/~/.cloudflared/config.yml` removed
+- `FoodPulse/command.sh` converted into a safe historical-notes wrapper
+- `FoodPulse/scripts/pg-failover-drill.sh` repaired
+- `Obervability-Stack/docs/README.md` reconciled with current primary ports
+- Kubernetes-minded normalization guidance added to root workspace docs
+
+Still to do before moving on:
+
+- tighten any remaining fuzzy startup and health contracts repo by repo
+- decide whether any tracked generated assets should be removed, ignored, or simply documented
+- identify which remaining normalization gaps are true blockers for Phase 3
 
 ---
 
@@ -215,6 +276,14 @@ If the hub is shaky, every downstream integration feels shaky.
 - control plane can boot reliably
 - app inventory is trustworthy
 - operator docs match reality
+
+### Current Status
+
+Not started.
+
+Expected entry condition:
+
+- Phase 2 has reduced enough repo drift that control-plane work is no longer compensating for basic workspace inconsistency
 
 ---
 
