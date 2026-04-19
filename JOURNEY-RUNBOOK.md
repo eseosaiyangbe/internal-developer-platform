@@ -5469,6 +5469,110 @@ The platform now has app operator runbooks for both ends of the current workload
 
 That makes the next runbooks easier because the pattern is no longer theoretical. We can adapt it to OpenSIS for legacy-platform operations and FoodPulse for resilience/failover operations.
 
+---
+
+## Phase 5: OpenSIS Operator Runbook
+
+### Why We Did This
+
+After SwiftPay and MemFlip, we carried the operator-runbook pattern into OpenSIS.
+
+OpenSIS is the right third workload because it teaches the legacy-platform story:
+
+- a large PHP/MariaDB application
+- local Docker Compose startup sequencing
+- Vault bootstrap and seed behavior
+- Vault Agent rendered secrets
+- MariaDB health and credential drift
+- blackbox monitoring rather than rich app-native business metrics
+- a serious Kubernetes/GitOps path around a stateful legacy system
+
+### Commands Run
+
+```bash
+rg --files OpenSIS Obervability-Stack/docs Obervability-Stack/scripts | sort
+git status --short
+sed -n '1,260p' Obervability-Stack/scripts/opensis-live-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/opensis-audit.sh
+sed -n '1,260p' OpenSIS/docker-compose.yaml
+sed -n '1,220p' OpenSIS/scripts/compose-start.sh
+sed -n '1,260p' OpenSIS/README.md
+sed -n '1,240p' OpenSIS/docs/04-operations-runbook.md
+sed -n '260,620p' OpenSIS/docker-compose.yaml
+sed -n '240,520p' OpenSIS/docs/04-operations-runbook.md
+sed -n '1,260p' OpenSIS/docs/05-troubleshooting-guide.md
+sed -n '1,220p' OpenSIS/.env.example
+git diff --check -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/OPENSIS_OPERATOR_RUNBOOK.md
+rg -n "OPENSIS_OPERATOR_RUNBOOK|OpenSIS Operator Runbook|opensis-live|localhost:8088|localhost:8200|probe_success|Vault|MariaDB|kubectl" Obervability-Stack/docs/OPENSIS_OPERATOR_RUNBOOK.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+git diff --stat -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/OPENSIS_OPERATOR_RUNBOOK.md
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh opensis
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/docs/OPENSIS_OPERATOR_RUNBOOK.md`
+
+The runbook documents:
+
+- what OpenSIS does
+- startup commands
+- health checks
+- ports and URLs
+- service roles
+- Vault and MariaDB dependency checks
+- blackbox probe expectations
+- logs to check
+- common failure scenarios
+- recovery commands
+- Kubernetes mapping
+- deeper OpenSIS docs to consult
+
+### What We Updated
+
+We updated:
+
+- `Obervability-Stack/docs/README.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `PROJECT-ROADMAP.md`
+- `JOURNEY-RUNBOOK.md`
+
+### Why This Matters
+
+The platform now has operator runbooks for three distinct workload patterns:
+
+- SwiftPay for microservices and async business flows
+- MemFlip for simple onboarding and browser-first validation
+- OpenSIS for legacy-platform operations with Vault and MariaDB
+
+This makes the remaining FoodPulse runbook easier to position as the resilience and failover story.
+
+### Validation
+
+The documentation checks passed with no whitespace errors.
+
+The OpenSIS static audit passed:
+
+- `26/26` checks
+- compose files and startup helper were present
+- OpenSIS UI and Vault port publishing matched the control-plane contract
+- build-local startup path was documented and wired
+- Prometheus blackbox target and `app=opensis` label were present
+- MariaDB credential environment contract was present
+
+The OpenSIS live audit passed:
+
+- `18/18` checks
+- OpenSIS responded on `localhost:8088`
+- OpenSIS root page returned HTML with application branding
+- Vault health endpoint responded
+- Vault reported initialized and unsealed
+- control plane saw OpenSIS as healthy
+- Prometheus saw OpenSIS blackbox targets and all were up
+
 ### Validation
 
 The documentation checks passed with no whitespace errors.
