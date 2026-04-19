@@ -5790,3 +5790,204 @@ The operator baseline passed without intentionally breaking any workload:
 - OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
 
 We intentionally did not run the break/fix drills in this checkpoint. The next step is to execute selected drills one at a time, capture evidence, recover, and record the outcome.
+
+---
+
+## Incident Drill: MemFlip Backend Down
+
+### Goal
+
+Prove that the platform can detect and recover from a simple application backend failure.
+
+This was selected as the first real drill because it has a small blast radius:
+
+- no volumes are removed
+- no database topology is changed
+- only one backend service is stopped
+- recovery is a normal `docker compose start backend`
+
+### Commands Run
+
+```bash
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+cd MemFlip && docker compose stop backend
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="memflip")'
+cd MemFlip && docker compose ps backend frontend
+curl --max-time 5 -sS -o /tmp/memflip_frontend_health.out -w 'frontend_health_http=%{http_code}\n' http://localhost:8080/api/health
+sed -n '1,80p' /tmp/memflip_frontend_health.out
+curl --max-time 5 -sS -o /tmp/memflip_backend_health.out -w 'backend_health_http=%{http_code}\n' http://localhost:3101/health
+sed -n '1,80p' /tmp/memflip_backend_health.out
+cd MemFlip && docker compose logs --tail=80 backend frontend
+cd MemFlip && docker compose start backend
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+curl --max-time 10 -fsS http://localhost:8080/api/health | jq '.status'
+cd MemFlip && docker compose ps backend frontend
+sleep 20; ./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+sleep 20; curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="memflip") | {status, endpoints: [.endpoints[] | {id, status, probeSuccess, lastChecked}]}'
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### Baseline
+
+Before breaking anything, MemFlip live audit passed:
+
+- `34/34` checks
+- frontend proxy health was healthy
+- backend health was healthy
+- synthetic game flow passed
+- backend metrics checks passed
+- control plane saw MemFlip as healthy
+
+### Trigger
+
+We stopped the MemFlip backend:
+
+```bash
+cd MemFlip
+docker compose stop backend
+```
+
+Docker stopped:
+
+- `humor-game-backend`
+
+The frontend stayed up:
+
+- `humor-game-frontend`
+
+### Detection
+
+The live audit detected the failure.
+
+The first failed check was:
+
+```text
+FAIL MemFlip frontend health endpoint is unreachable
+```
+
+The direct frontend proxy health check returned:
+
+```text
+frontend_health_http=502
+```
+
+The response body was the Nginx `502 Bad Gateway` page.
+
+The direct backend health check returned:
+
+```text
+backend_health_http=000
+curl: (7) Failed to connect to localhost port 3101
+```
+
+The frontend logs explained the failure:
+
+```text
+connect() failed (113: Host is unreachable) while connecting to upstream
+```
+
+### Important Observation
+
+Immediately after stopping the backend, the control-plane app health endpoint still showed MemFlip as healthy.
+
+That was not because the app was healthy. It was because the control plane was still reporting the most recent blackbox probe result.
+
+This is an important operator lesson:
+
+- live audits detect direct failure faster
+- control-plane probe state can lag by one scrape/probe interval
+- operators should compare direct app checks with control-plane state before deciding what is true
+
+### Recovery
+
+We restarted the backend:
+
+```bash
+cd MemFlip
+docker compose start backend
+```
+
+Docker waited for dependencies and started:
+
+- `humor-game-postgres`
+- `humor-game-redis`
+- `humor-game-backend`
+
+Direct health recovered quickly:
+
+```bash
+curl --max-time 10 -fsS http://localhost:8080/api/health | jq '.status'
+```
+
+Returned:
+
+```json
+"healthy"
+```
+
+### Post-Recovery Observation
+
+The first post-recovery MemFlip live audit passed direct app checks and synthetic game checks, but failed one control-plane check:
+
+```text
+FAIL Control plane sees MemFlip as healthy
+Checks passed: 33/34
+```
+
+That happened because the app had recovered before the control plane probe state refreshed.
+
+After waiting for the probe refresh interval, MemFlip live audit passed again:
+
+- `34/34` checks
+
+The control plane then reported:
+
+```json
+{
+  "status": "healthy",
+  "endpoints": [
+    {
+      "id": "memflip-frontend",
+      "status": "up",
+      "probeSuccess": 1
+    },
+    {
+      "id": "memflip-backend",
+      "status": "up",
+      "probeSuccess": 1
+    }
+  ]
+}
+```
+
+### Final Verification
+
+The full operator baseline passed after recovery:
+
+- control-plane smoke check passed `26/26`
+- inventory validation passed with `0` errors and `0` warnings
+- workspace app snapshot reported `4` total apps
+- all `4` managed apps were healthy
+- OpenSIS, SwiftPay, MemFlip, and FoodPulse all had healthy primary endpoints
+
+### Lessons
+
+This drill taught three useful platform lessons:
+
+- Direct live audits are the fastest way to prove app failure.
+- Control-plane health is still valuable, but it can lag behind real-time app state.
+- Recovery verification should include both direct app checks and a delayed control-plane check.
+
+### Kubernetes Mapping
+
+In Kubernetes, the equivalent drill would be:
+
+```bash
+kubectl scale deployment/backend --replicas=0 -n humor-game
+kubectl scale deployment/backend --replicas=1 -n humor-game
+kubectl rollout status deployment/backend -n humor-game
+```
+
+The same operator lesson applies in Kubernetes: pod/service readiness, ingress behavior, and Prometheus/blackbox state may not update at exactly the same moment.
