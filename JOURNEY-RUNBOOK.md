@@ -5047,3 +5047,69 @@ That is a stronger Phase 4 outcome because:
 - the control plane now carries more of the operator workflow itself
 - the OpenSIS integration is more than charts and logs
 - the next Phase 5 incident work can build on a real operator panel instead of starting from scratch
+
+---
+
+## Phase 4: FoodPulse Failover Guide In The Control Plane
+
+### Why We Did This
+
+`FoodPulse` is the resilience lab in this workspace.
+
+That means a useful control-plane integration is not only:
+
+- "is the app up?"
+
+It also has to answer:
+
+- when should I trust the browser path?
+- when should I run `cluster-status.sh`?
+- when is a Redis drill appropriate?
+- when is a Postgres drill intentionally disruptive?
+
+Without that layer, `FoodPulse` would still be visible in the platform, but not well explained by it.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '1,260p' FoodPulse/README.md
+sed -n '1,260p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,260p' FoodPulse/scripts/redis-failover-drill.sh
+sed -n '1,260p' FoodPulse/scripts/pg-failover-drill.sh
+sed -n '220,320p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '360,980p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+curl -fsS http://localhost:4000/api/apps/foodpulse/overview | jq '.app.id, .health.status, (.alerts|length), (.recentLogs|length)'
+./Obervability-Stack/scripts/foodpulse-live-audit.sh
+npm run type-check
+```
+
+### What We Changed
+
+We extended:
+
+- `Obervability-Stack/ui-next/app/dashboard/page.tsx`
+
+The new dashboard slice adds:
+
+- a FoodPulse operator summary driven by the live FoodPulse overview state
+- quick checks for:
+  - browser path
+  - cluster baseline
+  - Redis failover drill
+  - Postgres promotion drill
+- first-response command blocks
+- guidance on how to interpret FoodPulse lab failures
+
+### Why This Matters
+
+This gives `FoodPulse` a real operator story inside the control plane.
+
+The dashboard now explains that:
+
+- browser reachability comes first
+- `cluster-status.sh` is the baseline truth for lab health
+- Redis failover drills are the cleaner resilience exercise
+- Postgres promotion drills are educational but intentionally disruptive
+
+That is a much better Phase 4 integration than a simple uptime tile.
