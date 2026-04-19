@@ -4157,3 +4157,184 @@ It also moved the repo one step closer to a Kubernetes-friendly model:
 - app configuration now comes from explicit environment variables instead of hidden upstream constants
 - the running service now builds from workspace-owned source
 - the database contract is consistent between bootstrap, compose, and application code
+
+## 2026-04-19 04:46 EDT - Modernize FoodPulse and remove duplicates
+
+### Objective
+
+Modernize the `FoodPulse` repo structure and remove obvious duplicates/noise without breaking the HA lab or the future Kubernetes migration path.
+
+### Commands Run
+
+```bash
+find FoodPulse -maxdepth 3 -type d | sort
+find FoodPulse -maxdepth 3 -type f | sort
+du -sh FoodPulse/* FoodPulse/.* 2>/dev/null | sort -h
+rg -n "TODO|FIXME|deprecated|duplicate|upstream|vendored|legacy|obsolete" FoodPulse -g '!**/node_modules/**'
+diff -u FoodPulse/yelb-db/init-yelb-db.sh FoodPulse/yelb/yelb-db/init-yelb-db.sh || true
+find FoodPulse/ui -maxdepth 3 -type f -print -exec sed -n '1,200p' {} \;
+find FoodPulse/yelb/deployments -maxdepth 4 -type f | sed -n '1,200p'
+sed -n '1,240p' FoodPulse/yelb/README.md
+rg -n "ui-setup\.sh|yelb-ui-ng|FoodPulse/ui|Dashboards/Grafana1\.json|Grafana1\.json" . -g '!**/node_modules/**'
+find FoodPulse/Dashboards -maxdepth 3 -type f -print -exec sed -n '1,80p' {} \;
+sed -n '1,260p' FoodPulse/monitoring/prometheus.yml
+find FoodPulse/monitoring/grafana -maxdepth 4 -type f -print -exec sed -n '1,120p' {} \;
+rg --files -g '.gitignore'
+sed -n '1,240p' .gitignore
+git ls-files FoodPulse/.DS_Store FoodPulse/yelb/.DS_Store FoodPulse/yelb/deployments/.DS_Store FoodPulse/ui/ui-setup.sh FoodPulse/Dashboards/Grafana1.json FoodPulse/yelb-db/init-yelb-db.sh
+rg -n "grafana|Dashboards|provisioning|dashboard" FoodPulse/docker-compose.yml FoodPulse/README.md
+sed -n '200,360p' FoodPulse/docker-compose.yml
+wc -l FoodPulse/Dashboards/Grafana1.json && sed -n '1,40p' FoodPulse/Dashboards/Grafana1.json
+mkdir -p FoodPulse/monitoring/grafana/dashboards && mv FoodPulse/Dashboards/Grafana1.json FoodPulse/monitoring/grafana/dashboards/yelb-observability.json && rmdir FoodPulse/Dashboards && rmdir FoodPulse/ui && rm -f FoodPulse/.DS_Store FoodPulse/yelb/.DS_Store FoodPulse/yelb/deployments/.DS_Store && chmod +x FoodPulse/scripts/start.sh FoodPulse/scripts/stop.sh && git status --short
+bash -n FoodPulse/scripts/start.sh && bash -n FoodPulse/scripts/stop.sh && bash -n FoodPulse/scripts/cluster-status.sh && bash -n FoodPulse/scripts/pg-failover-drill.sh && bash -n FoodPulse/scripts/redis-failover-drill.sh
+source ~/.zprofile >/dev/null 2>&1; docker compose -f FoodPulse/docker-compose.yml config >/tmp/foodpulse-modernize.out && tail -n 40 /tmp/foodpulse-modernize.out
+find FoodPulse -maxdepth 3 \( -name '.DS_Store' -o -path 'FoodPulse/ui' -o -path 'FoodPulse/Dashboards' \) -print
+./FoodPulse/scripts/start.sh
+source ~/.zprofile >/dev/null 2>&1; docker exec foodpulse-grafana sh -lc 'ls -1 /var/lib/grafana/dashboards && echo --- && ls -1 /etc/grafana/provisioning/dashboards && echo --- && sed -n "1,80p" /etc/grafana/provisioning/dashboards/dashboard.yml'
+curl -fsSI http://localhost:8090 | sed -n '1,20p' && echo '---' && curl -fsSI http://localhost:3010 | sed -n '1,20p'
+rg -n "FoodPulse/Dashboards|Dashboards/Grafana1.json|FoodPulse/ui|ui-setup.sh|yelb-db/init-yelb-db.sh" . -g '!**/node_modules/**'
+```
+
+### What We Found
+
+The repo had three kinds of clutter:
+
+1. Actual duplicates
+
+- `FoodPulse/yelb-db/init-yelb-db.sh` was a duplicate copy of the vendored upstream DB bootstrap at `FoodPulse/yelb/yelb-db/init-yelb-db.sh`
+
+2. Dead scaffolding
+
+- `FoodPulse/ui/ui-setup.sh` was a standalone Angular scaffold script that was not referenced by the running stack
+
+3. Orphaned assets
+
+- `FoodPulse/Dashboards/Grafana1.json` contained a useful dashboard, but it was not wired into Grafana provisioning
+
+### Problems
+
+#### 1. The repo had two database bootstrap entrypoints for one database contract
+
+Problem:
+
+- the Compose stack mounted `FoodPulse/yelb-db/init-yelb-db.sh`
+- the vendored application also already had `FoodPulse/yelb/yelb-db/init-yelb-db.sh`
+- they were effectively the same bootstrap with only formatting differences
+
+Fix:
+
+- changed `FoodPulse/docker-compose.yml` to mount the vendored canonical bootstrap
+- deleted the duplicate root-level copy
+
+Why it mattered:
+
+- there should be one source of truth for the application schema bootstrap
+- duplicate bootstrap files become drift traps during future Kubernetes work
+
+#### 2. A root `ui/` directory looked important but was not part of the runtime
+
+Problem:
+
+- `FoodPulse/ui/ui-setup.sh` described an alternative Angular rebuild path
+- it was not referenced by Compose, the app runtime, or operator docs
+
+Fix:
+
+- removed the orphaned `ui/` folder
+
+Why it mattered:
+
+- dead scaffolding makes the repo look less trustworthy than it is
+- it also makes onboarding harder because operators cannot tell what is canonical
+
+#### 3. Grafana dashboard JSON existed, but Grafana was not actually provisioning it
+
+Problem:
+
+- `FoodPulse/Dashboards/Grafana1.json` was useful
+- Grafana only mounted datasource provisioning, not dashboard provisioning
+
+Fix:
+
+- moved the dashboard to:
+  - `FoodPulse/monitoring/grafana/dashboards/yelb-observability.json`
+- added:
+  - `FoodPulse/monitoring/grafana/provisioning/dashboards/dashboard.yml`
+- updated `FoodPulse/docker-compose.yml` to mount both the dashboard provider config and the dashboard directory
+
+Why it mattered:
+
+- observability assets should be live runtime configuration, not loose files sitting beside the repo
+- this makes the repo more reproducible and more Kubernetes-friendly
+
+#### 4. FoodPulse lacked a canonical start/stop wrapper
+
+Problem:
+
+- the repo relied on people remembering manual `docker compose` and network steps
+- this is easy to get wrong on a fresh workstation or after shell/PATH resets
+
+Fix:
+
+- added:
+  - `FoodPulse/scripts/start.sh`
+  - `FoodPulse/scripts/stop.sh`
+
+The new start path:
+
+- loads user-space toolchain paths
+- checks for `.env`
+- creates `observability-net` if needed
+- rebuilds the local `yelb-appserver`
+- starts the rest of the stack
+
+Why it mattered:
+
+- operator entrypoints should be explicit
+- this is the kind of contract we will want again when moving to Kubernetes
+
+#### 5. The appserver and UI build contexts were looser than they needed to be
+
+Problem:
+
+- the local build contexts could include unnecessary repo files
+
+Fix:
+
+- added:
+  - `FoodPulse/yelb/yelb-appserver/.dockerignore`
+  - `FoodPulse/yelb/yelb-ui/.dockerignore`
+
+Why it mattered:
+
+- smaller build contexts are easier to reason about and cheaper to rebuild
+
+### Validation
+
+Validated successfully:
+
+- `bash -n FoodPulse/scripts/start.sh`
+- `bash -n FoodPulse/scripts/stop.sh`
+- `bash -n FoodPulse/scripts/cluster-status.sh`
+- `bash -n FoodPulse/scripts/pg-failover-drill.sh`
+- `bash -n FoodPulse/scripts/redis-failover-drill.sh`
+- `docker compose -f FoodPulse/docker-compose.yml config`
+- `./FoodPulse/scripts/start.sh`
+- `curl -fsSI http://localhost:8090`
+- `curl -fsSI http://localhost:3010`
+- `docker exec foodpulse-grafana ...` confirmed:
+  - the dashboard file exists at `/var/lib/grafana/dashboards`
+  - the provisioning file exists at `/etc/grafana/provisioning/dashboards/dashboard.yml`
+
+### Why This Mattered
+
+This was not just cosmetic cleanup.
+
+It made `FoodPulse` more intentional in the ways that matter operationally:
+
+- one canonical bootstrap path
+- one canonical local startup path
+- live Grafana provisioning instead of stray dashboard files
+- less ambiguity about what is runtime code versus historical scaffolding
+
+That gives us a cleaner repo now and reduces future migration debt when we carry this workload into Kubernetes.
