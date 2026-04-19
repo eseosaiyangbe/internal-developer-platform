@@ -3774,3 +3774,262 @@ We now have the same control-plane shape for two workloads:
 - a documented runbook trail of the real issues encountered and fixed
 
 That is a stronger Phase 3 position and a much cleaner bridge into Phase 4 app onboarding.
+
+---
+
+## Phase 3: OpenSIS And FoodPulse Audit Expansion
+
+### Goal
+
+Carry the static-plus-live audit pattern through `OpenSIS` and `FoodPulse` so the control-plane handoff is not limited to `SwiftPay` and `MemFlip`.
+
+### Commands
+
+```bash
+rg -n "opensis|foodpulse" Obervability-Stack/ui-next/lib/monitored-apps.ts Obervability-Stack/prometheus/prometheus.yml Obervability-Stack/scripts Obervability-Stack/README.md Obervability-Stack/docs/README.md PROJECT-ROADMAP.md -g '!**/node_modules/**'
+sed -n '1,220p' OpenSIS/.env.example
+sed -n '1,220p' OpenSIS/scripts/compose-start.sh
+sed -n '1,220p' OpenSIS/README.md
+sed -n '1,260p' OpenSIS/docker-compose.yaml
+sed -n '1,220p' OpenSIS/docker-compose.buildlocal.yaml
+test -f OpenSIS/.env || cp OpenSIS/.env.example OpenSIS/.env
+docker compose -f OpenSIS/docker-compose.yaml config
+docker compose -f OpenSIS/docker-compose.yaml up -d
+docker compose -f OpenSIS/docker-compose.yaml -f OpenSIS/docker-compose.buildlocal.yaml up -d --build
+docker compose -f OpenSIS/docker-compose.yaml -f OpenSIS/docker-compose.buildlocal.yaml ps -a
+docker compose -f OpenSIS/docker-compose.yaml -f OpenSIS/docker-compose.buildlocal.yaml logs --tail=120 vault-bootstrap vault-seed opensis-db opensis-ui vault-agent-app vault-agent-db
+curl -fsSI http://localhost:8088
+curl -fsS http://localhost:8200/v1/sys/health
+curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="opensis")'
+curl -fsSL http://localhost:8088/install/index.php | sed -n '1,40p'
+
+sed -n '1,220p' FoodPulse/.env.example
+sed -n '1,260p' FoodPulse/docker-compose.yml
+sed -n '1,320p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,260p' FoodPulse/scripts/pg-failover-drill.sh
+sed -n '1,220p' FoodPulse/scripts/redis-failover-drill.sh
+rg -n "localhost|9090|3000|9093|8404|5432|5433|6379|26379|80:80|UI_URL|APP_STATS_URL" FoodPulse/README.md FoodPulse/scripts FoodPulse/docker-compose.yml FoodPulse/monitoring -g '!**/node_modules/**'
+test -f FoodPulse/.env || cp FoodPulse/.env.example FoodPulse/.env
+docker compose -f FoodPulse/docker-compose.yml config
+docker compose -f FoodPulse/docker-compose.yml up -d
+docker compose -f FoodPulse/docker-compose.yml down && docker compose -f FoodPulse/docker-compose.yml up -d
+docker compose -f FoodPulse/docker-compose.yml ps -a
+docker logs --tail=120 foodpulse-yelb-appserver
+docker logs --tail=120 foodpulse-pg-haproxy
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' foodpulse-pg-haproxy
+docker run --rm --network foodpulse_yelbnet postgres:14 getent hosts yelb-db-replica1 yelb-db-replica2 yelb-db-replica3
+docker restart foodpulse-pg-haproxy
+curl -fsSI http://localhost:8090
+curl -fsSI http://localhost:8090/api/getstats
+curl -fsS http://localhost:4000/api/apps/health | jq '.apps[] | select(.appId=="foodpulse")'
+curl -fsS http://localhost:4000/api/apps | jq '.apps[] | select(.id=="foodpulse") | {id, browserUrl: .observability.endpoints[0].browserUrl, localStart: .runbooks.localStart, healthCheck: .runbooks.healthCheck}'
+
+docker compose -f Obervability-Stack/docker-compose.yml up -d --build devops-monitor-ui
+./Obervability-Stack/scripts/opensis-audit.sh
+./Obervability-Stack/scripts/opensis-live-audit.sh
+./Obervability-Stack/scripts/foodpulse-audit.sh
+./Obervability-Stack/scripts/foodpulse-live-audit.sh
+FoodPulse/scripts/cluster-status.sh
+```
+
+### What We Learned
+
+- `OpenSIS` was already close to the target audit pattern, but Apple Silicon exposed a real deployment gap: the published `opensis-ui:dev` image does not ship an `arm64` manifest.
+- The repo already had the right escape hatch in `docker-compose.buildlocal.yaml` and `./scripts/compose-start.sh --build-local`; we just needed to treat that path as first-class operator guidance instead of an edge case.
+- `FoodPulse` was farther from a shared-workspace-ready state than the UI-only health signal suggested.
+- It had multiple direct host-port collisions with the control plane and generic container names like `prometheus`, `grafana`, and `alertmanager` that would collide globally on a monorepo workstation.
+- `FoodPulse` also had env contract drift: the repo's committed Redis and replication configs still expected `admin` and `replicatorpass`, while `.env.example` advertised different values.
+- The control-plane source update for FoodPulse's browser URL did not become visible at runtime until we rebuilt `devops-monitor-ui`.
+
+### Problems Encountered
+
+#### 1. OpenSIS published image was not multi-arch
+
+Problem:
+
+- `docker compose -f OpenSIS/docker-compose.yaml up -d` failed on this Mac mini because `docker.io/eseosaiyangbe/opensis-ui:dev` had no `linux/arm64/v8` manifest.
+
+Fix:
+
+- switched to the existing local build override:
+
+```bash
+docker compose -f OpenSIS/docker-compose.yaml -f OpenSIS/docker-compose.buildlocal.yaml up -d --build
+```
+
+- documented the Apple Silicon preference for `./scripts/compose-start.sh --build-local`
+- built the OpenSIS UI locally and then validated the live browser and Vault paths
+
+Why it mattered:
+
+- this is exactly the kind of platform reality we need in the runbook before any Kubernetes move
+- the repo already had the right mechanism, but it was not yet treated as part of the normal operator contract
+
+#### 2. FoodPulse could not coexist cleanly with the workspace
+
+Problem:
+
+- `FoodPulse/docker-compose.yml` published conflicting host ports like `80`, `3000`, `9090`, and `9093`
+- it also used generic global container names like `prometheus`, `grafana`, and `alertmanager`
+
+Fix:
+
+- normalized FoodPulse host ports into root env vars
+- moved the browser path to `http://localhost:8090`
+- renamed containers to `foodpulse-*` to avoid collisions with the control plane and other repos
+
+Why it mattered:
+
+- without this step, `FoodPulse` could look healthy in isolation but still break the monorepo operator experience
+
+#### 3. FoodPulse env defaults did not match the real lab config
+
+Problem:
+
+- the appserver returned `500` on `/api/getstats`
+- `foodpulse-yelb-appserver` logs showed `Redis::CommandError - WRONGPASS`
+- Postgres replicas also depended on a replication password that did not match the hardcoded bootstrap SQL
+
+Fix:
+
+- changed `FoodPulse/.env.example` to match the real lab defaults:
+  - `YELB_REDIS_PASSWORD=admin`
+  - `PG_REPLICATOR_PASSWORD=replicatorpass`
+- refreshed the local `.env`
+- recreated the FoodPulse stack
+
+Why it mattered:
+
+- the app UI was up, but the meaningful lab path was broken
+- this was a real configuration drift issue, not just a warm-up delay
+
+#### 4. FoodPulse helper scripts assumed Docker was globally installed
+
+Problem:
+
+- `FoodPulse/scripts/cluster-status.sh` and the failover drill helpers ran in non-interactive shells that did not inherit the user-space Docker install paths on this new Mac
+- the result looked like application degradation, but the deeper issue was the same PATH gap we had already seen earlier on the workstation
+
+Fix:
+
+- sourced `~/.zprofile` at the top of:
+  - `FoodPulse/scripts/cluster-status.sh`
+  - `FoodPulse/scripts/pg-failover-drill.sh`
+  - `FoodPulse/scripts/redis-failover-drill.sh`
+- exported `PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"` inside those helpers
+
+Why it mattered:
+
+- operators should not have to remember shell-specific PATH priming before the repo's own helpers work
+
+#### 5. FoodPulse Postgres helper defaults were aimed at the wrong database
+
+Problem:
+
+- `cluster-status.sh` and `pg-failover-drill.sh` defaulted to `PG_DB=postgres`
+- the lab actually bootstraps `yelbdatabase`
+
+Fix:
+
+- changed the helper default to `PG_DB=yelbdatabase`
+
+Why it mattered:
+
+- the helper would otherwise report empty or misleading Postgres results even when the actual application database path was healthy
+
+#### 6. FoodPulse HAProxy relied on replica hostnames that were missing after normalization
+
+Problem:
+
+- after normalizing container names, `foodpulse-pg-haproxy` kept restarting
+- logs showed it could not resolve `yelb-db-replica1`, `yelb-db-replica2`, and `yelb-db-replica3`
+
+Fix:
+
+- added those names back as `yelbnet` aliases on the replica services
+- restarted `foodpulse-pg-haproxy` once the aliases were present
+
+Why it mattered:
+
+- this preserved the safer workspace-wide container names while restoring the lab's internal HAProxy topology assumptions
+
+#### 7. FoodPulse HAProxy stats path was wrong in the live audit
+
+Problem:
+
+- the live audit initially checked `http://localhost:8410/`
+- the HAProxy config exposes the human-readable stats UI at `/stats`
+
+Fix:
+
+- updated the live audit and README to use:
+
+```text
+http://localhost:8410/stats
+```
+
+Why it mattered:
+
+- the stats service existed; the validation path was wrong
+- documenting the exact path avoids a false negative for future operators
+
+### What We Changed
+
+- added:
+  - `Obervability-Stack/scripts/opensis-audit.sh`
+  - `Obervability-Stack/scripts/opensis-live-audit.sh`
+  - `Obervability-Stack/scripts/foodpulse-audit.sh`
+  - `Obervability-Stack/scripts/foodpulse-live-audit.sh`
+- updated:
+  - `Obervability-Stack/scripts/devops-monitor.sh`
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+  - `Obervability-Stack/ui-next/lib/monitored-apps.ts`
+  - `PROJECT-ROADMAP.md`
+  - `WORKSPACE-SETUP-MATRIX.md`
+  - `JOURNEY-RUNBOOK.md`
+- normalized `FoodPulse`:
+  - `FoodPulse/docker-compose.yml`
+  - `FoodPulse/.env.example`
+  - `FoodPulse/README.md`
+  - `FoodPulse/scripts/cluster-status.sh`
+  - `FoodPulse/scripts/pg-failover-drill.sh`
+  - `FoodPulse/scripts/redis-failover-drill.sh`
+
+### Validation
+
+Validated successfully:
+
+- `bash -n Obervability-Stack/scripts/opensis-audit.sh`
+- `bash -n Obervability-Stack/scripts/opensis-live-audit.sh`
+- `bash -n Obervability-Stack/scripts/foodpulse-audit.sh`
+- `bash -n Obervability-Stack/scripts/foodpulse-live-audit.sh`
+- `docker compose -f OpenSIS/docker-compose.yaml -f OpenSIS/docker-compose.buildlocal.yaml config`
+- `docker compose -f FoodPulse/docker-compose.yml config`
+- `./Obervability-Stack/scripts/opensis-audit.sh`
+- `./Obervability-Stack/scripts/opensis-live-audit.sh`
+- `./Obervability-Stack/scripts/foodpulse-audit.sh`
+- `./Obervability-Stack/scripts/foodpulse-live-audit.sh`
+- `FoodPulse/scripts/cluster-status.sh`
+
+### Why This Mattered
+
+This completed the control-plane audit pattern across all four managed workloads in the workspace:
+
+- `SwiftPay`
+- `MemFlip`
+- `OpenSIS`
+- `FoodPulse`
+
+That is the real handoff point for Phase 3.
+
+We are no longer proving that the control plane can monitor one flagship app plus one small demo.
+We now have:
+
+- a modern microservices workload
+- a lightweight frontend/backend demo
+- a legacy monolith with Vault-backed bootstrap
+- a resilience lab with HAProxy, replication, and local monitoring surfaces
+
+That shifts the next bottleneck from control-plane trust to richer app onboarding and workflow design, which is exactly the Phase 4 handoff we wanted.

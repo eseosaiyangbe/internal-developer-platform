@@ -18,8 +18,8 @@ It answers, for each repo:
 |---|---|---|---|---|---|---|---|---|
 | `Obervability-Stack` | `docker compose up -d` | `./devops-monitor.sh start` | `env.example`, `docker-compose.env.example`, `ui-next/env.example` | `http://localhost:4000` | `curl -fsS http://localhost:4000/` | n/a, this repo owns the network too | App inventory should drift away from container-specific assumptions over time | Control plane repo |
 | `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Strongest candidate for early Service, Deployment, and probe mapping | Best flagship workload |
-| `OpenSIS` | `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap and secret rendering |
-| `FoodPulse` | `docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost` | `curl -I http://localhost` | `foodpulse-ui` | Good lab for StatefulSet-era concerns, but current failover logic is still drill-oriented | HA lab around Yelb |
+| `OpenSIS` | `./scripts/compose-start.sh --build-local` on Apple Silicon, otherwise `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap and secret rendering; arm64 operators should prefer the local build path |
+| `FoodPulse` | `cp .env.example .env && docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost:8090` | `curl -I http://localhost:8090` | `foodpulse-ui` | Good lab for StatefulSet-era concerns, but current failover logic is still drill-oriented | HA lab around Yelb, normalized for shared-workspace ports and container names |
 | `MemFlip` | `cp .env.example .env && docker compose up -d` | none yet | `.env.example` at repo root, with deeper reference in `env/env.example` | `http://localhost:8080` | `curl -fsS http://localhost:8080/api/health` | `memflip-frontend`, `memflip-backend` | Frontend and backend are now expressed through a cleaner local service boundary that maps better to future Service and probe design | Lightweight onboarding app with a clearer local browser path |
 
 ## Alias Verification Against Control Plane
@@ -40,11 +40,13 @@ The following aliases match the monitored app inventory in:
 ### `OpenSIS`
 
 - no committed `.env.example` existed before Phase 2 normalization
+- Apple Silicon operators should prefer `./scripts/compose-start.sh --build-local` because the published `opensis-ui:dev` image is not multi-arch
 
 ### `FoodPulse`
 
 - no committed `.env.example` existed before Phase 2 normalization
 - no top-level `README.md` existed before Phase 2 normalization
+- published host ports and generic container names are now normalized so the lab can coexist with the control plane
 
 ### `MemFlip`
 

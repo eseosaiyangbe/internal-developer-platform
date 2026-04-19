@@ -78,35 +78,30 @@ The work is divided into seven phases.
 |---|---|---|
 | 1. Foundation and governance | Complete | Monorepo, root runbook, and root roadmap are in place |
 | 2. Workspace normalization | Complete | Workspace hygiene checkpoint is in place and the remaining risks are no longer primarily normalization risks |
-| 3. Control plane hardening | In progress | App inventory verification and control-plane contract hardening have started |
-| 4. App integration and onboarding | Not started | Depends on a more trustworthy control plane |
+| 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
+| 4. App integration and onboarding | In progress | Control-plane handoff is complete enough to focus on richer workload onboarding |
 | 5. Operator workflows and incident drills | Not started | Depends on integrated workloads and stable observability paths |
 | 6. UX and demo polish | Not started | Should happen after operational flows are real |
 | 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
 
 ## Current Focus
 
-We are currently in **Phase 3: Control plane hardening**.
+We are currently in **Phase 4: App integration and onboarding**.
 
-The working intent inside Phase 3 is:
+The working intent inside Phase 4 is:
 
-- make `Obervability-Stack` trustworthy as the shared control plane
-- replace implicit operator knowledge with runnable validation commands
-- keep the local Docker control plane aligned with the future Kubernetes model
-- clear the remaining control-plane blockers before app onboarding work begins
-- validate the flagship workload against the live control plane, not just static config contracts
-- repeat the same audit pattern on at least one secondary workload so onboarding is not SwiftPay-specific
+- build richer onboarding and operator views on top of the now-trustworthy control plane
+- keep the workload contracts aligned with the future Kubernetes model
+- turn the validated workload patterns into repeatable onboarding stories instead of one-off fixes
+- preserve the new operator audit flow as the guardrail while app-specific work expands
 
 ## Current Definition Of Done
 
-Phase 3 will be considered complete when:
+Phase 4 will be considered complete when:
 
-- the control plane has trustworthy startup and smoke-check workflows
-- local operator access is explicit and actually usable
-- monitored app inventory is validated against the workspace contract
-- the flagship workload has at least one reproducible live integration audit through the control plane
-- at least one secondary workload has the same reproducible static-plus-live audit path
-- the next major bottleneck becomes app onboarding rather than control-plane reliability
+- onboarding flows are clear across the supported workloads
+- workload-specific operator checks are documented and runnable
+- the control plane exposes enough app-specific value that the next bottleneck becomes workflow polish rather than basic integration trust
 
 ---
 
@@ -282,20 +277,23 @@ If the hub is shaky, every downstream integration feels shaky.
 
 ### Current Status
 
-In progress.
+Complete.
 
-Started:
+Delivered:
 
 - monitored app inventory reconciled against the normalized workspace
 - control-plane auth model shifted from demo-only posture toward explicit database mode with controlled demo fallback
 - control-plane smoke checks now verify runtime health and API surfaces
 - local UI auth runtime now supports both demo login and database-backed login
 - monitored app inventory now has a runnable validation path
-- SwiftPay now has a dedicated onboarding audit path to validate the flagship integration contract
+- SwiftPay, MemFlip, OpenSIS, and FoodPulse each now have dedicated static and live audit paths
+- Apple Silicon-safe OpenSIS startup guidance now exists through the documented `--build-local` path
+- FoodPulse now has a workspace-safe startup contract with normalized ports, safer container names, and corrected lab defaults
 
-Expected entry condition:
+Exit condition achieved:
 
-- Phase 2 has reduced enough repo drift that control-plane work is no longer compensating for basic workspace inconsistency
+- Phase 2 reduced enough repo drift that control-plane work no longer had to compensate for basic workspace inconsistency
+- the next major bottleneck is richer app onboarding rather than control-plane trust
 
 ---
 
