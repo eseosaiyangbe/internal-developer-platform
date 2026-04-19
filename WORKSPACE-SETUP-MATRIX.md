@@ -14,13 +14,13 @@ It answers, for each repo:
 
 ## Setup Matrix
 
-| Repo | Primary Start Command | Optional Helper | Env Contract | Main Local URL | Health Check | `observability-net` Alias / Aliases | Notes |
-|---|---|---|---|---|---|---|---|
-| `Obervability-Stack` | `docker compose up -d` | `./devops-monitor.sh start` | `env.example`, `docker-compose.env.example`, `ui-next/env.example` | `http://localhost:4000` | `curl -fsS http://localhost:4000/` | n/a, this repo owns the network too | Control plane repo |
-| `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Best flagship workload |
-| `OpenSIS` | `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Includes Vault bootstrap and secret rendering |
-| `FoodPulse` | `docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost` | `curl -I http://localhost` | `foodpulse-ui` | HA lab around Yelb |
-| `MemFlip` | `docker compose up -d` | none yet | `env/env.example` | frontend port is not published by default in current compose file | `curl -fsS http://localhost:3001/health` | `memflip-frontend`, `memflip-backend` | Backend port exposed, frontend relies on internal network only in current compose |
+| Repo | Primary Start Command | Optional Helper | Env Contract | Main Local URL | Health Check | `observability-net` Alias / Aliases | Kubernetes Readiness Note | Notes |
+|---|---|---|---|---|---|---|---|---|
+| `Obervability-Stack` | `docker compose up -d` | `./devops-monitor.sh start` | `env.example`, `docker-compose.env.example`, `ui-next/env.example` | `http://localhost:4000` | `curl -fsS http://localhost:4000/` | n/a, this repo owns the network too | App inventory should drift away from container-specific assumptions over time | Control plane repo |
+| `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Strongest candidate for early Service, Deployment, and probe mapping | Best flagship workload |
+| `OpenSIS` | `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap and secret rendering |
+| `FoodPulse` | `docker compose up -d` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost` | `curl -I http://localhost` | `foodpulse-ui` | Good lab for StatefulSet-era concerns, but current failover logic is still drill-oriented | HA lab around Yelb |
+| `MemFlip` | `docker compose up -d` | none yet | `env/env.example` | frontend port is not published by default in current compose file | `curl -fsS http://localhost:3001/health` | `memflip-frontend`, `memflip-backend` | Frontend build output exists locally; treat source files, not generated assets, as the future image input contract | Backend port exposed, frontend relies on internal network only in current compose |
 
 ## Alias Verification Against Control Plane
 
@@ -50,10 +50,21 @@ The following aliases match the monitored app inventory in:
 
 - current frontend is not published to a host port in the active compose config
 - backend health is easier to verify than frontend reachability
+- `frontend/dist` exists in the repo, but the long-term source of truth should stay the frontend source tree and Docker build path
 
 ### `Obervability-Stack`
 
-- control plane docs still need reconciliation with actual current ports and behavior
+- root README and docs index now agree on the primary local ports
+- deeper control plane docs still need periodic drift checks as the repo evolves
+
+## Migration Lens
+
+During normalization, favor changes that reduce future Kubernetes friction:
+
+- document env inputs before inventing new helper scripts
+- prefer probe-ready HTTP endpoints over container-local checks
+- treat Docker aliases as temporary local equivalents of Kubernetes Services
+- keep generated frontend assets out of the architecture contract unless the repo truly depends on checked-in build output
 
 ## Recommended Startup Order For Workspace Work
 

@@ -87,6 +87,7 @@ rg --files -g 'README*' -g 'package.json' -g 'pyproject.toml' -g 'Cargo.toml' -g
 
 ### What We Learned
 
+
 - The workspace root is `/Users/raymond/Documents/DevOps-Easy-Learning`.
 - The initial repos present were:
   - `MemFlip`
@@ -1157,3 +1158,187 @@ Why it mattered:
 ```text
 https://github.com/eseosaiyangbe/DevOps-Easy-Learning.git
 ```
+
+---
+
+## Phase 8: Phase 2 Normalization Slice 2
+
+### Goal
+
+Clean the remaining obvious rough edges from workspace normalization while keeping the future Kubernetes migration in mind.
+
+This slice focused on:
+
+- repairing broken or misleading operator paths
+- reconciling control-plane docs with the actual runtime
+- making the local setup contract easier to translate into Kubernetes later
+
+### Commands
+
+```bash
+git status --short
+sed -n '1,260p' FoodPulse/scripts/pg-failover-drill.sh
+sed -n '1,220p' FoodPulse/command.sh
+sed -n '1,240p' Obervability-Stack/docs/README.md
+sed -n '1,240p' WORKSPACE-ARCHITECTURE.md
+sed -n '1,260p' JOURNEY-RUNBOOK.md
+sed -n '1,260p' WORKSPACE-SETUP-MATRIX.md
+sed -n '1,220p' FoodPulse/README.md
+sed -n '1,240p' Obervability-Stack/README.md
+rg -n "frontend/dist|dist/|build artifact|generated" MemFlip -g '!**/node_modules/**'
+git ls-files MemFlip/frontend/dist FoodPulse/command.sh FoodPulse/scripts/pg-failover-drill.sh Obervability-Stack/docs/README.md WORKSPACE-ARCHITECTURE.md WORKSPACE-SETUP-MATRIX.md JOURNEY-RUNBOOK.md
+tail -n 120 FoodPulse/scripts/pg-failover-drill.sh
+sed -n '1,220p' FoodPulse/scripts/redis-failover-drill.sh
+sed -n '1,220p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,220p' MemFlip/frontend/Dockerfile
+sed -n '1,220p' MemFlip/docker-compose.yml
+chmod +x FoodPulse/command.sh FoodPulse/scripts/pg-failover-drill.sh
+bash -n FoodPulse/command.sh
+bash -n FoodPulse/scripts/pg-failover-drill.sh
+ls -l FoodPulse/command.sh FoodPulse/scripts/pg-failover-drill.sh
+```
+
+### What We Learned
+
+#### `FoodPulse`
+
+- `command.sh` was not a real script.
+- It was a scratchpad of free-form notes and would fail if executed.
+- `scripts/pg-failover-drill.sh` had duplicated content and a corrupted top section.
+- `scripts/redis-failover-drill.sh` was the better reference for what a usable lab drill should look like.
+
+#### `Obervability-Stack`
+
+- `docs/README.md` still advertised stale port mappings.
+- The root `README.md` already matched the current local runtime more closely.
+- The docs index needed to become explicit that it is a navigation surface, not the primary runtime source of truth.
+
+#### `MemFlip`
+
+- `frontend/dist` is present in the repo, but the Docker build still builds from source.
+- That means checked-in frontend artifacts are not the architecture contract we want to preserve for Kubernetes.
+- We should treat the source tree plus Docker image build as the real contract and avoid designing around committed build output.
+
+### Problems Encountered
+
+#### 1. `FoodPulse/command.sh` looked executable but was not actually safe to run
+
+Problem:
+
+- the file had shell extension but contained unstructured notes
+- anyone treating it like a real operator script would hit errors immediately
+
+Fix:
+
+- converted it into a safe shell wrapper that prints guidance and preserves the historical notes as comments
+
+Why it mattered:
+
+- in a multi-repo workspace, misleading files are worse than noisy files
+- if we keep a historical artifact, it needs to fail safe
+
+#### 2. `FoodPulse/scripts/pg-failover-drill.sh` was duplicated and partially corrupted
+
+Problem:
+
+- the file repeated its own preamble and contained a second, conflicting implementation lower down
+- this made the drill untrustworthy before even considering the actual database behavior
+
+Fix:
+
+- rewrote the file into one clean script
+- kept its intent explicit: manual educational failover drill, not production-grade automation
+- aligned its structure with the healthier Redis drill style
+
+Why it mattered:
+
+- broken drills are dangerous because they teach the wrong operator habits
+- Kubernetes migration will not remove the need for good operational drills, so the drill needs to be conceptually clean now
+
+#### 3. Control-plane docs were partially stale
+
+Problem:
+
+- `Obervability-Stack/docs/README.md` still referenced old ports for the UI and Grafana
+
+Fix:
+
+- updated the docs index to match the current local runtime
+- added a note pointing operators back to the root `README.md` for startup truth
+
+Why it mattered:
+
+- observability is the hub of the workspace
+- when the hub docs drift, every app onboarding and troubleshooting step gets less reliable
+
+### Fixes Applied
+
+Files updated:
+
+- `FoodPulse/command.sh`
+- `FoodPulse/scripts/pg-failover-drill.sh`
+- `FoodPulse/README.md`
+- `Obervability-Stack/docs/README.md`
+- `WORKSPACE-ARCHITECTURE.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+Behavioral improvements:
+
+- `FoodPulse/command.sh` is now safe to execute
+- `FoodPulse/scripts/pg-failover-drill.sh` now passes `bash -n`
+- the workspace docs now explicitly frame Docker Compose as the proving ground and Kubernetes as the destination
+- the setup matrix now includes a Kubernetes-readiness lens per repo instead of treating local Compose setup as the end state
+
+### Kubernetes-Minded Decisions
+
+We explicitly chose the following direction in this phase:
+
+- prefer documenting env contracts now because they can become ConfigMaps and Secrets later
+- prefer health endpoints because they map cleanly to readiness and liveness probes
+- treat `observability-net` aliases as local stand-ins for future Kubernetes Services
+- avoid blessing committed frontend build artifacts as the long-term deployment contract
+- treat local helper scripts as operator aids, not the permanent control plane
+
+### Things We Deliberately Did Not Change Yet
+
+#### `MemFlip/frontend/dist`
+
+Decision:
+
+- do not remove it yet
+
+Why:
+
+- it is tracked today and referenced in project materials
+- removing it blindly could create noise without improving the actual runtime contract
+- for now, documenting that it should not become part of the future Kubernetes architecture is the safer move
+
+#### deeper `Obervability-Stack` docs
+
+Decision:
+
+- do not try to refresh every doc page in one sweep
+
+Why:
+
+- the immediate risk was port and startup drift in the main docs index
+- a larger docs audit should happen as a dedicated control-plane hardening task
+
+### Why This Step Mattered
+
+This phase reduced hidden local fragility.
+
+That matters because Kubernetes migrations usually fail when teams carry forward:
+
+- ambiguous startup contracts
+- Docker-only assumptions
+- misleading scripts
+- undocumented drift between docs and runtime
+
+We are trying to reduce those translation problems now instead of discovering them during the cluster move.
+
+### Follow-Up Work
+
+- continue Phase 2 by tightening startup and health contracts where they are still fuzzy
+- begin identifying which workloads are closest to having clean Kubernetes manifests already
+- start mapping `Obervability-Stack` assumptions from Docker aliases toward service-oriented discovery

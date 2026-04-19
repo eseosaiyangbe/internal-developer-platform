@@ -155,6 +155,24 @@ For an app to participate cleanly in this workspace platform, it should have:
 4. a documented local browser URL if user-facing
 5. a log and metrics story, even if minimal
 
+## Kubernetes-Ready Direction
+
+We are still normalizing the workspace in Docker Compose first, but the target direction is Kubernetes.
+
+That changes how we make local decisions now:
+
+- prefer explicit env contracts that can become ConfigMaps and Secrets later
+- prefer stable service names and aliases that can map cleanly to Kubernetes Services
+- prefer health endpoints that can become liveness and readiness probes
+- prefer stateless app containers where possible
+- treat local helper scripts as operator runbooks, not permanent control mechanisms
+- avoid coupling the control plane to container names when a service-level target would work
+
+Compose is the proving ground.
+Kubernetes is the destination.
+
+The point of Phase 2 is to reduce the amount of hidden Docker-only behavior we would need to unlearn later.
+
 ## Architecture Pattern By Repo
 
 This workspace is valuable because it compares different architecture styles under one operator model.
@@ -201,3 +219,12 @@ The app inventory and docs in `Obervability-Stack` need to be fully trustworthy.
 
 Do not force every app into the same story.
 Use each workload for the thing it best demonstrates.
+
+### 4. Normalize for future Kubernetes migration
+
+Priority areas:
+
+- repo-level `.env.example` coverage
+- explicit health and startup contracts
+- cleaner separation between generated artifacts and source-of-truth files
+- fewer ad hoc scripts masquerading as product workflows
