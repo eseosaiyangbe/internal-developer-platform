@@ -5113,3 +5113,62 @@ The dashboard now explains that:
 - Postgres promotion drills are educational but intentionally disruptive
 
 That is a much better Phase 4 integration than a simple uptime tile.
+
+---
+
+## Phase 4: MemFlip Onboarding Guide In The Control Plane
+
+### Why We Did This
+
+`MemFlip` is supposed to be the easiest onboarding example in the workspace.
+
+That means the control plane should show the exact path we want future browser-first apps to follow:
+
+- frontend-proxied health
+- backend fallback health
+- synthetic user flow
+- backend metrics confirmation
+
+Without that, `MemFlip` would be present in the platform but not fully useful as the reference onboarding model.
+
+### Commands Run
+
+```bash
+git status --short
+sed -n '1,260p' MemFlip/README.md
+sed -n '1,220p' MemFlip/docs/local/README.md
+sed -n '1,220p' MemFlip/docs/local/02-compose.md
+sed -n '1,260p' Obervability-Stack/scripts/memflip-live-audit.sh
+curl -fsS http://localhost:4000/api/apps/memflip/overview | jq '.app.id, .health.status, (.alerts|length), (.recentLogs|length)'
+npm run type-check
+./Obervability-Stack/scripts/memflip-live-audit.sh
+```
+
+### What We Changed
+
+We extended:
+
+- `Obervability-Stack/ui-next/app/dashboard/page.tsx`
+
+The new dashboard slice adds:
+
+- a MemFlip operator summary driven by live MemFlip overview state
+- quick checks for:
+  - frontend proxy health
+  - backend API health
+  - synthetic game flow
+  - backend metrics
+- first-response command blocks
+- guidance on how to interpret MemFlip onboarding failures
+
+### Why This Matters
+
+This completes the current Phase 4 deepening pattern across the managed workloads.
+
+The control plane now explains:
+
+- OpenSIS as the legacy-platform case
+- FoodPulse as the failover lab
+- MemFlip as the clean onboarding reference
+
+That gives us a much stronger handoff into Phase 5, because the dashboard now contains operator-oriented guidance for all the main workload stories instead of only generic health state.

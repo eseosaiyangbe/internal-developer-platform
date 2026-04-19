@@ -384,6 +384,7 @@ Latest progress:
 - the reusable onboarding template and operator app matrix are now part of the Phase 4 deliverable set
 - the dashboard now includes an OpenSIS-specific operator guide so the control plane explains first-response actions, not just health state
 - the dashboard now includes a FoodPulse failover guide so the resilience lab is represented as an operator workflow, not just a health probe
+- the dashboard now includes a MemFlip onboarding guide so the simplest browser-first workload is fully represented as a reusable platform pattern
 
 ---
 
