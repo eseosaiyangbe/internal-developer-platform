@@ -86,24 +86,23 @@ The work is divided into seven phases.
 
 ## Current Focus
 
-We are currently in **Phase 2: Workspace normalization**.
+We are currently in **Phase 3: Control plane hardening**.
 
-The working intent inside Phase 2 is:
+The working intent inside Phase 3 is:
 
-- reduce repo drift
-- tighten startup, health, and env contracts
-- document the shared platform model clearly
-- make local decisions that translate cleanly into future Kubernetes resources
+- make `Obervability-Stack` trustworthy as the shared control plane
+- replace implicit operator knowledge with runnable validation commands
+- keep the local Docker control plane aligned with the future Kubernetes model
+- clear the remaining control-plane blockers before app onboarding work begins
 
 ## Current Definition Of Done
 
-Phase 2 will be considered complete when:
+Phase 3 will be considered complete when:
 
-- every repo has a trustworthy startup contract
-- every repo has a documented env contract
-- every monitored workload has a verified alias and health path
-- obvious junk, misleading scripts, and accidental files have been cleaned up or explicitly documented
-- the remaining work naturally shifts from normalization into control-plane hardening
+- the control plane has trustworthy startup and smoke-check workflows
+- local operator access is explicit and actually usable
+- monitored app inventory is validated against the workspace contract
+- the next major bottleneck becomes app onboarding rather than control-plane reliability
 
 ---
 
@@ -285,6 +284,9 @@ Started:
 
 - monitored app inventory reconciled against the normalized workspace
 - control-plane auth model shifted from demo-only posture toward explicit database mode with controlled demo fallback
+- control-plane smoke checks now verify runtime health and API surfaces
+- local UI auth runtime now supports both demo login and database-backed login
+- monitored app inventory now has a runnable validation path
 
 Expected entry condition:
 

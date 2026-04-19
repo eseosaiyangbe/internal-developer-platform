@@ -657,6 +657,72 @@ Results:
 
 ---
 
+## Phase 3: Inventory Validation Automation
+
+### Goal
+
+Turn the monitored app inventory contract into a runnable validation command so Phase 3 inventory integrity is not only documented but also executable.
+
+### Commands
+
+```bash
+sed -n '1,360p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,220p' Obervability-Stack/docs/WORKSPACE_APP_INVENTORY_AUDIT.md
+ls -la Obervability-Stack/scripts
+ls -la Obervability-Stack/ui-next
+find Obervability-Stack/ui-next -maxdepth 2 -type d | sort | sed -n '1,120p'
+test -x Obervability-Stack/ui-next/node_modules/.bin/tsx && echo yes || echo no
+```
+
+### What We Learned
+
+- the control plane already had good inventory documentation, but no first-class command to validate whether the monitored app model stayed internally consistent
+- `ui-next/lib/monitored-apps.ts` is the strongest source of truth for this check because it contains app IDs, endpoint metadata, runbooks, docker aliases, and Kubernetes metadata in one place
+- the local repo already has the `tsx` runtime available inside `ui-next/node_modules/.bin/tsx`, so we can add a typed validator without inventing another global dependency
+
+### Fixes Applied
+
+- added `Obervability-Stack/ui-next/scripts/validate-monitored-apps.ts`
+- added `Obervability-Stack/scripts/inventory-audit.sh`
+- updated `Obervability-Stack/scripts/devops-monitor.sh` with an `inventory` command
+- updated:
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+  - `Obervability-Stack/docs/WORKSPACE_APP_INVENTORY_AUDIT.md`
+  - `PROJECT-ROADMAP.md`
+
+### Why This Step Mattered
+
+- it turns inventory integrity into a repeatable operator command
+- it reduces the risk of Phase 4 onboarding work drifting away from the control-plane model
+- it also strengthens the later Kubernetes migration path, because service metadata mistakes can be caught before we start translating more of the platform into cluster resources
+
+### Follow-Up Work
+
+- decide whether inventory validation should eventually be folded into the broader smoke-check path or stay as its own explicit control-plane command
+
+### Verification
+
+```bash
+chmod +x Obervability-Stack/scripts/inventory-audit.sh
+bash -n Obervability-Stack/scripts/inventory-audit.sh
+bash -n Obervability-Stack/scripts/devops-monitor.sh
+./Obervability-Stack/scripts/inventory-audit.sh
+./Obervability-Stack/scripts/devops-monitor.sh inventory
+```
+
+Results:
+
+- the inventory wrapper script passed `bash -n`
+- both entrypoints completed successfully
+- the inventory validator passed with:
+  - `Apps checked: 4`
+  - `Errors: 0`
+  - `Warnings: 0`
+
+---
+
 ## Phase 2: Observability-Stack Discovery
 
 ### Goal
