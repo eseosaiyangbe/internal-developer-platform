@@ -1820,3 +1820,80 @@ Without this toolchain:
 ### Follow-Up Work
 
 - once pulls are healthy, move back to the remaining Phase 2 normalization work
+
+---
+
+## Phase 12: Linux Workstation Bootstrap Companion
+
+### Goal
+
+Add a Linux companion bootstrap script so the workstation setup path is not limited to macOS users.
+
+### Commands
+
+```bash
+sed -n '1,320p' scripts/bootstrap-macos-userland.sh
+rg -n "bootstrap-macos-userland|workstation bootstrap|macOS workstation" JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md WORKSPACE-ARCHITECTURE.md WORKSPACE-SETUP-MATRIX.md -g '!**/node_modules/**'
+ls scripts
+bash -n scripts/bootstrap-linux-userland.sh
+sed -n '1,260p' scripts/bootstrap-linux-userland.sh
+git status --short
+```
+
+### What We Changed
+
+- added `scripts/bootstrap-linux-userland.sh`
+
+The Linux script mirrors the same broad toolchain goals as the macOS bootstrap:
+
+- Docker + Docker Compose
+- Kubernetes CLIs
+- Terraform
+- Node.js and npm
+- AWS CLI
+- Azure CLI
+- yq
+- cloudflared
+- argocd
+
+### Design Notes
+
+The Linux version intentionally differs from the macOS version in a few ways:
+
+- it targets Linux instead of Apple Silicon macOS
+- it uses Docker Engine directly instead of Colima/Lima
+- it detects `apt-get` and `dnf` for base package installation
+- it still installs most project tooling into user-space locations such as:
+  - `~/.local/bin`
+  - `~/.local/opt`
+  - `~/.docker/cli-plugins`
+  - local Python virtual environments for `aws` and `az`
+
+### Why This Mattered
+
+The project already had a real workstation bootstrap path, but it was Mac-specific.
+
+Adding the Linux companion matters because:
+
+- collaborators should be able to follow the same project setup story on non-Mac machines
+- the repo should carry its own bootstrap logic, not rely on private shell history
+- a Linux path is especially relevant for people learning Kubernetes, Docker, and Terraform on cloud VMs or Linux laptops
+
+### Validation Level
+
+Validated here:
+
+- shell syntax check via `bash -n`
+- structure review against the macOS installer and current repo requirements
+
+Not yet validated here:
+
+- full end-to-end execution on a live Linux host
+
+Why:
+
+- this session is running on macOS, so we could not execute the Linux bootstrap directly
+
+### Follow-Up Work
+
+- when we have access to a Linux workstation or VM, run the script end to end and capture any Linux-specific issues in this runbook
