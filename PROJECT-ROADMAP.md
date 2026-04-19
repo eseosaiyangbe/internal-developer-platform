@@ -94,6 +94,7 @@ The working intent inside Phase 3 is:
 - replace implicit operator knowledge with runnable validation commands
 - keep the local Docker control plane aligned with the future Kubernetes model
 - clear the remaining control-plane blockers before app onboarding work begins
+- validate the flagship workload against the live control plane, not just static config contracts
 
 ## Current Definition Of Done
 
@@ -102,6 +103,7 @@ Phase 3 will be considered complete when:
 - the control plane has trustworthy startup and smoke-check workflows
 - local operator access is explicit and actually usable
 - monitored app inventory is validated against the workspace contract
+- the flagship workload has at least one reproducible live integration audit through the control plane
 - the next major bottleneck becomes app onboarding rather than control-plane reliability
 
 ---

@@ -3207,3 +3207,179 @@ This guide fixes that gap and makes the workstation setup story part of the root
 ### Follow-Up Work
 
 - if we later add a Windows or WSL path, extend this guide instead of scattering setup notes across repos
+
+---
+
+## Phase 14: SwiftPay Live Control-Plane Audit
+
+### Goal
+
+Move beyond static SwiftPay onboarding checks and prove that the control plane can observe a real end-to-end SwiftPay transaction flow while the stack is live.
+
+### Commands
+
+```bash
+docker compose -f SwiftPay/docker-compose.yml ps
+curl http://localhost:4000/api/apps/swiftpay/business | jq .
+curl http://localhost:4000/api/apps/health | jq '.summary, (.apps[] | select(.id=="swiftpay"))'
+sed -n '260,460p' SwiftPay/docker-compose.yml
+sed -n '1,220p' SwiftPay/docs/observability-runbook.md
+docker network inspect observability-net >/dev/null 2>&1 || docker network create observability-net
+sed -n '1,260p' Obervability-Stack/ui-next/lib/app-observability.ts
+docker compose -f SwiftPay/docker-compose.yml up -d
+source ~/.zprofile >/dev/null 2>&1; which docker && docker compose -f SwiftPay/docker-compose.yml ps
+curl -fsS http://localhost:3007/health
+curl -fsSI http://localhost:8081
+curl -fsS http://localhost:4000/api/apps/health
+curl -fsS http://localhost:4000/api/apps/swiftpay/business
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job=~"swiftpay-.+"}'
+rg -n "app_business|pendingTransactions|queueDepth|circuitBreaker|register|login|transfer|wallet" SwiftPay/services -g '!*node_modules*'
+sed -n '1,240p' Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts
+curl -fsS http://localhost:3007/metrics | rg 'swiftpay|transaction|wallet|queue|circuit|failure|pending'
+curl -fsS http://localhost:3008/metrics | rg 'swiftpay|transaction|wallet|queue|circuit|failure|pending'
+rg -n "APIClient|register\\(|login\\(|createTransaction|/api/transactions|fromUserId|toUserId|amount" SwiftPay/services/frontend/src
+sed -n '1,260p' SwiftPay/services/frontend/src/App.js
+rg -n "authenticate|Authorization|Bearer|token" SwiftPay/services/frontend/src
+sed -n '1,340p' SwiftPay/services/frontend/src/lib/api-client.js
+curl -fsS http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name|test("swiftpay";"i"))'
+set -euo pipefail
+TS=$(date +%s)
+EMAIL1="live.audit.$TS.a@example.com"
+EMAIL2="live.audit.$TS.b@example.com"
+PASS='Password123!'
+NAME1='Live Audit A'
+NAME2='Live Audit B'
+RESP1=$(curl -fsS -X POST http://localhost:3007/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL1\",\"password\":\"$PASS\",\"name\":\"$NAME1\"}")
+RESP2=$(curl -fsS -X POST http://localhost:3007/api/auth/register -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL2\",\"password\":\"$PASS\",\"name\":\"$NAME2\"}")
+TOKEN1=$(printf '%s' "$RESP1" | jq -r '.accessToken')
+USER1=$(printf '%s' "$RESP1" | jq -r '.user.id // .userId')
+USER2=$(printf '%s' "$RESP2" | jq -r '.user.id // .userId')
+WALLETS=$(curl -fsS http://localhost:3007/api/wallets -H "Authorization: Bearer $TOKEN1")
+TXN=$(curl -fsS -X POST http://localhost:3007/api/transactions -H "Authorization: Bearer $TOKEN1" -H 'Content-Type: application/json' -H "Idempotency-Key: live-audit-$TS" -d "{\"fromUserId\":\"$USER1\",\"toUserId\":\"$USER2\",\"amount\":25.5}")
+sleep 5
+WALLET1=$(curl -fsS http://localhost:3007/api/wallets/$USER1 -H "Authorization: Bearer $TOKEN1")
+TXNS=$(curl -fsS "http://localhost:3007/api/transactions?userId=$USER1" -H "Authorization: Bearer $TOKEN1")
+BUSINESS=$(curl -fsS http://localhost:4000/api/apps/swiftpay/business)
+PROM_Q1=$(curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=swiftpay:transaction_queue_depth')
+PROM_Q2=$(curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=swiftpay_transaction_volume_dollars_total')
+PROM_Q3=$(curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=transactions_total{job="swiftpay-transaction-service"}')
+bash -n Obervability-Stack/scripts/swiftpay-live-audit.sh
+chmod +x Obervability-Stack/scripts/swiftpay-live-audit.sh
+./Obervability-Stack/scripts/swiftpay-live-audit.sh
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+```
+
+### What We Learned
+
+- `SwiftPay` was not running at the start of this slice, so the control plane correctly marked it down while still returning zero-valued business metrics from recording rules that use `or vector(0)` fallbacks.
+- Once `SwiftPay` was started, the control plane immediately saw it as healthy through `/api/apps/health`, and Prometheus reported all five SwiftPay metrics jobs as `up`.
+- A real end-to-end transaction through the public gateway worked:
+  - user registration succeeded
+  - the gateway created wallets for the new users
+  - the transfer entered the queue as `PENDING`
+  - the transaction completed asynchronously
+  - the sender wallet balance dropped from `1000.00` to `974.50`
+- The control-plane SwiftPay business endpoint can still show all zeros after a successful transfer, and that turned out to be expected for a healthy path.
+
+### Problems Encountered
+
+#### 1. `docker` was not visible in one command-execution path
+
+Problem:
+
+- one shell invocation reported `zsh:1: command not found: docker`
+- this was not a real machine-level Docker failure
+- it was a command-environment issue where the userland tool path from `~/.zprofile` was not loaded
+
+Fix:
+
+- re-ran the Docker-dependent check with:
+
+```bash
+source ~/.zprofile >/dev/null 2>&1
+```
+
+Why it mattered:
+
+- we needed to distinguish a shell-path problem from an actual control-plane or SwiftPay runtime problem
+
+#### 2. The first business-metrics reading looked misleading
+
+Problem:
+
+- `/api/apps/swiftpay/business` returned zeros before and after the successful transfer
+- at first glance that looked like a broken control-plane query path
+
+What we found:
+
+- the business endpoint in `Obervability-Stack/ui-next/app/api/apps/swiftpay/business/route.ts` only reports:
+  - pending transaction count
+  - pending amount
+  - queue depth
+  - transaction failure rate
+  - wallet failure rate
+  - wallet circuit-breaker state
+- those metrics legitimately return `0` on a healthy happy-path transfer when nothing is stuck, failing, or tripping a breaker
+
+Fix:
+
+- documented this behavior explicitly
+- encoded it into a new live audit so operators do not misread healthy zero values as broken instrumentation
+
+Why it mattered:
+
+- this is exactly the kind of subtle observability misunderstanding that creates false alarms later
+
+#### 3. The static onboarding audit was not enough
+
+Problem:
+
+- `Obervability-Stack/scripts/swiftpay-audit.sh` validated config contracts only
+- it did not prove that a live transfer path worked through the real stack
+
+Fix:
+
+- added `Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- wired it into `Obervability-Stack/scripts/devops-monitor.sh` as:
+
+```bash
+./scripts/devops-monitor.sh swiftpay-live
+```
+
+Why it mattered:
+
+- Phase 3 is about making the control plane trustworthy
+- that means proving live operator behavior, not just static file alignment
+
+### What We Changed
+
+- added `Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- updated `Obervability-Stack/scripts/devops-monitor.sh` with a `swiftpay-live` command
+- updated:
+  - `Obervability-Stack/scripts/README.md`
+  - `Obervability-Stack/README.md`
+  - `Obervability-Stack/docs/README.md`
+  - `PROJECT-ROADMAP.md`
+  - `JOURNEY-RUNBOOK.md`
+
+### Validation
+
+Validated successfully:
+
+- `bash -n Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- `./Obervability-Stack/scripts/swiftpay-live-audit.sh`
+- `./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live`
+
+### Why This Mattered
+
+This step closes an important gap between:
+
+- "the config says SwiftPay is onboarded"
+- and "an operator can prove SwiftPay really works through the live control plane"
+
+That is a much stronger Phase 3 outcome, and it sets us up to move into broader app integration work with less ambiguity.
+
+### Follow-Up Work
+
+- decide whether the SwiftPay business panel should later include one success-oriented metric so healthy activity is more visually obvious
+- use the same live-audit pattern for the next onboarded workload instead of relying on config-only checks
