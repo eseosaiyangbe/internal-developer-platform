@@ -5550,6 +5550,109 @@ The platform now has operator runbooks for three distinct workload patterns:
 
 This makes the remaining FoodPulse runbook easier to position as the resilience and failover story.
 
+---
+
+## Phase 5: FoodPulse Operator Runbook
+
+### Why We Did This
+
+After SwiftPay, MemFlip, and OpenSIS, we carried the operator-runbook pattern into FoodPulse.
+
+FoodPulse is the right fourth workload because it completes the app-level runbook set with the resilience/failover story:
+
+- a modern owned UI and API
+- Postgres primary/replica topology
+- Redis master/replica topology with Sentinel
+- HAProxy routing for Postgres and Redis
+- central blackbox monitoring through the shared observability stack
+- explicit Redis and Postgres failover drills
+
+### Commands Run
+
+```bash
+rg --files FoodPulse Obervability-Stack/docs Obervability-Stack/scripts | sort
+git status --short
+sed -n '1,280p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/foodpulse-audit.sh
+sed -n '1,320p' FoodPulse/docker-compose.yml
+sed -n '1,260p' FoodPulse/README.md
+sed -n '1,260p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,260p' FoodPulse/scripts/start.sh
+sed -n '260,560p' FoodPulse/scripts/cluster-status.sh
+sed -n '1,260p' FoodPulse/scripts/redis-failover-drill.sh
+sed -n '1,280p' FoodPulse/scripts/pg-failover-drill.sh
+git diff --check -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/FOODPULSE_OPERATOR_RUNBOOK.md
+rg -n "FOODPULSE_OPERATOR_RUNBOOK|FoodPulse Operator Runbook|foodpulse-live|localhost:8090|cluster-status|redis-failover|pg-failover|probe_success|kubectl" Obervability-Stack/docs/FOODPULSE_OPERATOR_RUNBOOK.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md
+git diff --stat -- JOURNEY-RUNBOOK.md PROJECT-ROADMAP.md Obervability-Stack/docs/README.md Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md Obervability-Stack/docs/FOODPULSE_OPERATOR_RUNBOOK.md
+git status --short
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+```
+
+### What We Added
+
+We added:
+
+- `Obervability-Stack/docs/FOODPULSE_OPERATOR_RUNBOOK.md`
+
+The runbook documents:
+
+- what FoodPulse does
+- startup commands
+- health checks
+- ports and URLs
+- service roles
+- Postgres and Redis HA topology checks
+- blackbox probe expectations
+- logs to check
+- common failure scenarios
+- Redis and Postgres failover drill guidance
+- recovery commands
+- Kubernetes mapping
+- deeper FoodPulse docs and scripts to consult
+
+### What We Updated
+
+We updated:
+
+- `Obervability-Stack/docs/README.md`
+- `Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md`
+- `PROJECT-ROADMAP.md`
+- `JOURNEY-RUNBOOK.md`
+
+### Why This Matters
+
+The platform now has operator runbooks for all four managed workload patterns:
+
+- SwiftPay for microservices and async business flows
+- MemFlip for simple onboarding and browser-first validation
+- OpenSIS for legacy-platform operations with Vault and MariaDB
+- FoodPulse for resilience, failover, and HA topology reasoning
+
+This closes the first major app-runbook milestone in Phase 5.
+
+### Validation
+
+The documentation checks passed with no whitespace errors.
+
+The FoodPulse static audit passed:
+
+- `21/21` checks
+- compose and inventory contracts aligned
+- browser URL and startup path matched the control plane
+- FoodPulse remained free of duplicate local Prometheus, Grafana, and Alertmanager services
+- central Prometheus blackbox target was present
+- cluster-status helper used the normalized browser port and HAProxy container names
+
+The FoodPulse live audit passed:
+
+- `16/16` checks
+- FoodPulse responded on `localhost:8090`
+- stats endpoint returned app telemetry through the UI proxy
+- control plane saw FoodPulse as healthy
+- Prometheus saw FoodPulse blackbox target health and all targets were up
+- `cluster-status.sh` reported a healthy lab
+
 ### Validation
 
 The documentation checks passed with no whitespace errors.
