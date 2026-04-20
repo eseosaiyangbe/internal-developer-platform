@@ -9386,3 +9386,98 @@ font-size: clamp(1.15rem, 1.8vw, 1.55rem)
 ### Why This Matters
 
 The FoodPulse page now has a calmer hierarchy. The hero still feels premium, but the typography no longer overwhelms the restaurant labels and live voting content.
+
+## 2026-04-20 - Stop FoodPulse Vote Clicks From Reordering Restaurant Labels
+
+### Question
+
+Clicking one restaurant label appeared to affect other labels, even though the vote count only changed for the clicked restaurant.
+
+### Root Cause
+
+The vote was being recorded correctly for only the clicked restaurant.
+
+The confusing behavior came from the UI update after a vote. After the API returned, the React state update did this:
+
+```text
+map the clicked restaurant to the new vote count
+then sort the whole restaurant list by votes descending
+```
+
+That meant a single vote could move cards around. The other restaurants were not receiving votes, but their visual positions changed, which made it look like they were affected.
+
+### Commands Run
+
+Inspected the UI and API vote flow:
+
+```bash
+sed -n '1,360p' FoodPulse/ui/src/App.jsx
+sed -n '1,260p' FoodPulse/api/src/index.js
+git status --short
+```
+
+Built the UI:
+
+```bash
+npm run build
+```
+
+Result:
+
+```text
+vite build completed successfully.
+```
+
+Rebuilt FoodPulse:
+
+```bash
+docker compose up -d --build foodpulse-ui
+```
+
+Verified page and health:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+curl -fsS http://localhost:8090/api/health
+```
+
+Result:
+
+```text
+foodpulse_ui 200
+FoodPulse health returned healthy with database=true and cache=true.
+```
+
+### Fix
+
+Removed sorting from the restaurant label grid after a vote.
+
+Before:
+
+```text
+Update clicked restaurant votes.
+Sort all cards by vote count.
+```
+
+After:
+
+```text
+Update clicked restaurant votes in place.
+Keep the restaurant label grid stable.
+```
+
+Added a separate ranked list for the `Live pulse` chart:
+
+```text
+rankedVenues = sortByVotes(data.venues)
+```
+
+The restaurant cards now keep their current order, while the chart and leader display can still rank by vote count.
+
+### Why This Matters
+
+This improves trust. Voting should feel local and predictable:
+
+- the clicked card updates in place
+- unrelated cards do not jump around
+- the ranking still lives where users expect ranking to live: in the live pulse chart
