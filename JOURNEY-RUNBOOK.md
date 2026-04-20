@@ -8665,3 +8665,86 @@ For learners, this makes the lesson more honest:
 - Demo data should not be mixed into operational screens.
 - A sidebar status badge is only useful if it reflects the same live source used elsewhere.
 - Shared status sources reduce disagreement between pages.
+
+## 2026-04-20 - Add Disk Usage Label And Align Dashboard Helper Copy
+
+### Request
+
+The dashboard needed a visible disk usage label, and this helper sentence needed better alignment:
+
+```text
+The dashboard stays light; the deep operator workflow lives inside each app page.
+```
+
+### Commands Run
+
+Opened the dashboard page:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+sed -n '260,620p' Obervability-Stack/ui-next/app/dashboard/page.tsx
+```
+
+Searched for existing disk usage and dashboard copy:
+
+```bash
+rg -n "dashboard stays light|Disk|disk|usage|node_filesystem|filesystem|managed app|Managed" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/lib Obervability-Stack/prometheus.yml Obervability-Stack -g '!ui-next/node_modules/**'
+```
+
+Problem encountered:
+
+```text
+rg: Obervability-Stack/prometheus.yml: No such file or directory
+```
+
+This was harmless. The repo stores Prometheus configuration under `Obervability-Stack/prometheus/`, not a root-level `prometheus.yml`.
+
+Ran the UI type-check:
+
+```bash
+npm run type-check
+```
+
+Result:
+
+```text
+tsc --noEmit completed successfully.
+```
+
+### Fix
+
+Added a `Disk Usage` dashboard stat card using the existing live metric:
+
+```text
+metrics.data?.disk
+```
+
+The card uses the existing `formatPercent()` helper and changes tone by threshold:
+
+```text
+green below 80%
+yellow at 80% and above
+red at 90% and above
+```
+
+Changed the top dashboard stat grid from four columns to five columns on large screens so the new disk label fits alongside:
+
+```text
+Healthy Apps
+Firing Alerts
+CPU
+Disk Usage
+Network
+```
+
+Moved the helper sentence into a clean bordered control strip beside the Refresh button. The sentence now appears as a blue operator-guidance pill with a shield icon, which keeps it visually aligned with the dashboard's lightweight control-room purpose.
+
+### Why This Matters
+
+Disk pressure is one of the most important early-warning signals in a DevOps dashboard. Adding it to the lightweight dashboard keeps the page simple while still showing the core host health signals operators care about first:
+
+- application health
+- active alerts
+- CPU pressure
+- disk pressure
+- network traffic
