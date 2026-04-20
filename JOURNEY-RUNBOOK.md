@@ -9481,3 +9481,338 @@ This improves trust. Voting should feel local and predictable:
 - the clicked card updates in place
 - unrelated cards do not jump around
 - the ranking still lives where users expect ranking to live: in the live pulse chart
+
+## 2026-04-20 - Observability Stack Down Incident
+
+### Situation
+
+The user reported:
+
+```text
+my observabilty stack is down
+```
+
+We treated this as a production-style incident and checked the stack from the outside first, then moved inward to containers, logs, disk, Docker storage, and app health.
+
+### Commands Run
+
+Checked the Observability Stack compose state:
+
+```bash
+docker compose ps -a
+```
+
+Checked the running containers that matter to the platform and managed apps:
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+Checked public health endpoints:
+
+```bash
+curl -fsS -o /tmp/monitor-ui.txt -w 'monitor_ui %{http_code}\n' http://localhost:4000
+curl -fsS -o /tmp/prometheus.txt -w 'prometheus %{http_code}\n' http://localhost:9090/-/ready
+curl -fsS -o /tmp/grafana.txt -w 'grafana %{http_code}\n' http://localhost:3000/api/health
+curl -fsS -o /tmp/loki.txt -w 'loki %{http_code}\n' http://localhost:3100/ready
+curl -fsS -o /tmp/alertmanager.txt -w 'alertmanager %{http_code}\n' http://localhost:9093/-/ready
+```
+
+Checked the real service status returned by the Observability UI API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Checked managed app health from the Observability UI API:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/health
+```
+
+Collected logs from the main Observability Stack services:
+
+```bash
+docker compose logs --tail=80 devops-monitor-ui prometheus grafana loki alertmanager
+```
+
+Checked host disk:
+
+```bash
+df -h
+```
+
+Checked Docker storage usage:
+
+```bash
+docker system df -v
+```
+
+Checked relevant Docker volumes:
+
+```bash
+docker volume ls --format 'table {{.Name}}\t{{.Driver}}' | rg 'loki|obervability|grafana|prometheus'
+```
+
+Checked disk from inside the Loki container:
+
+```bash
+docker exec loki df -h / /loki
+```
+
+Inspected Loki mounts:
+
+```bash
+docker inspect loki --format '{{json .Mounts}}' | python3 -m json.tool
+```
+
+Checked FoodPulse database logs because managed app health and container restarts were also affected:
+
+```bash
+docker logs --tail=60 foodpulse-db
+```
+
+Freed Docker build cache:
+
+```bash
+docker builder prune -f
+```
+
+Restarted Loki and Promtail after freeing space:
+
+```bash
+docker compose restart loki promtail
+```
+
+Restarted FoodPulse services that had been impacted by the same disk pressure:
+
+```bash
+docker compose restart foodpulse-db foodpulse-api foodpulse-ui
+```
+
+Rechecked Observability Stack services:
+
+```bash
+docker compose ps
+```
+
+Rechecked FoodPulse services:
+
+```bash
+docker compose ps foodpulse-db foodpulse-api foodpulse-ui
+```
+
+Rechecked Loki readiness and query path:
+
+```bash
+curl -fsS -o /tmp/loki-ready.txt -w 'loki_ready %{http_code}\n' http://localhost:3100/ready
+curl -fsS -o /tmp/loki-labels.json -w 'loki_labels %{http_code}\n' http://localhost:3100/loki/api/v1/labels
+```
+
+Rechecked FoodPulse UI on the correct local port:
+
+```bash
+curl -fsS -o /tmp/foodpulse.txt -w 'foodpulse %{http_code}\n' http://localhost:8090
+```
+
+Rechecked Docker disk from inside Loki after cleanup:
+
+```bash
+docker exec loki df -h / /loki
+```
+
+Rechecked real platform status from the UI API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2)); console.log(j.services.map(s=>`${s.name}: ${s.status} ${s.version||""}`).join("\n"));})'
+```
+
+Rechecked managed app health from the UI API:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/health | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2)); console.log(j.apps.map(a=>`${a.name}: ${a.status} latency=${a.latencyMs}`).join("\n"));})'
+```
+
+### Problems Found
+
+The Mac host disk was not full:
+
+```text
+/System/Volumes/Data had available space.
+```
+
+The Docker Desktop internal disk was full from inside Loki:
+
+```text
+overlay 58.8G used 55.8G available 0 use% 100% /
+/dev/vdb1 58.8G used 55.8G available 0 use% 100% /loki
+```
+
+Loki logs showed write failures:
+
+```text
+no space left on device
+```
+
+FoodPulse database logs showed PostgreSQL could not write its lock file:
+
+```text
+could not write lock file "postmaster.pid": No space left on device
+```
+
+Alertmanager was also retrying webhook notifications to the monitor UI and receiving a `500` response:
+
+```text
+http://devops-monitor-ui:3000/api/notifications/webhook
+Unexpected end of JSON input
+```
+
+This webhook issue was not the root cause of the outage, but it should be handled as a follow-up bug if it continues.
+
+One verification command failed because shell quoting broke the inline Node formatter:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2)); console.log(j.services.map(s=>`${s.name}: ${s.status} ${s.version||''}`).join('\n'));})"
+```
+
+The shell interpreted `${...}` before Node could run it, causing:
+
+```text
+zsh: bad substitution
+SyntaxError: Unexpected token ')'
+```
+
+We fixed that by wrapping the Node program in single quotes and using double quotes inside the JavaScript.
+
+One verification command checked the old FoodPulse port:
+
+```bash
+curl -fsS -o /tmp/foodpulse.txt -w 'foodpulse %{http_code}\n' http://localhost:8084
+```
+
+That returned:
+
+```text
+foodpulse 000
+```
+
+FoodPulse is currently exposed on port `8090`, so the correct check is:
+
+```bash
+curl -fsS -o /tmp/foodpulse.txt -w 'foodpulse %{http_code}\n' http://localhost:8090
+```
+
+### Root Cause
+
+Docker Desktop internal storage was full.
+
+The Mac still had host disk available, but containers write through Docker Desktop's internal Linux VM disk. That internal disk reached `100%`, so Loki could not write chunks/index data and FoodPulse PostgreSQL could not write its lock file. This made the stack look down or unstable even though several containers were still technically running.
+
+### Fix Applied
+
+Freed Docker build cache:
+
+```bash
+docker builder prune -f
+```
+
+Result:
+
+```text
+Total reclaimed space: 5.823GB
+```
+
+Restarted the impacted logging services:
+
+```bash
+docker compose restart loki promtail
+```
+
+Restarted the impacted FoodPulse services:
+
+```bash
+docker compose restart foodpulse-db foodpulse-api foodpulse-ui
+```
+
+### Verification
+
+Loki disk after cleanup:
+
+```text
+overlay 58.8G used 50.7G available 5.0G use% 91% /
+/dev/vdb1 58.8G used 50.7G available 5.0G use% 91% /loki
+```
+
+Loki readiness and query path:
+
+```text
+loki_ready 200
+loki_labels 200
+```
+
+Observability platform services:
+
+```text
+total: 8
+up: 8
+down: 0
+updatesAvailable: 0
+```
+
+Service results:
+
+```text
+Prometheus: up
+Grafana: up
+Alertmanager: up
+Node Exporter: up
+Blackbox Exporter: up
+cAdvisor: up
+Loki: up
+Promtail: up
+```
+
+FoodPulse:
+
+```text
+foodpulse 200
+foodpulse-db: up
+foodpulse-api: up
+foodpulse-ui: up
+```
+
+Managed app health:
+
+```text
+OpenSIS: down
+SwiftPay: healthy
+MemFlip: healthy
+FoodPulse: healthy
+```
+
+OpenSIS is a separate managed-app follow-up. The Observability Stack itself is back up.
+
+### Why We Did This
+
+We checked health endpoints first because they match what a user sees. Then we checked logs and disk because a service can be "running" but still broken if it cannot write. Loki and PostgreSQL both reported write failures, which pointed to storage pressure. Checking disk inside the container confirmed the real problem was Docker Desktop internal disk, not the Mac host filesystem.
+
+### Follow-Up Recommendations
+
+Add retention and storage limits for Loki so local logs cannot grow forever.
+
+Increase Docker Desktop disk image size or keep a documented minimum free-space threshold for this project.
+
+Add a dashboard warning when Docker/container filesystem usage crosses a dangerous threshold.
+
+Create a safe cleanup script for learners:
+
+```bash
+docker builder prune -f
+docker image prune -f
+```
+
+Do not automatically prune volumes in the learner script because volumes may contain database data.
+
+Investigate the Alertmanager webhook `Unexpected end of JSON input` error if it continues after the storage incident.
+
+Bring OpenSIS back up separately if the managed-app dashboard should show all four apps healthy.
