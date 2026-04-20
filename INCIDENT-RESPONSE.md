@@ -840,3 +840,448 @@ alertmanager: healthy
 Investigate why this local Docker Desktop cAdvisor deployment only exposes the root cgroup CPU series. If we want richer per-container CPU alerting in local Compose, cAdvisor may need additional host mounts, permissions, or Docker Desktop-specific tuning.
 
 When we move to Kubernetes, prefer kube-state-metrics/cAdvisor/kubelet container metrics from the cluster path rather than relying on this local Docker Desktop behavior.
+
+## IR-2026-04-20-004 - FoodPulse UI API 502 Through Postgres HAProxy
+
+### Situation
+
+The user asked us to check the FoodPulse UI.
+
+The first check showed the static UI was reachable, but the application was not fully healthy:
+
+```text
+http://localhost:8090 returned 200
+http://localhost:8090/api/health returned 502
+```
+
+That meant Nginx could serve the frontend, but the UI could not load live restaurant/status data from the API.
+
+### Commands Run
+
+Checked the FoodPulse UI HTTP status:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+```
+
+Checked the FoodPulse API health endpoint through the UI proxy:
+
+```bash
+curl -fsS http://localhost:8090/api/health
+```
+
+Tried to inspect FoodPulse Compose services, initially using the container-style Redis name instead of the Compose service name:
+
+```bash
+docker compose ps foodpulse-ui foodpulse-api foodpulse-db foodpulse-redis-master
+```
+
+Collected UI and API logs:
+
+```bash
+docker compose logs --tail=80 foodpulse-ui foodpulse-api
+```
+
+Checked the full FoodPulse Compose state:
+
+```bash
+docker compose ps
+```
+
+Checked Postgres and Postgres HAProxy logs:
+
+```bash
+docker compose logs --tail=120 foodpulse-db pg-haproxy
+```
+
+Verified the primary Postgres database was reachable directly:
+
+```bash
+docker compose exec -T foodpulse-db psql -U postgres -d foodpulse -c 'select 1 as db_ok;'
+```
+
+Checked FoodPulse API database environment variables:
+
+```bash
+docker compose exec -T foodpulse-api printenv | sort | grep FOODPULSE
+```
+
+Reviewed the FoodPulse API startup path:
+
+```bash
+sed -n '1,140p' api/src/index.js
+```
+
+Reviewed the Postgres HAProxy configuration from the repo:
+
+```bash
+sed -n '1,220p' haproxy/haproxy.cfg
+```
+
+Reviewed the active Postgres HAProxy configuration inside the running container:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc 'cat /usr/local/etc/haproxy/haproxy.cfg'
+```
+
+Checked database roles:
+
+```bash
+docker compose exec -T foodpulse-db psql -U postgres -d foodpulse -c "\du"
+```
+
+Checked databases:
+
+```bash
+docker compose exec -T foodpulse-db psql -U postgres -d foodpulse -c "select datname from pg_database order by datname;"
+```
+
+Checked Postgres host-based auth rules:
+
+```bash
+docker compose exec -T foodpulse-db sh -lc 'grep -v "^[[:space:]]*#" "$PGDATA/pg_hba.conf" | sed "/^[[:space:]]*$/d"'
+```
+
+Checked current Postgres sessions:
+
+```bash
+docker compose exec -T foodpulse-db psql -U postgres -d foodpulse -c "select usename, client_addr, state, application_name from pg_stat_activity order by backend_start desc limit 20;"
+```
+
+Checked HAProxy binary availability:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc 'haproxy -vv | head -80'
+```
+
+That command failed because `haproxy` was not on the default shell path in the container.
+
+Checked whether the FoodPulse API image had Postgres client tools and confirmed its platform:
+
+```bash
+docker compose exec -T foodpulse-api sh -lc 'which pg_isready || true; which psql || true; node -e "console.log(process.arch, process.platform)"'
+```
+
+Checked whether the API could query Postgres through HAProxy:
+
+```bash
+docker compose exec -T foodpulse-api sh -lc 'node - <<"NODE"
+const { Pool } = require("pg");
+const pool = new Pool({host:"pg-haproxy", port:5432, database:"foodpulse", user:"foodpulse", password:"foodpulse"});
+pool.query("select 1 as ok").then(r=>{console.log(r.rows); process.exit(0)}).catch(e=>{console.error(e.message); process.exit(1)});
+NODE'
+```
+
+Checked whether the API could query Postgres directly:
+
+```bash
+docker compose exec -T foodpulse-api sh -lc 'node - <<"NODE"
+const { Pool } = require("pg");
+const pool = new Pool({host:"foodpulse-db", port:5432, database:"foodpulse", user:"foodpulse", password:"foodpulse"});
+pool.query("select 1 as ok").then(r=>{console.log(r.rows); process.exit(0)}).catch(e=>{console.error(e.message); process.exit(1)});
+NODE'
+```
+
+Listed Compose services to confirm service names:
+
+```bash
+docker compose config --services
+```
+
+Checked HAProxy logs for backend failures:
+
+```bash
+docker logs --tail=160 foodpulse-pg-haproxy
+```
+
+Inspected the Postgres HAProxy container command:
+
+```bash
+docker inspect foodpulse-pg-haproxy --format '{{json .Config.Cmd}} {{json .Config.Entrypoint}} {{json .Config.Image}}'
+```
+
+Listed common binary paths inside the HAProxy container:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc 'ls -la /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin 2>/dev/null | sed -n "1,220p"'
+```
+
+Searched for FoodPulse HAProxy/database references:
+
+```bash
+rg -n "pg-haproxy|FOODPULSE_DB_SERVER|haproxy|foodpulse-db" docker-compose.yml api -S
+```
+
+Confirmed the primary Postgres node was writable and not in recovery:
+
+```bash
+docker compose exec -T foodpulse-db psql -U postgres -d foodpulse -c "select pg_is_in_recovery() as in_recovery, current_setting('transaction_read_only') as tx_read_only;"
+```
+
+Validated the active HAProxy config:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc '/usr/local/sbin/haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg'
+```
+
+Checked HAProxy DNS resolution for the primary and replicas:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc 'getent hosts foodpulse-db foodpulse-db-replica1 foodpulse-db-replica2 foodpulse-db-replica3'
+```
+
+Checked TCP reachability from HAProxy to the primary and a replica:
+
+```bash
+docker compose exec -T pg-haproxy sh -lc 'timeout 2 bash -lc "</dev/tcp/foodpulse-db/5432"; echo primary_tcp_$?; timeout 2 bash -lc "</dev/tcp/foodpulse-db-replica1/5432"; echo replica1_tcp_$?'
+```
+
+Restarted only the Postgres HAProxy service to clear the bad backend state:
+
+```bash
+docker compose restart pg-haproxy
+```
+
+Retested API-to-Postgres through HAProxy:
+
+```bash
+sleep 3; docker compose exec -T foodpulse-api sh -lc 'node - <<"NODE"
+const { Pool } = require("pg");
+const pool = new Pool({host:"pg-haproxy", port:5432, database:"foodpulse", user:"foodpulse", password:"foodpulse"});
+pool.query("select 1 as ok").then(r=>{console.log(r.rows); process.exit(0)}).catch(e=>{console.error(e.message); process.exit(1)});
+NODE'
+```
+
+Checked recent Postgres HAProxy logs after restart:
+
+```bash
+sleep 3; docker logs --tail=40 foodpulse-pg-haproxy
+```
+
+Checked the recovered service state:
+
+```bash
+sleep 3; docker compose ps foodpulse-api pg-haproxy foodpulse-ui
+```
+
+Verified the UI and API endpoints after recovery:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'ui %{http_code}\n' http://localhost:8090
+curl -fsS -w '\nhealth %{http_code}\n' http://localhost:8090/api/health
+curl -fsS -w '\nvenues %{http_code}\n' http://localhost:8090/api/venues | head -c 2000
+```
+
+Checked that `npx` was available before using the local Playwright wrapper:
+
+```bash
+command -v npx >/dev/null 2>&1; echo npx_$?
+```
+
+Attempted to open the UI with Playwright using a one-line environment assignment:
+
+```bash
+mkdir -p output/playwright && CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh" "$PWCLI" open http://localhost:8090
+```
+
+That command failed because `PWCLI` expanded before the temporary `CODEX_HOME` assignment was available to the same command. We fixed it by assigning variables first, then running the wrapper.
+
+Opened the FoodPulse UI in a real browser:
+
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"; PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"; ls -l "$PWCLI"; "$PWCLI" open http://localhost:8090
+```
+
+Captured a browser accessibility snapshot:
+
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"; PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"; "$PWCLI" snapshot
+```
+
+Clicked the Naija Jollof vote button and captured the updated UI state:
+
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"; PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"; "$PWCLI" click e84 && "$PWCLI" snapshot
+```
+
+Attempted to save a screenshot with the wrong Playwright CLI option:
+
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"; PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"; "$PWCLI" screenshot --path output/playwright/foodpulse-ui-2026-04-20.png
+```
+
+That failed because this wrapper uses `--filename`, not `--path`.
+
+Saved a full-page screenshot with the correct option:
+
+```bash
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"; PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"; "$PWCLI" screenshot --filename output/playwright/foodpulse-ui-2026-04-20.png --full-page
+```
+
+Checked recent API/UI logs after recovery:
+
+```bash
+docker compose logs --tail=60 foodpulse-api foodpulse-ui
+```
+
+Removed temporary Playwright artifacts created during the check so we did not commit generated browser output:
+
+```bash
+rm -rf .playwright-cli output
+```
+
+### Evidence
+
+The UI served static content:
+
+```text
+foodpulse_ui 200
+```
+
+The API was initially failing through the UI proxy:
+
+```text
+GET /api/health HTTP/1.1" 502
+```
+
+FoodPulse API logs showed repeated startup dependency failures:
+
+```text
+foodpulse-api startup dependency check failed ... Connection terminated unexpectedly
+foodpulse-api failed to start Error: Connection terminated unexpectedly
+```
+
+Nginx in the UI container could not connect to the API while the API was restarting:
+
+```text
+connect() failed (111: Connection refused) while connecting to upstream
+```
+
+Postgres itself was reachable:
+
+```text
+db_ok
+-----
+1
+```
+
+The API could query the primary database directly:
+
+```text
+[ { ok: 1 } ]
+```
+
+The API could not query the database through `pg-haproxy` before the fix:
+
+```text
+Connection terminated unexpectedly
+```
+
+HAProxy was returning no available server for write traffic:
+
+```text
+pg_rw pg_rw_backend/<NOSRV>
+```
+
+The primary Postgres node was not in recovery and was writable:
+
+```text
+in_recovery = f
+tx_read_only = off
+```
+
+HAProxy could resolve and reach the Postgres containers over TCP:
+
+```text
+primary_tcp_0
+replica1_tcp_0
+```
+
+After restarting `pg-haproxy`, API-to-Postgres through HAProxy succeeded:
+
+```text
+[ { ok: 1 } ]
+```
+
+The FoodPulse health endpoint recovered:
+
+```json
+{"status":"healthy","checks":{"database":true,"cache":true},"hostname":"0667777b05ca"}
+```
+
+The browser snapshot showed eight restaurant labels online and the live board healthy:
+
+```text
+Live board: Healthy
+8 kitchens online
+```
+
+Voting worked for the selected label. Naija Jollof changed from 71 to 72 votes, while other restaurant labels kept their previous vote counts. The aggregate live pulse changed from 238 to 239 total votes.
+
+### Root Cause
+
+The FoodPulse UI was not broken at the static frontend layer. The outage was in the API dependency path.
+
+The API depends on Postgres through `pg-haproxy`:
+
+```text
+FOODPULSE_DB_SERVER=pg-haproxy
+```
+
+The primary Postgres database had recovered from the earlier disk-space incident and was directly reachable, but the Postgres HAProxy service was still presenting the write backend as unavailable:
+
+```text
+pg_rw_backend/<NOSRV>
+```
+
+Because the API startup check uses the HAProxy path, the API repeatedly failed startup, and the UI's Nginx proxy returned 502 for `/api/*` routes.
+
+### Fix
+
+Restarted the Postgres HAProxy service only:
+
+```bash
+docker compose restart pg-haproxy
+```
+
+This cleared the stale backend state and allowed HAProxy to route write traffic to the recovered primary Postgres container again.
+
+### Verification
+
+Verified API-to-database through HAProxy:
+
+```text
+[ { ok: 1 } ]
+```
+
+Verified FoodPulse API health through the UI proxy:
+
+```text
+health 200
+```
+
+Verified venues load through the UI proxy:
+
+```text
+venues data returned restaurant records
+```
+
+Verified with a real browser that:
+
+```text
+FoodPulse page title is present.
+Live board shows Healthy.
+Eight restaurant labels render.
+Vote buttons are present.
+Naija Jollof vote increments only the selected restaurant label.
+The live pulse total increments by one.
+```
+
+### Follow-Up
+
+Add better operational visibility around the FoodPulse Postgres HAProxy layer before Kubernetes migration. Good next hardening options:
+
+- Add an HAProxy stats socket or stats endpoint for backend state inspection.
+- Add a FoodPulse precheck that verifies `pg-haproxy` can route to Postgres, not just that Postgres is reachable directly.
+- Add a targeted runbook step for restarting only `pg-haproxy` after database recovery if HAProxy continues to report `<NOSRV>`.
+- Revisit HAProxy health-check behavior if this repeats, because a healthy proxy should usually recover backend state without a manual restart.
