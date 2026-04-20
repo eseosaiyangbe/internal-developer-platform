@@ -7592,3 +7592,381 @@ This keeps the learning flow clean.
 The main dashboard is now the front door, not the whole encyclopedia. The learner sees app labels first, then clicks into OpenSIS, SwiftPay, FoodPulse, or MemFlip when they want probe latency, uptime, alerts, recent logs, and operator guidance.
 
 It also removes a hidden build dependency on Google Fonts, which is better for a DevOps training repo that should work on fresh laptops and restricted lab networks.
+
+## Phase 6 UI Polish: Monitoring And Logging Service Labels
+
+### Date
+
+2026-04-20
+
+### Goal
+
+Add a `Monitoring and Logging` section under `Managed Apps` on the Services page.
+
+The requested labels are:
+
+- Prometheus
+- Grafana
+- Alertmanager
+- Loki
+- Promtail
+- Node Exporter
+- Blackbox Exporter
+- cAdvisor
+
+Each label needed to show:
+
+- whether the service is up or down
+- current version
+- latest available version
+- whether an update is available
+- an `Open` button to the service URL
+- a `Check Update` action
+
+### Commands Run
+
+Read the current Services page:
+
+```bash
+sed -n '1,280p' Obervability-Stack/ui-next/app/services/page.tsx
+```
+
+Searched for previous version/update monitoring code and service references:
+
+```bash
+rg -n "Version|version|update|Update|Prometheus|Grafana|Alertmanager|Loki|promtail|Node exporter|blackbox|cAdvisor|cadvisor" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib -g '*.tsx' -g '*.ts'
+```
+
+Listed existing API routes:
+
+```bash
+find Obervability-Stack/ui-next/app/api -maxdepth 4 -type f | sort
+```
+
+Read the Observability Stack Compose file:
+
+```bash
+sed -n '1,220p' Obervability-Stack/docker-compose.yml
+```
+
+```bash
+sed -n '220,520p' Obervability-Stack/docker-compose.yml
+```
+
+Read the existing health and version helpers:
+
+```bash
+sed -n '1,340p' Obervability-Stack/ui-next/lib/health-api.ts
+```
+
+```bash
+sed -n '1,380p' Obervability-Stack/ui-next/lib/version-monitor.ts
+```
+
+Read the existing service health API route:
+
+```bash
+sed -n '1,130p' Obervability-Stack/ui-next/app/api/services/health/route.ts
+```
+
+Read the centralized service config:
+
+```bash
+sed -n '1,160p' Obervability-Stack/ui-next/lib/service-config.ts
+```
+
+Checked whether cAdvisor, Promtail, Blackbox Exporter, and Node Exporter already existed in Compose and Prometheus config:
+
+```bash
+rg -n "cadvisor|cAdvisor|blackbox|promtail|node-exporter|9100|9115|8080|8082" Obervability-Stack/prometheus Obervability-Stack -g '*.yml' -g '*.yaml' -g '*.env*'
+```
+
+Listed Compose files in the repo:
+
+```bash
+find . -maxdepth 3 -iname '*compose*.yml' -o -iname '*compose*.yaml'
+```
+
+Read Prometheus scrape configuration:
+
+```bash
+sed -n '1,260p' Obervability-Stack/prometheus/prometheus.yml
+```
+
+Read the monitored-app hook pattern before adding the platform-services hook:
+
+```bash
+sed -n '1,140p' Obervability-Stack/ui-next/lib/hooks/use-monitored-apps.ts
+```
+
+Ran TypeScript after adding the platform service API, hook, and UI:
+
+```bash
+npm run type-check
+```
+
+Reviewed the diff and changed files:
+
+```bash
+git diff --stat
+```
+
+```bash
+git diff -- Obervability-Stack/ui-next/app/services/page.tsx Obervability-Stack/docker-compose.yml
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt the UI and recreated Promtail so the Promtail `Open` button can reach `http://localhost:9080`:
+
+```bash
+docker compose up -d --build devops-monitor-ui promtail
+```
+
+Verified UI and Promtail containers:
+
+```bash
+docker compose ps devops-monitor-ui promtail
+```
+
+Checked the new platform service API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Confirmed Promtail is reachable from the host:
+
+```bash
+curl -fsS -I http://localhost:9080/ready
+```
+
+Confirmed `/services` is still protected by auth:
+
+```bash
+curl -fsS -I http://localhost:4000/services
+```
+
+Checked working tree state:
+
+```bash
+git status --short
+```
+
+Started cAdvisor using its existing profile to verify it can run on this machine:
+
+```bash
+docker compose --profile container-metrics up -d cadvisor
+```
+
+Verified cAdvisor container and health endpoint:
+
+```bash
+docker compose ps cadvisor
+```
+
+```bash
+curl -fsS -I http://localhost:8082/healthz
+```
+
+Checked the platform service API again after cAdvisor started:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Promoted cAdvisor into the default Compose service list and enabled the Prometheus cAdvisor scrape job, then reran checks:
+
+```bash
+npm run type-check
+```
+
+```bash
+docker compose config --services
+```
+
+```bash
+git diff --stat
+```
+
+Rebuilt and restarted the affected containers:
+
+```bash
+docker compose up -d --build devops-monitor-ui prometheus cadvisor promtail
+```
+
+Prometheus did not recreate because its container definition did not change, so the mounted config was reloaded explicitly:
+
+```bash
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Verified final runtime state:
+
+```bash
+docker compose ps devops-monitor-ui prometheus promtail cadvisor
+```
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Verified Prometheus is scraping cAdvisor:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22cadvisor%22%7D'
+```
+
+Confirmed `/services` remains auth-protected:
+
+```bash
+curl -fsS -I http://localhost:4000/services
+```
+
+Checked final working tree state:
+
+```bash
+git status --short
+```
+
+### Changes Made
+
+Added a new server-side platform service inventory and checker:
+
+```text
+Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+This checker collects:
+
+- service status
+- response time
+- current version
+- latest GitHub release version
+- update availability
+- public URL
+- release URL
+
+Added a new API route:
+
+```text
+Obervability-Stack/ui-next/app/api/services/platform/route.ts
+```
+
+Added a client hook:
+
+```text
+Obervability-Stack/ui-next/lib/hooks/use-platform-services.ts
+```
+
+Updated the Services page:
+
+```text
+Obervability-Stack/ui-next/app/services/page.tsx
+```
+
+The page now keeps `Managed Apps` first, then adds `Monitoring and Logging` directly below it.
+
+Updated Docker Compose:
+
+```text
+Obervability-Stack/docker-compose.yml
+```
+
+Changes:
+
+- exposed Promtail on `9080:9080`
+- changed cAdvisor host port from `8080` to `8082` to avoid collision with MemFlip
+- promoted cAdvisor out of the optional profile so it is part of the default stack
+- passed Promtail, Blackbox Exporter, and cAdvisor URLs into the UI container
+
+Updated Prometheus scrape config:
+
+```text
+Obervability-Stack/prometheus/prometheus.yml
+```
+
+Change:
+
+- enabled the `cadvisor` scrape job
+
+### Problems And Fixes
+
+Problem: cAdvisor already existed, but it was behind the `container-metrics` profile and was not part of the normal stack.
+
+Fix: Start cAdvisor with the profile first to prove it works on this Mac. After it started healthy, remove the profile so it becomes a default service.
+
+Problem: cAdvisor used host port `8080`, but MemFlip already uses `8080`.
+
+Fix: map cAdvisor as `8082:8080`, so the cAdvisor Open button uses `http://localhost:8082`.
+
+Problem: Promtail had no host port, so an `Open` button would not work from the browser.
+
+Fix: expose Promtail on `9080:9080`.
+
+Problem: Prometheus did not automatically restart after the mounted `prometheus.yml` changed.
+
+Fix: call the lifecycle reload endpoint:
+
+```bash
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed and included:
+
+```text
+/api/services/platform
+```
+
+Runtime platform-service API returned:
+
+- total services: `8`
+- up: `8`
+- down: `0`
+- updates available: `8`
+
+cAdvisor is healthy:
+
+```text
+cadvisor   Up ... (healthy)   0.0.0.0:8082->8080/tcp
+```
+
+Promtail is reachable from the browser host path:
+
+```text
+HTTP/1.1 200 OK
+```
+
+Prometheus is scraping cAdvisor:
+
+```json
+{"metric":{"__name__":"up","instance":"cadvisor","job":"cadvisor"},"value":[...,"1"]}
+```
+
+The `/services` route still requires sign-in:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fservices
+```
+
+### Why This Matters
+
+This gives learners a single Services page with two clean layers:
+
+- `Managed Apps`: OpenSIS, SwiftPay, FoodPulse, and MemFlip
+- `Monitoring and Logging`: the observability tools that support those apps
+
+That is the right mental model for the future Kubernetes version too. The apps are workloads, while Prometheus, Grafana, Alertmanager, Loki, Promtail, Node Exporter, Blackbox Exporter, and cAdvisor are platform services.
