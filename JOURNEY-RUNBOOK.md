@@ -7970,3 +7970,329 @@ This gives learners a single Services page with two clean layers:
 - `Monitoring and Logging`: the observability tools that support those apps
 
 That is the right mental model for the future Kubernetes version too. The apps are workloads, while Prometheus, Grafana, Alertmanager, Loki, Promtail, Node Exporter, Blackbox Exporter, and cAdvisor are platform services.
+
+## Phase 6 UI Polish: Monitoring And Logging Health Sweep, Loki 404, And Promtail Fix
+
+### Date
+
+2026-04-20
+
+### Goal
+
+The user reported that cAdvisor was being explored and Loki returned:
+
+```text
+404 page not found
+```
+
+The goal was to check every monitoring and logging tool, explain the Loki behavior, and fix anything genuinely broken.
+
+### Commands Run
+
+Checked all Observability Stack containers:
+
+```bash
+docker compose ps
+```
+
+Checked the platform service API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Checked all Prometheus `up` series:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=up'
+```
+
+Checked active Prometheus targets:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/targets?state=active'
+```
+
+Checked browser-facing root and health URLs:
+
+```bash
+curl -sS -o /tmp/prometheus-root.out -w 'prometheus_root %{http_code}\n' http://localhost:9090/
+```
+
+```bash
+curl -sS -o /tmp/grafana-root.out -w 'grafana_root %{http_code}\n' http://localhost:3000/
+```
+
+```bash
+curl -sS -o /tmp/alertmanager-root.out -w 'alertmanager_root %{http_code}\n' http://localhost:9093/
+```
+
+```bash
+curl -sS -o /tmp/loki-root.out -w 'loki_root %{http_code}\n' http://localhost:3100/
+```
+
+```bash
+curl -sS -o /tmp/loki-ready.out -w 'loki_ready %{http_code}\n' http://localhost:3100/ready
+```
+
+```bash
+curl -sS -o /tmp/promtail-ready.out -w 'promtail_ready %{http_code}\n' http://localhost:9080/ready
+```
+
+```bash
+curl -sS -o /tmp/node-metrics.out -w 'node_exporter_metrics %{http_code}\n' http://localhost:9100/metrics
+```
+
+```bash
+curl -sS -o /tmp/cadvisor-root.out -w 'cadvisor_root %{http_code}\n' http://localhost:8082/
+```
+
+Checked Blackbox Exporter and cAdvisor browser behavior:
+
+```bash
+curl -sS -o /tmp/blackbox-root.out -w 'blackbox_root %{http_code}\n' http://localhost:9115/
+```
+
+```bash
+curl -sS -o /tmp/blackbox-healthy.out -w 'blackbox_healthy %{http_code}\n' http://localhost:9115/-/healthy
+```
+
+```bash
+curl -sS -L -o /tmp/cadvisor-containers.out -w 'cadvisor_follow %{http_code}\n' http://localhost:8082/
+```
+
+```bash
+curl -sS -o /tmp/cadvisor-health.out -w 'cadvisor_healthz %{http_code}\n' http://localhost:8082/healthz
+```
+
+Checked Loki labels and log query behavior:
+
+```bash
+curl -fsS 'http://localhost:3100/loki/api/v1/labels'
+```
+
+```bash
+curl -fsS 'http://localhost:3100/loki/api/v1/query?query=%7Bcompose_project%3D~%22.%2B%22%7D'
+```
+
+Checked Promtail targets:
+
+```bash
+curl -fsS http://localhost:9080/targets
+```
+
+Checked Promtail and Loki logs:
+
+```bash
+docker compose logs --tail=80 promtail
+```
+
+```bash
+docker compose logs --tail=80 loki
+```
+
+Read Promtail configuration:
+
+```bash
+sed -n '1,260p' Obervability-Stack/loki/promtail-config.yml
+```
+
+Tried a Docker API version override first:
+
+```bash
+docker compose up -d --build devops-monitor-ui promtail
+```
+
+Checked the rebuilt services:
+
+```bash
+docker compose logs --tail=30 promtail
+```
+
+Checked valid Promtail image tags:
+
+```bash
+docker manifest inspect grafana/promtail:3.5.8
+```
+
+```bash
+docker manifest inspect grafana/promtail:3.4.4
+```
+
+```bash
+docker manifest inspect grafana/promtail:3.3.2
+```
+
+```bash
+docker manifest inspect grafana/promtail:3.2.1
+```
+
+Rebuilt with Promtail `3.5.8`:
+
+```bash
+docker compose up -d --build devops-monitor-ui promtail
+```
+
+Waited briefly for Docker target discovery:
+
+```bash
+sleep 8
+```
+
+Verified Promtail and UI containers:
+
+```bash
+docker compose ps promtail devops-monitor-ui
+```
+
+Checked Promtail logs again:
+
+```bash
+docker compose logs --tail=40 promtail
+```
+
+Checked Loki labels and actual log lines:
+
+```bash
+curl -fsS 'http://localhost:3100/loki/api/v1/labels'
+```
+
+```bash
+curl -fsS 'http://localhost:3100/loki/api/v1/query?query=%7Bcompose_service%3D%22promtail%22%7D'
+```
+
+Checked the platform service API after the fix:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Confirmed the corrected Loki and Promtail Open URLs return `200`:
+
+```bash
+curl -sS -o /tmp/loki-ready-after.out -w 'loki_open_url %{http_code}\n' http://localhost:3100/ready
+```
+
+```bash
+curl -sS -o /tmp/promtail-targets-after.out -w 'promtail_open_url %{http_code}\n' http://localhost:9080/targets
+```
+
+### Findings
+
+All containers were running:
+
+- Prometheus: healthy
+- Grafana: healthy
+- Alertmanager: healthy
+- Loki: healthy
+- Promtail: running
+- Node Exporter: healthy
+- Blackbox Exporter: healthy
+- cAdvisor: healthy
+
+Prometheus targets were all up, including:
+
+- `job="prometheus"`
+- `job="grafana"`
+- `job="alertmanager"`
+- `job="loki"`
+- `job="promtail"`
+- `job="node-exporter"`
+- `job="cadvisor"`
+- `job="blackbox-http"`
+
+Loki root returned:
+
+```text
+loki_root 404
+```
+
+But Loki health returned:
+
+```text
+loki_ready 200
+```
+
+This means Loki was healthy. The problem was the UI `Open` button pointing to the wrong human-facing URL.
+
+Promtail was running, but initially not discovering containers. Promtail logs showed:
+
+```text
+client version 1.41 is too old. Minimum supported API version is 1.44
+```
+
+That meant Loki itself was working, but log ingestion from Docker was broken.
+
+### Fixes
+
+Changed Loki’s Open URL from the root path to:
+
+```text
+http://localhost:3100/ready
+```
+
+Changed Promtail’s Open URL to:
+
+```text
+http://localhost:9080/targets
+```
+
+Tried setting:
+
+```text
+DOCKER_API_VERSION=1.44
+```
+
+That did not fix Promtail `2.8.0`, because its bundled Docker client still negotiated as too old.
+
+Checked valid Promtail images and upgraded Promtail from:
+
+```text
+grafana/promtail:2.8.0
+```
+
+to:
+
+```text
+grafana/promtail:3.5.8
+```
+
+This fixed Docker discovery. Promtail logs then showed many `added Docker target` entries.
+
+### Verification
+
+Loki labels now return real label names:
+
+```json
+["compose_project","compose_service","container"]
+```
+
+Loki query now returns actual log lines:
+
+```text
+{compose_service="promtail"}
+```
+
+Platform service API now reports:
+
+- total services: `8`
+- up: `8`
+- down: `0`
+
+The corrected Open URLs return:
+
+```text
+loki_open_url 200
+promtail_open_url 200
+```
+
+### Why This Matters
+
+This is a useful DevOps lesson:
+
+- `404` does not always mean a service is down.
+- Loki is API-first and does not serve a dashboard at `/`.
+- Grafana is the UI normally used to explore Loki logs.
+- Promtail can be up while still failing its real job if Docker discovery is broken.
+
+The final state is better for learners because the UI now opens meaningful endpoints, and the logging pipeline actually ingests Docker logs into Loki.
