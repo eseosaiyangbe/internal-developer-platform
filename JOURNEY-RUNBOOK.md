@@ -8296,3 +8296,187 @@ This is a useful DevOps lesson:
 - Promtail can be up while still failing its real job if Docker discovery is broken.
 
 The final state is better for learners because the UI now opens meaningful endpoints, and the logging pipeline actually ingests Docker logs into Loki.
+
+## 2026-04-20 - cAdvisor Docker Containers Page Failed Because Docker Client API Was Too Old
+
+### Symptom
+
+When opening cAdvisor and clicking into the Docker containers view, cAdvisor showed:
+
+```text
+failed to get docker info: Error response from daemon: client version 1.41 is too old. Minimum supported API version is 1.44, please upgrade your client to a newer version
+```
+
+The confusing part was that cAdvisor still appeared healthy in Docker Compose and in the platform UI.
+
+### Commands Run
+
+Checked the cAdvisor container state:
+
+```bash
+docker compose ps cadvisor
+```
+
+Result:
+
+```text
+cadvisor gcr.io/cadvisor/cadvisor:v0.49.1 Up ... healthy 0.0.0.0:8082->8080
+```
+
+Checked cAdvisor logs:
+
+```bash
+docker compose logs --tail=80 cadvisor
+```
+
+Important log entry:
+
+```text
+Registration of the docker container factory failed: failed to validate Docker info: failed to detect Docker info: Error response from daemon: client version 1.41 is too old. Minimum supported API version is 1.44
+```
+
+Checked the Docker containers route:
+
+```bash
+curl -sS -o /tmp/cadvisor-docker.out -w 'cadvisor_docker %{http_code}\n' http://localhost:8082/docker
+```
+
+Result:
+
+```text
+cadvisor_docker 301
+```
+
+Searched the repo for cAdvisor references:
+
+```bash
+rg -n "cadvisor|cAdvisor" Obervability-Stack/docker-compose.yml Obervability-Stack/ui-next/lib/platform-services.ts JOURNEY-RUNBOOK.md
+```
+
+Checked newer image availability:
+
+```bash
+docker manifest inspect gcr.io/cadvisor/cadvisor:v0.56.2
+docker manifest inspect gcr.io/cadvisor/cadvisor:v0.53.0
+docker manifest inspect gcr.io/cadvisor/cadvisor:v0.52.1
+docker manifest inspect ghcr.io/google/cadvisor:v0.56.2
+docker manifest inspect ghcr.io/google/cadvisor:v0.52.1
+```
+
+Results:
+
+```text
+gcr.io/cadvisor/cadvisor:v0.56.2 did not have a pullable manifest.
+gcr.io/cadvisor/cadvisor:v0.53.0 did not have a pullable manifest.
+gcr.io/cadvisor/cadvisor:v0.52.1 had a valid manifest and included arm64 support.
+ghcr.io/google/cadvisor:v0.56.2 was not available.
+ghcr.io/google/cadvisor:v0.52.1 was not available.
+```
+
+### Root Cause
+
+The project was running:
+
+```text
+gcr.io/cadvisor/cadvisor:v0.49.1
+```
+
+That cAdvisor release bundled an older Docker client that attempted to talk to the Docker daemon using API version `1.41`.
+
+Docker Desktop on this machine requires Docker API version `1.44` or newer.
+
+That is why cAdvisor health still looked good while the Docker Containers page failed. The `/healthz` endpoint only proves the cAdvisor process is alive. The Docker Containers view needs cAdvisor to successfully talk to the Docker daemon, and that specific Docker API call was failing.
+
+### Fix
+
+Upgraded cAdvisor from:
+
+```text
+gcr.io/cadvisor/cadvisor:v0.49.1
+```
+
+to:
+
+```text
+gcr.io/cadvisor/cadvisor:v0.52.1
+```
+
+Files changed:
+
+```text
+Obervability-Stack/docker-compose.yml
+Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Rebuilt and restarted the affected services:
+
+```bash
+docker compose up -d --build devops-monitor-ui cadvisor
+```
+
+### Verification
+
+Checked the services after the upgrade:
+
+```bash
+docker compose ps cadvisor devops-monitor-ui
+```
+
+Result:
+
+```text
+cadvisor gcr.io/cadvisor/cadvisor:v0.52.1 Up ... healthy 0.0.0.0:8082->8080
+devops-monitor-ui Up ... healthy 0.0.0.0:4000->3000
+```
+
+Checked cAdvisor logs again:
+
+```bash
+docker compose logs --tail=80 cadvisor
+```
+
+Result:
+
+```text
+The Docker API version error was gone.
+```
+
+Checked the Docker containers page directly:
+
+```bash
+curl -sS -L -o /tmp/cadvisor-docker-after.out -w 'cadvisor_docker_after %{http_code}\n' http://localhost:8082/docker/
+```
+
+Result:
+
+```text
+cadvisor_docker_after 200
+```
+
+Checked the platform services API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Result:
+
+```text
+8 of 8 platform services reported up.
+cAdvisor reported currentVersion 0.52.1.
+```
+
+### Remaining Notes
+
+After the upgrade, cAdvisor still logged some Docker Desktop filesystem mapping warnings about missing `overlayfs` `mount-id` files under `/rootfs/var/lib/docker/...`.
+
+Those warnings are different from the Docker API compatibility error. They appear to be Docker Desktop filesystem mapping noise and do not block the cAdvisor Docker Containers page, which now returns `200`.
+
+### Why This Matters
+
+This is another useful learning moment for the project:
+
+- A container can be `healthy` while a deeper feature inside the app is broken.
+- Health checks should prove the most important behavior when possible, not only process liveness.
+- Observability tools also need version maintenance.
+- Docker Desktop upgrades can break older container tooling if the tool bundles an outdated Docker client.
