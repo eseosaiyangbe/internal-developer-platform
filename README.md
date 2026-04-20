@@ -104,6 +104,10 @@ Read the full command-by-command journey here:
 
 - [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md)
 
+Read operational incident investigations here:
+
+- [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md)
+
 ## Key Docs
 
 | Doc | Purpose |
@@ -112,6 +116,7 @@ Read the full command-by-command journey here:
 | [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | How the repos fit together as one platform |
 | [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | Startup commands, ports, health checks, and aliases |
 | [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
+| [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) | Dedicated incident response log for alerts, outages, fixes, and follow-ups |
 | [Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md](Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md) | Standard first-response workflow |
 
 ## Current Phase
