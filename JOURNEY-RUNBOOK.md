@@ -8480,3 +8480,188 @@ This is another useful learning moment for the project:
 - Health checks should prove the most important behavior when possible, not only process liveness.
 - Observability tools also need version maintenance.
 - Docker Desktop upgrades can break older container tooling if the tool bundles an outdated Docker client.
+
+## 2026-04-20 - Sidebar Service Status Was Demo Data Instead of Real Health
+
+### Symptom
+
+The UI sidebar had a `Service Status` section listing monitoring and logging tools, but it always showed a fixed set of services as healthy.
+
+That meant the sidebar could say a service was healthy even if the actual container or endpoint was down.
+
+### Commands Run
+
+Searched for the sidebar status source:
+
+```bash
+rg -n "Service Status|service status|platformServices|usePlatformServices|Monitoring|Logging|status" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib
+```
+
+Listed the relevant UI files:
+
+```bash
+find Obervability-Stack/ui-next -maxdepth 3 -type f \( -name '*.tsx' -o -name '*.ts' \) | sort
+```
+
+Opened the sidebar component:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/components/sidebar.tsx
+sed -n '260,620p' Obervability-Stack/ui-next/components/sidebar.tsx
+```
+
+Opened the real platform service checker:
+
+```bash
+sed -n '1,360p' Obervability-Stack/ui-next/lib/platform-services.ts
+sed -n '1,120p' Obervability-Stack/ui-next/app/api/services/platform/route.ts
+```
+
+Ran a type-check after the first edit:
+
+```bash
+npm run type-check
+```
+
+Problem found:
+
+```text
+components/sidebar.tsx(182,22): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type ...
+```
+
+Ran the type-check again after fixing the icon-map typing:
+
+```bash
+npm run type-check
+```
+
+Result:
+
+```text
+tsc --noEmit completed successfully.
+```
+
+Rebuilt and restarted the UI container:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+The build completed successfully. Docker printed warnings about `NEXTAUTH_SECRET` and `AUTH_MODE` being used in Dockerfile `ARG`/`ENV` instructions. Those warnings are worth revisiting later for secret hygiene, but they did not block this change.
+
+Checked the live platform API that now feeds the sidebar:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform
+```
+
+Result:
+
+```text
+8 of 8 platform services reported up.
+Promtail reported currentVersion 3.5.8.
+Loki reported currentVersion 2.8.0.
+```
+
+While checking this response, noticed an existing fallback URL formatting bug. When GitHub release checks returned `Unknown`, release URLs were built as `https:/github.com/...` instead of `https://github.com/...`.
+
+Fixed the replacement logic in:
+
+```text
+Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Verified the API response again and confirmed fallback release URLs now use the correct `https://github.com/...` format.
+
+Checked the running containers:
+
+```bash
+docker compose ps devops-monitor-ui prometheus grafana alertmanager loki promtail node-exporter blackbox-exporter cadvisor
+```
+
+Result:
+
+```text
+devops-monitor-ui healthy
+prometheus healthy
+grafana healthy
+alertmanager healthy
+loki healthy
+promtail running
+node-exporter healthy
+blackbox-exporter healthy
+cadvisor healthy
+```
+
+### Root Cause
+
+The sidebar had a hardcoded array:
+
+```text
+Prometheus healthy
+Grafana healthy
+Loki healthy
+Node Exporter healthy
+```
+
+This was demo data. It did not call the live `/api/services/platform` endpoint, and it did not include several important observability services.
+
+### Fix
+
+Removed the hardcoded demo status list from the sidebar and wired the sidebar to:
+
+```text
+/api/services/platform
+```
+
+The sidebar now uses the same real health source as the Services page.
+
+Added the important monitoring and logging services to the sidebar:
+
+```text
+Prometheus
+Grafana
+Alertmanager
+Loki
+Promtail
+Node Exporter
+Blackbox Exporter
+cAdvisor
+```
+
+The sidebar now shows:
+
+```text
+live up/down status
+response time in milliseconds
+summary count such as 8/8 up
+loading state while checks are running
+error state if the live status API is unavailable
+```
+
+The shared platform-services hook now refreshes every 30 seconds while the UI is open, so the sidebar and Services page do not stay stale after the first page load.
+
+Also corrected Promtail's fallback version from:
+
+```text
+2.8.0
+```
+
+to:
+
+```text
+3.5.8
+```
+
+This keeps the platform-service metadata aligned with the Promtail image version currently used in Docker Compose.
+
+### Why This Matters
+
+This removes a dangerous observability anti-pattern: a dashboard that looks healthy because the UI says so, not because the system was checked.
+
+For learners, this makes the lesson more honest:
+
+- UI status should come from real health checks.
+- Demo data should not be mixed into operational screens.
+- A sidebar status badge is only useful if it reflects the same live source used elsewhere.
+- Shared status sources reduce disagreement between pages.
