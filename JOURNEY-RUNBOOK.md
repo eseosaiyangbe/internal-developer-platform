@@ -10036,3 +10036,380 @@ We also improved the alert rule because a single Docker Desktop disk can appear 
 ### Remaining Risk
 
 Docker Desktop disk usage is now under the alert threshold, but it is still not roomy. If the project grows, we should either increase Docker Desktop's disk image size or add regular safe cleanup guidance for learners.
+
+## 2026-04-20 - OpenSIS ARM Startup, AppRole Automation, and Resolved Alert UX
+
+### Situation
+
+The user reported three issues:
+
+```text
+why is the resloved label not active on the active alert page?
+
+why am i getting this:
+[✘ Image docker.io/eseosaiyangbe/opensis-ui:dev Error no matching manifest for linux/arm64/v8 ...]
+when i ran ./scripts/compose-start.sh?
+
+why do i need to manually create app-approle and db-approle?
+i want the script to automate this. because the pre-check failed because of this.
+```
+
+The user also noted that OpenSIS was originally created in a Linux environment. That mattered because this workstation is an Apple Silicon Mac, so Docker defaults to `linux/arm64/v8`.
+
+### Commands Run
+
+Inspected alert UI and Alertmanager client code:
+
+```bash
+rg -n "resolved|active alert|alerts|Alert" Obervability-Stack/ui-next -g '*.{ts,tsx,js,jsx,css}'
+sed -n '1,340p' Obervability-Stack/ui-next/app/alerts/page.tsx
+sed -n '340,760p' Obervability-Stack/ui-next/app/alerts/page.tsx
+sed -n '760,930p' Obervability-Stack/ui-next/app/alerts/page.tsx
+sed -n '1,340p' Obervability-Stack/ui-next/lib/alertmanager-api.ts
+sed -n '1,170p' Obervability-Stack/ui-next/lib/hooks/use-alertmanager-alerts.ts
+sed -n '1,80p' Obervability-Stack/ui-next/app/api/alerts/route.ts
+```
+
+Inspected OpenSIS Compose, startup, precheck, and Vault AppRole bootstrap code:
+
+```bash
+rg -n "approle|app-approle|db-approle|vault|VAULT|compose-start|platform|opensis-ui|eseosaiyangbe/opensis-ui" OpenSIS -g '*.{sh,yml,yaml,env,md,Dockerfile,json}'
+ls -la OpenSIS/scripts OpenSIS
+sed -n '1,240p' OpenSIS/scripts/compose-start.sh
+sed -n '1,180p' OpenSIS/scripts/precheck.sh
+sed -n '1,230p' OpenSIS/scripts/bootstrap.sh
+cat OpenSIS/docker-compose.buildlocal.yaml
+sed -n '250,300p' OpenSIS/docker-compose.yaml
+```
+
+Checked repository state:
+
+```bash
+git status --short
+```
+
+Checked OpenSIS docs for old image/startup wording:
+
+```bash
+rg -n "--build-local|opensis-ui:dev|ARM|Apple|linux/arm64|pulls docker.io" OpenSIS/README.md OpenSIS/docs OpenSIS/TROUBLESHOOTING.md OpenSIS/SECURITY_NOTES.md
+```
+
+That command failed because the pattern started with `--build-local`, and `rg` treated it as an option. The safe form would be:
+
+```bash
+rg -n -- "--build-local|opensis-ui:dev|ARM|Apple|linux/arm64|pulls docker.io" OpenSIS/README.md OpenSIS/docs OpenSIS/TROUBLESHOOTING.md OpenSIS/SECURITY_NOTES.md
+```
+
+Read the local startup docs directly:
+
+```bash
+sed -n '100,150p' OpenSIS/README.md
+sed -n '50,90p' OpenSIS/docs/02-local-compose-guide.md
+sed -n '10,30p' OpenSIS/TROUBLESHOOTING.md
+```
+
+Ran OpenSIS precheck after the fix:
+
+```bash
+./scripts/precheck.sh
+```
+
+Validated the merged Compose config with the local-build override:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml config --quiet
+```
+
+Checked the Observability UI package scripts:
+
+```bash
+cat Obervability-Stack/ui-next/package.json
+```
+
+Reviewed the patch:
+
+```bash
+git diff -- OpenSIS/scripts/compose-start.sh OpenSIS/scripts/precheck.sh Obervability-Stack/ui-next/app/alerts/page.tsx
+```
+
+Ran UI type checking:
+
+```bash
+npm run type-check
+```
+
+Checked the OpenSIS startup help:
+
+```bash
+./scripts/compose-start.sh --skip-precheck --help
+```
+
+Started OpenSIS using the updated startup script:
+
+```bash
+./scripts/compose-start.sh
+```
+
+Verified OpenSIS container state:
+
+```bash
+sleep 20; docker compose ps vault vault-bootstrap vault-seed vault-agent-app vault-agent-db opensis-db opensis-ui
+```
+
+Verified OpenSIS UI endpoint:
+
+```bash
+sleep 20; curl -fsS -o /tmp/opensis-ui.html -w 'opensis_ui %{http_code}\n' http://localhost:8088
+```
+
+Verified managed app health from the Observability UI API:
+
+```bash
+sleep 20; curl -fsS http://localhost:4000/api/apps/health | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2)); console.log(j.apps.map(a=>`${a.name}: ${a.status}`).join("\n"));})'
+```
+
+Tried to check notification summary without quoting the URL:
+
+```bash
+curl -fsS http://localhost:4000/api/notifications/webhook?limit=100 | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2));})'
+```
+
+That failed because zsh treated the unquoted `?limit=100` as a filename glob.
+
+Retried with the URL quoted:
+
+```bash
+curl -fsS 'http://localhost:4000/api/notifications/webhook?limit=100' | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2));})'
+```
+
+Inspected notification webhook and inbox code:
+
+```bash
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/notifications/webhook/route.ts
+sed -n '1,260p' Obervability-Stack/ui-next/lib/notification-inbox.ts
+sed -n '1,130p' Obervability-Stack/ui-next/lib/notification-service.ts
+sed -n '210,270p' Obervability-Stack/ui-next/lib/notification-service.ts
+```
+
+Checked monitor UI logs:
+
+```bash
+docker compose logs --tail=120 devops-monitor-ui
+```
+
+Checked monitor UI environment and notification store:
+
+```bash
+docker exec devops-monitor-ui sh -lc 'printenv | sort | grep -E "CONFIG_PATH|NOTIFICATION|SLACK|SMTP|EMAIL" || true'
+docker exec devops-monitor-ui sh -lc 'pwd; ls -la; ls -l config.json 2>/dev/null; wc -c config.json 2>/dev/null; sed -n "1,20p" config.json 2>/dev/null'
+docker exec devops-monitor-ui sh -lc 'ls -l /app/data/notification-events.json 2>/dev/null; wc -c /app/data/notification-events.json 2>/dev/null; sed -n "1,20p" /app/data/notification-events.json 2>/dev/null'
+```
+
+Checked OpenSIS/Vault logs:
+
+```bash
+docker compose logs --tail=80 vault-bootstrap vault-seed vault-agent-app vault-agent-db opensis-ui
+```
+
+Rebuilt and restarted the monitoring UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Final live checks:
+
+```bash
+curl -fsS -o /tmp/alerts-page.html -w 'alerts_page %{http_code}\n' http://localhost:4000/alerts
+curl -fsS 'http://localhost:4000/api/notifications/webhook?limit=100' | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2));})'
+curl -fsS -o /tmp/opensis-ui.html -w 'opensis_ui %{http_code}\n' http://localhost:8088
+curl -fsS http://localhost:4000/api/apps/health | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const j=JSON.parse(d); console.log(JSON.stringify(j.summary,null,2)); console.log(j.apps.map(a=>`${a.name}: ${a.status}`).join("\n"));})'
+docker compose ps devops-monitor-ui prometheus alertmanager loki
+```
+
+### Problems Found
+
+The OpenSIS default Compose file used:
+
+```text
+docker.io/eseosaiyangbe/opensis-ui:dev
+```
+
+That image tag did not have a `linux/arm64/v8` manifest, so Apple Silicon Docker could not pull it:
+
+```text
+no matching manifest for linux/arm64/v8 in the manifest list entries
+```
+
+The repository already had a local-build override:
+
+```text
+docker-compose.buildlocal.yaml
+```
+
+But learners had to know to pass `--build-local`. On this Mac, the default path should be smart enough to avoid the incompatible image pull.
+
+The OpenSIS precheck still required old bind-mounted AppRole directories:
+
+```text
+vault-agent/db-approle
+vault-agent/app-approle
+```
+
+The current Compose design does not need those directories. AppRole credentials are written by `vault-bootstrap` into Docker volumes:
+
+```text
+app_runtime_approle
+db_runtime_approle
+```
+
+So the precheck was enforcing stale filesystem requirements.
+
+The Active Alerts page showed a `Resolved` card, but Alertmanager's `/api/v2/alerts` endpoint returns current alerts only. Resolved alerts disappear from that active feed. Resolved events are available through Alertmanager webhooks and our local notification inbox.
+
+The notification inbox endpoint also failed because the store file existed but was empty:
+
+```text
+/app/data/notification-events.json
+size: 0 bytes
+```
+
+The code tried to parse the empty file as JSON:
+
+```text
+JSON.parse("")
+Unexpected end of JSON input
+```
+
+### Fix Applied
+
+Updated `OpenSIS/scripts/compose-start.sh`:
+
+```text
+Detect ARM64 with uname -m.
+Automatically use docker-compose.buildlocal.yaml on ARM64.
+Keep --build-local for explicit local builds.
+Add --pull-image for users who intentionally want the published image path.
+```
+
+Updated `OpenSIS/scripts/precheck.sh`:
+
+```text
+Stop requiring legacy app-approle and db-approle bind-mount directories.
+Keep required Vault policy/config/template checks.
+Print that AppRole runtime credentials are generated by vault-bootstrap into Docker volumes.
+```
+
+Updated OpenSIS learner docs:
+
+```text
+README.md now explains the ARM auto-build fallback.
+docs/02-local-compose-guide.md now recommends ./scripts/compose-start.sh as the portable path.
+TROUBLESHOOTING.md no longer tells Apple Silicon users to pull the incompatible image directly.
+```
+
+Updated the Active Alerts UI:
+
+```text
+Resolved card now reads Resolved History.
+Resolved card links to /notifications.
+Status filter explains that Alertmanager only returns current alerts on this page.
+```
+
+Updated notification inbox storage handling:
+
+```text
+An empty notification-events.json now returns [] instead of crashing.
+Malformed local inbox JSON also fails safe to [].
+```
+
+### Verification
+
+OpenSIS startup detected ARM and built locally:
+
+```text
+Detected Apple Silicon/ARM64 host.
+The published docker.io/eseosaiyangbe/opensis-ui:dev image is not available for linux/arm64/v8, so this run will build opensis-ui locally.
+```
+
+OpenSIS containers:
+
+```text
+vault: healthy
+vault-agent-app: up
+vault-agent-db: up
+opensis-db: healthy
+opensis-ui: healthy
+```
+
+OpenSIS endpoint:
+
+```text
+opensis_ui 302
+```
+
+The `302` is acceptable because OpenSIS redirects into its application/install flow.
+
+Vault bootstrap logs confirmed AppRole automation:
+
+```text
+Creating AppRoles...
+Success! Data written to: auth/approle/role/opensis-db
+Success! Data written to: auth/approle/role/opensis-app
+Generating AppRole credentials...
+Vault bootstrap completed successfully.
+```
+
+Vault agent logs confirmed the credentials were usable:
+
+```text
+authentication successful
+rendered "/vault/templates/db.env.tpl" => "/vault/secrets/db.env"
+rendered "/vault/templates/app.env.tpl" => "/vault/secrets/app.env"
+```
+
+Managed app health:
+
+```text
+totalApps: 4
+healthyApps: 4
+downApps: 0
+OpenSIS: healthy
+SwiftPay: healthy
+MemFlip: healthy
+FoodPulse: healthy
+```
+
+Notification inbox after the fix:
+
+```text
+total: 6
+firing: 0
+resolved: 6
+```
+
+Monitoring UI rebuild:
+
+```text
+Next.js compiled successfully.
+devops-monitor-ui started healthy.
+```
+
+### Why We Did This
+
+The OpenSIS image problem was not an application bug. It was an image publishing/platform compatibility issue. Linux AMD64 machines can pull images that Apple Silicon cannot. For a learning repo, the script should hide that platform wrinkle and choose the correct path automatically.
+
+The AppRole problem was a stale precheck problem. The actual security model was already better: AppRole credentials belong in Docker runtime volumes, not learner-created bind-mounted folders. The precheck needed to match that design.
+
+The resolved-alert problem was a UX model problem. Active alerts and resolved history are different streams:
+
+```text
+Active Alerts page: current Alertmanager alerts.
+Notifications page: webhook history, including resolved events.
+```
+
+### Remaining Notes
+
+For a future CI/CD improvement, publish `docker.io/eseosaiyangbe/opensis-ui:dev` as a multi-arch image with both `linux/amd64` and `linux/arm64` manifests. Then Mac and Linux users can both pull the same tag.
+
+For Kubernetes, keep the same principle: bootstrap should create required auth roles and runtime credentials automatically. Learners should not manually create security plumbing before the stack can start.
