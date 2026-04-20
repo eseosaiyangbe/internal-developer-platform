@@ -9276,3 +9276,113 @@ rm -rf .playwright-cli
 ### Why This Matters
 
 FoodPulse now has a fuller restaurant lineup while staying visually manageable. The background now matches the Observability Stack atmosphere more closely, and the tighter card labels make the eight-restaurant board easier to scan.
+
+## 2026-04-20 - Reduce Oversized FoodPulse Hero And Section Labels
+
+### Request
+
+The following FoodPulse labels/headline were too big:
+
+```text
+Live pulse
+Live Dining Board
+Ops Snapshot
+A food vote with production-grade resilience.
+```
+
+### Commands Run
+
+Found the relevant React text and CSS selectors:
+
+```bash
+rg -n "welcome-title|section-label|panel-label|ops-kicker|panel-heading h2|Live pulse|Live Dining Board|Ops Snapshot|A food vote" FoodPulse/ui/src/App.jsx FoodPulse/ui/src/styles.css
+sed -n '204,236p' FoodPulse/ui/src/styles.css
+sed -n '584,598p' FoodPulse/ui/src/styles.css
+```
+
+Built the UI:
+
+```bash
+npm run build
+```
+
+Result:
+
+```text
+vite build completed successfully.
+```
+
+Rebuilt FoodPulse:
+
+```bash
+docker compose up -d --build foodpulse-ui
+```
+
+Verified the page and health:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+curl -fsS http://localhost:8090/api/health
+```
+
+Result:
+
+```text
+foodpulse_ui 200
+FoodPulse health returned healthy with database=true and cache=true.
+```
+
+### Fix
+
+Reduced the shared operational label size used by:
+
+```text
+Live Dining Board
+Ops Snapshot
+Vote Split
+stats labels
+```
+
+Changed:
+
+```text
+font-size: 0.74rem
+letter-spacing: 0.15em
+```
+
+to:
+
+```text
+font-size: 0.66rem
+letter-spacing: 0.13em
+```
+
+Reduced the hero headline:
+
+```text
+font-size: clamp(2.6rem, 7vw, 5.9rem)
+line-height: 0.92
+```
+
+to:
+
+```text
+font-size: clamp(2rem, 4.8vw, 4.15rem)
+line-height: 0.98
+```
+
+Reduced the `Live pulse` heading:
+
+```text
+font-size: clamp(1.45rem, 2.4vw, 2.1rem)
+```
+
+to:
+
+```text
+font-size: clamp(1.15rem, 1.8vw, 1.55rem)
+```
+
+### Why This Matters
+
+The FoodPulse page now has a calmer hierarchy. The hero still feels premium, but the typography no longer overwhelms the restaurant labels and live voting content.
