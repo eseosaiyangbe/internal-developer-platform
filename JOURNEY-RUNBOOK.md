@@ -9816,3 +9816,223 @@ Do not automatically prune volumes in the learner script because volumes may con
 Investigate the Alertmanager webhook `Unexpected end of JSON input` error if it continues after the storage incident.
 
 Bring OpenSIS back up separately if the managed-app dashboard should show all four apps healthy.
+
+## 2026-04-20 - HighDiskUsage Alert Follow-Up
+
+### Situation
+
+After the Observability Stack recovered, Alertmanager still showed:
+
+```text
+HighDiskUsage
+High disk usage on node-exporter
+Firing
+Warning
+Value: 85%
+Description: Disk usage is above 85% for more than 5 minutes on node-exporter
+device=/dev/vdb1
+mountpoint=/var/lib/cni
+```
+
+This was related to the same Docker Desktop internal disk pressure from the previous incident. The earlier cleanup got Docker out of the `100%` hard-failure state, but the disk was still above the `85%` warning threshold.
+
+### Commands Run
+
+Checked disk usage from inside a running container:
+
+```bash
+docker exec node-exporter df -h /host/var/lib/cni /host 2>/dev/null || docker exec loki df -h / /loki
+```
+
+Checked Docker storage usage:
+
+```bash
+docker system df -v
+```
+
+Queried Prometheus for the exact alert value:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=100%20-%20(node_filesystem_avail_bytes%7Bjob%3D%22node-exporter%22%2Cmountpoint%3D%22%2Fvar%2Flib%2Fcni%22%7D%20*%20100%20%2F%20node_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cmountpoint%3D%22%2Fvar%2Flib%2Fcni%22%7D)'
+```
+
+Listed Docker images to look for safe cleanup candidates:
+
+```bash
+docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' | head -80
+```
+
+Pruned unused builder cache:
+
+```bash
+docker builder prune -af
+```
+
+Rechecked disk usage:
+
+```bash
+docker exec loki df -h / /loki
+```
+
+Rechecked Prometheus directly:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=100%20-%20(node_filesystem_avail_bytes%7Bjob%3D%22node-exporter%22%2Cmountpoint%3D%22%2Fvar%2Flib%2Fcni%22%7D%20*%20100%20%2F%20node_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cmountpoint%3D%22%2Fvar%2Flib%2Fcni%22%7D)'
+```
+
+Checked active disk alerts:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/alerts'
+```
+
+Inspected the disk alert rules:
+
+```bash
+rg -n "HighDiskUsage|node_filesystem|mountpoint" Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/prometheus/prometheus.yml
+sed -n '1,120p' Obervability-Stack/prometheus/alert_rules.yml
+sed -n '1,180p' Obervability-Stack/prometheus/prometheus.yml
+```
+
+Checked which mountpoints mapped to the same disk:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=sort_desc((node_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D%20-%20node_filesystem_avail_bytes%7Bjob%3D%22node-exporter%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D)%20%2F%20node_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D%20*%20100)'
+```
+
+Validated the updated Prometheus rules:
+
+```bash
+docker exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+```
+
+Reloaded Prometheus without restarting the stack:
+
+```bash
+curl -fsS -X POST -w 'prometheus_reload %{http_code}\n' http://localhost:9090/-/reload -o /tmp/prometheus-reload.txt
+```
+
+Verified the new device-level disk query:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=max%20by(instance%2Cdevice%2Cfstype)%20(((node_filesystem_size_bytes%7Bfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D-node_filesystem_avail_bytes%7Bfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D)%2Fnode_filesystem_size_bytes%7Bfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D)*100)'
+```
+
+Verified core monitoring services:
+
+```bash
+docker compose ps prometheus node-exporter alertmanager loki promtail
+```
+
+### Problems Found
+
+The disk was still above the warning threshold:
+
+```text
+Prometheus query result: 91.16%
+Container df result: 91%
+```
+
+Docker build cache had grown again:
+
+```text
+Build cache usage: 7.848GB
+```
+
+The alert rule was also noisy because node-exporter exposed the same Docker Desktop disk through several mountpoints:
+
+```text
+91.43% /dev/vdb1 /mnt/lima-colima ext4
+91.43% /dev/vdb1 /var/lib/cni ext4
+91.43% /dev/vdb1 /var/lib/containerd ext4
+91.43% /dev/vdb1 /var/lib/docker ext4
+91.43% /dev/vdb1 /var/lib/ramalama ext4
+91.43% /dev/vdb1 /var/lib/rancher ext4
+```
+
+That meant one physical disk issue could create several duplicate alerts.
+
+### Fix Applied
+
+Pruned all unused Docker builder cache:
+
+```bash
+docker builder prune -af
+```
+
+Result:
+
+```text
+Total reclaimed space: 7.848GB
+```
+
+Updated `HighDiskUsage` and `CriticalDiskUsage` to aggregate by physical device:
+
+```text
+max by(instance, device, fstype) (...)
+```
+
+This keeps the alert real, but prevents duplicate alerts for every bind-mounted view of the same Docker Desktop disk.
+
+Reloaded Prometheus:
+
+```text
+prometheus_reload 200
+```
+
+### Verification
+
+Disk usage after cleanup:
+
+```text
+overlay 58.8G used 44.8G available 10.9G use% 80% /
+/dev/vdb1 58.8G used 44.8G available 10.9G use% 80% /loki
+```
+
+Prometheus disk query after cleanup:
+
+```text
+/var/lib/cni on /dev/vdb1: 81.43%
+```
+
+New device-level query:
+
+```text
+81.36% node-exporter /dev/vdb1 ext4
+67.43% node-exporter lima-8adf3fcc95ea7bab virtiofs
+10.58% node-exporter /dev/vda16 ext4
+6.50% node-exporter /dev/vda15 vfat
+4.87% node-exporter /dev/root ext4
+```
+
+Active disk alerts:
+
+```text
+disk_alerts: none active
+```
+
+Prometheus rule validation:
+
+```text
+SUCCESS: 40 rules found
+```
+
+Core monitoring services remained healthy:
+
+```text
+prometheus: healthy
+node-exporter: healthy
+alertmanager: healthy
+loki: healthy
+promtail: up
+```
+
+### Why We Did This
+
+The alert was useful because it caught the remaining risk after the outage fix. We did not delete volumes because those can hold learner data and databases. We pruned only builder cache because it is safe to regenerate and was large enough to bring the disk below the warning threshold.
+
+We also improved the alert rule because a single Docker Desktop disk can appear under multiple mountpoints. Alerting by physical device makes the signal easier to understand.
+
+### Remaining Risk
+
+Docker Desktop disk usage is now under the alert threshold, but it is still not roomy. If the project grows, we should either increase Docker Desktop's disk image size or add regular safe cleanup guidance for learners.
