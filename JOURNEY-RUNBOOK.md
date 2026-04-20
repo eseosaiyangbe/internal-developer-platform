@@ -8748,3 +8748,157 @@ Disk pressure is one of the most important early-warning signals in a DevOps das
 - CPU pressure
 - disk pressure
 - network traffic
+
+## 2026-04-20 - Redesign FoodPulse With Observability Stack Visual Language
+
+### Request
+
+FoodPulse needed to use the same styling direction, design language, and font feel as the Observability Stack while still feeling unique.
+
+The design goal was not to make FoodPulse look like a generic clone. The goal was to make it feel like a first-party app in the same platform family:
+
+- rounded glass panels
+- strong gradient hero sections
+- clean operational labels
+- polished status pills
+- clear live-data storytelling
+- responsive layout
+
+### Commands Run
+
+Discovered the FoodPulse UI files:
+
+```bash
+find FoodPulse -maxdepth 4 -type f | sort | sed -n '1,240p'
+find FoodPulse -maxdepth 3 -type f \( -name 'package.json' -o -name 'Dockerfile' -o -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.tsx' -o -name '*.jsx' \) | sort
+sed -n '1,280p' FoodPulse/docker-compose.yml
+```
+
+Opened the FoodPulse React and CSS source:
+
+```bash
+sed -n '1,260p' FoodPulse/ui/src/App.jsx
+sed -n '260,620p' FoodPulse/ui/src/App.jsx
+sed -n '1,320p' FoodPulse/ui/src/styles.css
+sed -n '320,760p' FoodPulse/ui/src/styles.css
+cat FoodPulse/ui/package.json
+sed -n '1,120p' FoodPulse/ui/src/main.jsx
+sed -n '1,160p' FoodPulse/ui/Dockerfile
+```
+
+Checked API fields available to the UI:
+
+```bash
+sed -n '1,280p' FoodPulse/api/src/index.js
+sed -n '280,620p' FoodPulse/api/src/index.js
+find FoodPulse/postgres -maxdepth 3 -type f -print -exec sed -n '1,220p' {} \;
+```
+
+Compared the existing Observability Stack visual language:
+
+```bash
+find Obervability-Stack/ui-next/app -maxdepth 2 -name 'page.tsx' -print | sort | xargs rg -n "bg-gradient|rounded-2xl|shadow-xl|backdrop|VersionBadge|Live Data"
+```
+
+Built the FoodPulse UI locally:
+
+```bash
+npm run build
+```
+
+Result:
+
+```text
+vite build completed successfully.
+```
+
+Rebuilt and restarted the FoodPulse UI container:
+
+```bash
+docker compose up -d --build foodpulse-ui
+```
+
+Checked the live app and API:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+curl -fsS http://localhost:8090/api/health
+curl -fsS http://localhost:8090/api/venues | head -c 500
+docker compose ps foodpulse-ui foodpulse-api
+```
+
+Result:
+
+```text
+FoodPulse UI returned HTTP 200.
+FoodPulse API health returned healthy.
+Database check returned true.
+Cache check returned true.
+foodpulse-ui and foodpulse-api were running.
+```
+
+Used the Playwright skill for a browser render check:
+
+```bash
+command -v npx >/dev/null 2>&1 && echo npx-ok
+mkdir -p output/playwright
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
+"$PWCLI" open http://localhost:8090
+"$PWCLI" snapshot
+"$PWCLI" screenshot --filename output/playwright/foodpulse-redesign.png --full-page
+```
+
+Problem encountered:
+
+```text
+The first screenshot attempt used the wrong wrapper syntax and failed with a selector parsing error.
+```
+
+Fix:
+
+```bash
+"$PWCLI" screenshot --filename output/playwright/foodpulse-redesign.png --full-page
+```
+
+The browser snapshot confirmed the page rendered with live data, restaurant cards, health state, and vote results.
+
+### Design Changes
+
+Reworked FoodPulse into a unique live dining operations board:
+
+- added a dark gradient hero inspired by the Observability Stack dashboard hero treatment
+- kept Manrope and JetBrains Mono for the same clean product/ops feel
+- added a branded top bar with `FoodPulse`, `Resilient dining signal`, `Live board`, and health state
+- added a right-side `Ops Snapshot` panel fed by real health data
+- added `Failover posture` messaging to connect the UI to the HA lab story
+- surfaced live Postgres and Redis health checks as operational rows
+- redesigned restaurant cards as clean colored labels with each restaurant's accent color
+- added vote totals directly into each restaurant label card
+- redesigned the vote chart section as `Live pulse`
+- kept the voting API behavior unchanged
+- kept the page responsive for mobile and desktop
+
+### Visual QA Note
+
+The first browser screenshot showed the `Ops Snapshot` panel had too much empty vertical space on desktop.
+
+Fixed by adding a `Failover posture` feature block inside the panel. This made the right side feel intentional and tied the UI back to FoodPulse's resilience-lab purpose.
+
+Temporary Playwright artifacts were removed after review:
+
+```bash
+rm -rf .playwright-cli output
+```
+
+### Why This Matters
+
+FoodPulse now feels like it belongs to the same platform family as the Observability Stack, but it has its own identity.
+
+The page is no longer just a voting demo. It now tells the real FoodPulse story:
+
+- restaurant voting on the surface
+- live data underneath
+- Postgres and Redis health in view
+- HAProxy/failover context visible to learners
+- a design language that fits the broader DevOps Easy Learning project
