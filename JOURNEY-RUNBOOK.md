@@ -8902,3 +8902,200 @@ The page is no longer just a voting demo. It now tells the real FoodPulse story:
 - Postgres and Redis health in view
 - HAProxy/failover context visible to learners
 - a design language that fits the broader DevOps Easy Learning project
+
+## 2026-04-20 - Replace FoodPulse Demo Restaurants With Real Restaurants
+
+### Request
+
+Replace the default FoodPulse restaurant names with:
+
+```text
+https://naijajollof.com/
+https://www.tumerico.com/
+https://street.restaurant/
+https://www.roohrestaurants.com/
+https://www.zandyrestaurant.com/
+https://www.paitoronto.com/
+```
+
+Also:
+
+- search the internet to learn about them
+- write stronger headlines
+- make each label cooler
+- add a website button
+- keep a vote button
+
+### Research Notes
+
+Used the restaurant websites and search results to shape the copy.
+
+Summary of what informed the labels:
+
+- `Naija Jollof`: Nigerian food, Toronto presence, jollof-focused comfort-food/catering story.
+- `Tumerico`: Tucson vegetarian/vegan Latin restaurant, local ingredient story, Chef Wendy Garcia reputation.
+- `STREET Taco and Beer Co.`: Tucson street-style Mexican tacos, tortas, local beer, and STREET Dog.
+- `ROOH`: progressive Indian restaurant group with San Francisco, Palo Alto, and New Delhi locations.
+- `Z & Y Restaurant`: San Francisco Chinatown Szechuan restaurant led by Chef Lijun Han.
+- `PAI Northern Thai Kitchen`: Toronto Northern Thai restaurant with Michelin Guide recognition.
+
+### Commands Run
+
+Opened and inspected the FoodPulse data and UI paths:
+
+```bash
+sed -n '1,220p' FoodPulse/postgres/initdb/01-init-foodpulse.sh
+sed -n '1,280p' FoodPulse/api/src/index.js
+sed -n '1,260p' FoodPulse/ui/src/App.jsx
+sed -n '1,420p' FoodPulse/ui/src/styles.css
+```
+
+Updated the database seed:
+
+```text
+FoodPulse/postgres/initdb/01-init-foodpulse.sh
+```
+
+Added two new venue fields:
+
+```text
+headline
+website_url
+```
+
+Updated the API query so `/api/venues` returns:
+
+```text
+headline
+website_url
+```
+
+Updated the React card to show:
+
+```text
+headline
+signature item
+spotlight
+Visit website button
+Vote button
+```
+
+Applied the schema and data change to the running local database because Docker init scripts only run when the database volume is first created:
+
+```bash
+docker exec -i foodpulse-db psql -U postgres -d foodpulse <<'SQL'
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS headline text NOT NULL DEFAULT '';
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS website_url text NOT NULL DEFAULT '';
+DELETE FROM vote_events;
+DELETE FROM venues;
+INSERT INTO venues (slug, name, neighborhood, category, headline, signature_item, energy_score, price_band, accent_color, website_url, spotlight)
+VALUES
+  ('naija-jollof', 'Naija Jollof', 'Toronto, Canada', 'Nigerian comfort food', 'Lagos-style jollof energy served like a homecoming.', 'Jollof rice with chicken, plantain, and coleslaw', 94, '$$', '#16a34a', 'https://naijajollof.com/', 'Nigerian classics, catering, pickup, and delivery with a warm Toronto community feel.'),
+  ('tumerico', 'Tumerico', 'Tucson, Arizona', 'Vegan Latin kitchen', 'Inventive Latin plant-based plates with local heritage ingredients.', 'Fresh vegan tacos and rotating Latin specials', 97, '$$', '#f59e0b', 'https://www.tumerico.com/', 'A celebrated Tucson kitchen led by Chef Wendy Garcia with bold vegetarian and vegan flavor.'),
+  ('street-taco-beer', 'STREET Taco and Beer Co.', 'Tucson, Arizona', 'Street-style Mexican', 'Tacos, beer, and Tucson street-food swagger in every bite.', 'Street tacos with onion, cilantro, and cold beer', 90, '$', '#ef4444', 'https://street.restaurant/', 'Authentic street-style tacos, tortas, local beers, and the bacon-wrapped STREET Dog.'),
+  ('rooh', 'ROOH', 'San Francisco, Palo Alto, New Delhi', 'Progressive Indian', 'Modern Indian dining with color, technique, and a little theatre.', 'Dahi puri with yogurt mousse and tamarind', 93, '$$$', '#7c3aed', 'https://www.roohrestaurants.com/', 'Progressive Indian menus across San Francisco, Palo Alto, and New Delhi with signature small plates.'),
+  ('z-and-y-restaurant', 'Z & Y Restaurant', 'San Francisco Chinatown', 'Szechuan institution', 'Chinatown heat from a chef trusted by presidents.', 'Szechuan fish filet with flaming chili oil', 96, '$$', '#dc2626', 'https://www.zandyrestaurant.com/', 'Award-winning authentic Szechuan cuisine from Chef Lijun Han in historic San Francisco Chinatown.'),
+  ('pai-northern-thai', 'PAI Northern Thai Kitchen', 'Toronto, Canada', 'Northern Thai', 'Toronto''s Northern Thai favorite with Michelin Guide shine.', 'Khao soi and Northern Thai street-market plates', 95, '$$', '#0ea5e9', 'https://www.paitoronto.com/', 'A Michelin Guide Toronto restaurant known for lively Northern Thai cooking and big downtown energy.');
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO foodpulse;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO foodpulse;
+SQL
+```
+
+Result:
+
+```text
+ALTER TABLE
+ALTER TABLE
+DELETE 195
+DELETE 4
+INSERT 0 6
+GRANT
+GRANT
+```
+
+Important note:
+
+```text
+Replacing the demo restaurants deleted the previous demo vote history.
+```
+
+Rebuilt the FoodPulse API and UI:
+
+```bash
+docker compose up -d --build foodpulse-api foodpulse-ui
+```
+
+Built the UI locally:
+
+```bash
+npm run build
+```
+
+Verified the live API data:
+
+```bash
+curl -fsS http://localhost:8090/api/venues | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s); console.log(j.venues.map(v=>`${v.name} | ${v.headline} | ${v.website_url}`).join("\n"));})'
+```
+
+Result:
+
+```text
+Naija Jollof | Lagos-style jollof energy served like a homecoming. | https://naijajollof.com/
+PAI Northern Thai Kitchen | Toronto's Northern Thai favorite with Michelin Guide shine. | https://www.paitoronto.com/
+ROOH | Modern Indian dining with color, technique, and a little theatre. | https://www.roohrestaurants.com/
+STREET Taco and Beer Co. | Tacos, beer, and Tucson street-food swagger in every bite. | https://street.restaurant/
+Tumerico | Inventive Latin plant-based plates with local heritage ingredients. | https://www.tumerico.com/
+Z & Y Restaurant | Chinatown heat from a chef trusted by presidents. | https://www.zandyrestaurant.com/
+```
+
+Checked the live page and health:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+curl -fsS http://localhost:8090/api/health
+```
+
+Result:
+
+```text
+foodpulse_ui 200
+{"status":"healthy","checks":{"database":true,"cache":true},...}
+```
+
+Used Playwright to confirm the browser-rendered cards:
+
+```bash
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
+"$PWCLI" open http://localhost:8090
+"$PWCLI" snapshot
+```
+
+The browser snapshot confirmed:
+
+- six restaurant cards render
+- each card has `Visit website`
+- each card has `Vote`
+- the FoodPulse health panel still renders
+- the live pulse section updates from the new venue data
+
+Cleaned the temporary Playwright artifact:
+
+```bash
+rm -rf .playwright-cli
+```
+
+### Why This Matters
+
+FoodPulse now feels more real and more useful as a demo application. Instead of fake restaurants, the app now uses recognizable restaurant brands with richer food stories, external website links, and a clean vote action.
+
+This also taught an important platform lesson:
+
+```text
+Changing seed data is not enough when a database volume already exists.
+```
+
+We had to update both:
+
+- the source seed script for future clean installs
+- the running database for the current local environment
