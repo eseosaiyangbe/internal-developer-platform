@@ -9099,3 +9099,180 @@ We had to update both:
 
 - the source seed script for future clean installs
 - the running database for the current local environment
+
+## 2026-04-20 - Add Little India And Perfect Chinese, Tighten FoodPulse Labels
+
+### Request
+
+Add two more restaurants:
+
+```text
+https://littleindia.ca/
+https://perfectchineserestaurant.com/
+```
+
+Also:
+
+- the labels were too big
+- use the Observability Stack background color
+
+### Research Notes
+
+Used official/current restaurant information to write the FoodPulse card copy:
+
+- `Little India`: Toronto Indian restaurant with dine-in, pickup, delivery, catering, and a large Indian menu.
+- `Perfect Chinese Restaurant`: Scarborough Chinese restaurant with online ordering, seafood, dim sum, and late-night Chinese dining energy.
+
+### Commands Run
+
+Opened the relevant seed and style files:
+
+```bash
+sed -n '1,220p' FoodPulse/postgres/initdb/01-init-foodpulse.sh
+sed -n '1,260p' FoodPulse/ui/src/styles.css
+sed -n '260,620p' FoodPulse/ui/src/styles.css
+sed -n '150,260p' FoodPulse/ui/src/App.jsx
+```
+
+Updated the seed script:
+
+```text
+FoodPulse/postgres/initdb/01-init-foodpulse.sh
+```
+
+Added:
+
+```text
+Little India
+Perfect Chinese Restaurant
+```
+
+Updated the running database with an upsert so existing votes were preserved:
+
+```bash
+docker exec -i foodpulse-db psql -U postgres -d foodpulse <<'SQL'
+INSERT INTO venues (slug, name, neighborhood, category, headline, signature_item, energy_score, price_band, accent_color, website_url, spotlight)
+VALUES
+  ('little-india-toronto', 'Little India', 'Toronto, Canada', 'Indian dining and catering', 'Downtown Toronto Indian comfort with a hundred-plus-item menu.', 'Butter chicken, tandoori plates, curries, and catering trays', 92, '$$', '#2563eb', 'https://littleindia.ca/', 'A long-running Toronto Indian restaurant offering dine-in, delivery, pickup, catering, and vegetarian-friendly options.'),
+  ('perfect-chinese-restaurant', 'Perfect Chinese Restaurant', 'Scarborough, Canada', 'Chinese seafood and dim sum', 'Scarborough late-night dim sum and seafood built for every hour.', 'Dim sum, seafood, beef chow fun, and classic Chinese plates', 91, '$$', '#0f766e', 'https://perfectchineserestaurant.com/', 'A trusted Scarborough Chinese restaurant with online ordering, generous seating, seafood dishes, and dim sum energy.')
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  neighborhood = EXCLUDED.neighborhood,
+  category = EXCLUDED.category,
+  headline = EXCLUDED.headline,
+  signature_item = EXCLUDED.signature_item,
+  energy_score = EXCLUDED.energy_score,
+  price_band = EXCLUDED.price_band,
+  accent_color = EXCLUDED.accent_color,
+  website_url = EXCLUDED.website_url,
+  spotlight = EXCLUDED.spotlight;
+SQL
+```
+
+Result:
+
+```text
+INSERT 0 2
+```
+
+Updated the FoodPulse background to match the Observability Stack dashboard background more closely:
+
+```text
+radial-gradient(circle at top left, #dbeafe, transparent 34%)
+linear-gradient(135deg, #f8fafc, #ffffff 45%, #eef2ff)
+```
+
+Tightened the restaurant cards:
+
+- smaller card radius
+- smaller card padding
+- smaller category badges
+- smaller score badges
+- smaller metadata labels
+- smaller title size
+- tighter headline spacing
+- tighter signature and spotlight text
+- tighter Visit/Vote buttons
+
+Built the UI:
+
+```bash
+npm run build
+```
+
+Result:
+
+```text
+vite build completed successfully.
+```
+
+Rebuilt FoodPulse:
+
+```bash
+docker compose up -d --build foodpulse-ui
+```
+
+Verified the API:
+
+```bash
+curl -fsS http://localhost:8090/api/venues | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s); console.log(`count=${j.venues.length}`); console.log(j.venues.map(v=>`${v.name} | ${v.website_url}`).join("\n"));})'
+```
+
+Result:
+
+```text
+count=8
+Naija Jollof | https://naijajollof.com/
+PAI Northern Thai Kitchen | https://www.paitoronto.com/
+ROOH | https://www.roohrestaurants.com/
+STREET Taco and Beer Co. | https://street.restaurant/
+Z & Y Restaurant | https://www.zandyrestaurant.com/
+Little India | https://littleindia.ca/
+Perfect Chinese Restaurant | https://perfectchineserestaurant.com/
+Tumerico | https://www.tumerico.com/
+```
+
+Verified page and health:
+
+```bash
+curl -fsS -o /tmp/foodpulse-ui.html -w 'foodpulse_ui %{http_code}\n' http://localhost:8090
+curl -fsS http://localhost:8090/api/health
+docker compose ps foodpulse-ui foodpulse-api
+```
+
+Result:
+
+```text
+foodpulse_ui 200
+FoodPulse health returned healthy with database=true and cache=true.
+foodpulse-ui and foodpulse-api were running.
+```
+
+Used Playwright for browser-level verification:
+
+```bash
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
+"$PWCLI" open http://localhost:8090
+"$PWCLI" snapshot
+```
+
+The snapshot confirmed:
+
+- eight restaurant cards render
+- Little India renders
+- Perfect Chinese Restaurant renders
+- each card has a Visit website link
+- each card has a Vote button
+- the labels are smaller
+- the health/ops panel still renders
+
+Cleaned the Playwright artifact:
+
+```bash
+rm -rf .playwright-cli
+```
+
+### Why This Matters
+
+FoodPulse now has a fuller restaurant lineup while staying visually manageable. The background now matches the Observability Stack atmosphere more closely, and the tighter card labels make the eight-restaurant board easier to scan.
