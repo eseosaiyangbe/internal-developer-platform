@@ -62,6 +62,7 @@ Show:
 - the app inventory
 - health state
 - app categories
+- the Demo Center at `http://localhost:4000/demo`
 - primary app URLs
 - clickable managed-app cards on the services page
 - the app comparison view at `http://localhost:4000/services/compare`
@@ -187,15 +188,16 @@ MemFlip:   http://localhost:8080
 
 Recommended Phase 6 flow:
 
-1. Open the control plane first.
-2. Open the Services page and explain that it is now a simple managed-app launch board.
-3. Open `Compare Apps` to explain why the workspace has a microservices app, legacy platform app, HA lab, and onboarding app.
-4. Click the FoodPulse label to show its operator page, then open the live app from there.
-5. Use the app page's `Open operator runbook` button to show the Markdown handoff.
-6. Use `View incident drills` to connect the app page to the executed drill catalog.
-7. Open SwiftPay to show the flagship microservices app and its operator page.
-8. Open OpenSIS to explain legacy modernization and its Vault/platform signals.
-9. Open MemFlip as the lightweight onboarding reference.
+1. Open the Demo Center at `http://localhost:4000/demo`.
+2. Confirm the page shows the environment as safe to demo.
+3. Open the Services page and explain that it is now a simple managed-app launch board.
+4. Open `Compare Apps` to explain why the workspace has a microservices app, legacy platform app, HA lab, and onboarding app.
+5. Click the FoodPulse label to show its operator page, then open the live app from there.
+6. Use the app page's `Open operator runbook` button to show the Markdown handoff.
+7. Use `View incident drills` to connect the app page to the executed drill catalog.
+8. Open SwiftPay to show the flagship microservices app and its operator page.
+9. Open OpenSIS to explain legacy modernization and its Vault/platform signals.
+10. Open MemFlip as the lightweight onboarding reference.
 
 ### 8. Close With Kubernetes Direction
 
@@ -243,12 +245,13 @@ When every app probe fails at once but direct app URLs work, suspect the shared 
 
 If you only have five minutes:
 
-1. Open `http://localhost:4000`.
-2. Run `./Obervability-Stack/scripts/devops-monitor.sh operator`.
-3. Explain the four workload roles.
-4. Show `Obervability-Stack/docs/INCIDENT_DRILLS.md`.
-5. Open `JOURNEY-RUNBOOK.md` to one drill.
-6. Close with the Kubernetes-ready direction.
+1. Open `http://localhost:4000/demo`.
+2. Confirm the live demo readiness state.
+3. Run `./Obervability-Stack/scripts/devops-monitor.sh operator`.
+4. Explain the four workload roles from the Demo Center.
+5. Show `Obervability-Stack/docs/INCIDENT_DRILLS.md`.
+6. Open `JOURNEY-RUNBOOK.md` to one drill.
+7. Close with the Kubernetes-ready direction.
 
 ## What Not To Do During A Demo
 

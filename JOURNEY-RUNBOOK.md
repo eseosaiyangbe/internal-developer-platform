@@ -12242,3 +12242,210 @@ The workspace now has a clearer mixed-architecture story:
 - `MemFlip` demonstrates the smallest repeatable onboarding pattern.
 
 This makes Phase 6 stronger because a new viewer can understand the purpose of the four apps from one control-plane view before drilling into individual operator pages.
+
+## 2026-04-21 - Phase 6 Demo Center
+
+### Objective
+
+Turn the Markdown demo walkthrough into a first-class control-plane UI route so a presenter can start from one guided page, confirm live readiness, copy the right commands, open the correct app pages, and connect the UI story back to incident evidence and Kubernetes direction.
+
+### Commands Run
+
+Checked the current git state and recent commits:
+
+```bash
+git status --short && git log --oneline -5
+```
+
+Read the current demo script and sidebar layout:
+
+```bash
+sed -n '1,260p' DEMO-WALKTHROUGH.md
+sed -n '1,380p' Obervability-Stack/ui-next/components/sidebar.tsx
+sed -n '1,240p' Obervability-Stack/ui-next/app/layout.tsx
+```
+
+Ran TypeScript validation:
+
+```bash
+npm run type-check
+```
+
+Reviewed the root README demo path before updating it:
+
+```bash
+sed -n '1,180p' README.md
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt the UI container:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the rebuilt container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Verified the new route is protected:
+
+```bash
+curl -sS -I http://localhost:4000/demo | sed -n '1,10p'
+```
+
+Verified the live app health API used by the Demo Center:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/health | jq '{total:.summary.totalApps, healthy:.summary.healthyApps, statuses:[.apps[] | {appId,status,endpoints:(.endpoints|length)}]}'
+```
+
+Verified the app inventory summary used by the Demo Center:
+
+```bash
+curl -fsS http://localhost:4000/api/apps | jq '{total:.summary.totalApps, owned:.summary.ownedApps, endpoints:.summary.endpoints}'
+```
+
+Signed in with the local admin account and verified the rendered Demo Center content:
+
+```bash
+tmp_cookie=$(mktemp)
+csrf=$(curl -fsS -c "$tmp_cookie" http://localhost:4000/api/auth/csrf | jq -r '.csrfToken')
+curl -fsS -b "$tmp_cookie" -c "$tmp_cookie" -X POST http://localhost:4000/api/auth/callback/credentials \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "csrfToken=$csrf" \
+  --data-urlencode 'email=demo@example.com' \
+  --data-urlencode 'password=demo123' \
+  --data-urlencode 'callbackUrl=http://localhost:4000/demo' >/dev/null
+curl -fsS -b "$tmp_cookie" http://localhost:4000/demo | grep -Eo 'Demo Center|Phase 6 demo path|Pre-Demo Checklist' | sort -u
+rm -f "$tmp_cookie"
+```
+
+Ran the full operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Changes Made
+
+Added a new Demo Center route:
+
+```text
+Obervability-Stack/ui-next/app/demo/page.tsx
+```
+
+The page includes:
+
+- live demo readiness state
+- live managed-app health snapshot
+- pre-demo checklist
+- copyable command blocks
+- guided presenter cards
+- workload role summaries
+- links to app pages, incident drills, journey runbook, architecture docs, and demo walkthrough
+
+Updated sidebar navigation:
+
+```text
+Obervability-Stack/ui-next/components/sidebar.tsx
+```
+
+Added:
+
+```text
+Demo Center -> /demo
+```
+
+Updated project documentation:
+
+```text
+README.md
+DEMO-WALKTHROUGH.md
+PROJECT-ROADMAP.md
+JOURNEY-RUNBOOK.md
+```
+
+### Problems Encountered
+
+No implementation blocker occurred during this slice.
+
+One existing risk remains:
+
+```text
+Docker build secret warnings for NEXTAUTH_SECRET and AUTH_MODE are still present.
+```
+
+This is not related to the Demo Center route and should be fixed separately as a production hardening task.
+
+### Verification
+
+TypeScript validation passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed and listed:
+
+```text
+/demo
+```
+
+The rebuilt UI container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The Demo Center route is protected:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fdemo
+```
+
+The app health API returned all apps healthy:
+
+```json
+{
+  "total": 4,
+  "healthy": 4
+}
+```
+
+The app inventory API returned:
+
+```json
+{
+  "total": 4,
+  "owned": 1,
+  "endpoints": 10
+}
+```
+
+The authenticated Demo Center smoke check found:
+
+```text
+Demo Center
+Phase 6 demo path
+Pre-Demo Checklist
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+The Demo Center makes Phase 6 more usable for real presentations. Instead of asking someone to keep several Markdown files, URLs, and commands in their head, the control plane now gives a single guided presenter path with live readiness and direct operational links.

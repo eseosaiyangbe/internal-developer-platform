@@ -554,6 +554,7 @@ Latest progress:
 - the control-plane services page now lets operators open managed apps directly from the app cards
 - the services dashboard is now simplified into managed app labels, with app-specific operator pages for latency, uptime, alerts, logs, and guidance
 - the services area now includes a live app comparison view that explains each workload's architecture role, operator value, Kubernetes direction, and live health state
+- the control plane now includes a Demo Center that turns the Markdown walkthrough into a guided UI presenter path with live readiness, commands, talking points, and reference links
 
 ---
 

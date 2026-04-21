@@ -67,9 +67,9 @@ Use the guided walkthrough when presenting or practicing:
 
 The short version:
 
-1. Open the control plane at `http://localhost:4000`.
-2. Show the managed app inventory.
-3. Open each app from the dashboard.
+1. Open the Demo Center at `http://localhost:4000/demo`.
+2. Confirm the live demo readiness state.
+3. Open the managed app comparison view.
 4. Run one app-specific live audit.
 5. Show one recorded incident drill.
 6. Explain how the same pattern maps to Kubernetes.
