@@ -11079,3 +11079,337 @@ Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
 This makes the control plane feel more trustworthy.
 
 The platform is not pretending everything is fine, and it is not hiding behind vague wording. It now tells the operator what happened: the current versions are known locally, but the external latest-release check is currently rate-limited by GitHub.
+
+## Phase 6 Admin Panel And User Management
+
+### Goal
+
+Turn the Admin Panel from a mock-data screen into a real user-management surface backed by Prisma and protected by server-side admin checks.
+
+The admin page already looked polished, but it was not operationally honest yet. It rendered hardcoded users, fake dashboard/config counts, and buttons that did not call any backend. Because this project is becoming an operator control plane, user management needs real data and guardrails.
+
+### Commands Run
+
+Inspected admin/auth/user-management files:
+
+```bash
+find Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib Obervability-Stack/ui-next/prisma -maxdepth 4 -type f | sort | rg 'admin|auth|user|prisma|register|signin|signup|profile|settings|seed|schema'
+rg -n "admin|role|user|User|AUTH_MODE|demo|register|signup|signin|session|next-auth|PrismaAdapter|bcrypt|password" Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib Obervability-Stack/ui-next/prisma -S -g '!**/node_modules/**'
+git status --short && git log --oneline -5
+```
+
+Reviewed the existing admin page, auth runtime, registration route, and Prisma schema:
+
+```bash
+sed -n '1,460p' Obervability-Stack/ui-next/app/admin/page.tsx
+sed -n '1,300p' Obervability-Stack/ui-next/lib/auth.ts
+sed -n '1,120p' 'Obervability-Stack/ui-next/app/api/auth/[...nextauth]/route.ts'
+sed -n '1,140p' Obervability-Stack/ui-next/lib/auth-runtime.ts
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/auth/register/route.ts
+sed -n '1,220p' Obervability-Stack/ui-next/prisma/schema.prisma
+sed -n '1,120p' Obervability-Stack/ui-next/prisma/seed.ts
+```
+
+Reviewed route protection and current navigation:
+
+```bash
+sed -n '1,220p' 'Obervability-Stack/ui-next/app/api/auth/[...nextauth]/route.ts'
+sed -n '1,260p' Obervability-Stack/ui-next/proxy.ts
+sed -n '1,260p' Obervability-Stack/ui-next/app/layout.tsx
+sed -n '1,260p' Obervability-Stack/ui-next/components/sidebar.tsx
+sed -n '1,240p' Obervability-Stack/ui-next/components/user-menu.tsx
+sed -n '1,260p' Obervability-Stack/ui-next/app/profile/page.tsx
+```
+
+Searched for audit/status/user-management support:
+
+```bash
+rg -n "model Audit|audit|lastLogin|status|disabled|active|invite|passwordReset|reset|admin" Obervability-Stack/ui-next/prisma Obervability-Stack/ui-next/app/api Obervability-Stack/ui-next/lib -S -g '!**/node_modules/**'
+```
+
+Checked runtime environment and current database users:
+
+```bash
+rg -n "devops-monitor-ui|DATABASE_URL|AUTH_MODE|DEMO_LOGIN|NEXTAUTH|prisma|seed|db" Obervability-Stack/docker-compose.yml Obervability-Stack/scripts Obervability-Stack/ui-next/Dockerfile Obervability-Stack/ui-next/env.example -S
+curl -fsSI http://localhost:4000/admin
+curl -sSI http://localhost:4000/admin/users | sed -n '1,20p'
+curl -sS -X POST http://localhost:4000/api/auth/register -H 'Content-Type: application/json' -d '{"name":"Probe User","email":"probe-user@example.com","password":"short"}' | jq .
+docker exec devops-monitor-ui sh -lc 'env | sort | grep -E "AUTH_MODE|DEMO_LOGIN|DATABASE_URL|NEXTAUTH"; echo ---data---; ls -la /app/data; echo ---prisma---; ls -la /app/prisma 2>/dev/null || true'
+docker exec devops-monitor-ui node -e 'const {PrismaClient}=require("@prisma/client"); const prisma=new PrismaClient(); (async()=>{const users=await prisma.user.findMany({select:{id:true,email:true,name:true,role:true,createdAt:true,updatedAt:true}}); const dashboards=await prisma.dashboard.count(); const configurations=await prisma.configuration.count(); console.log(JSON.stringify({users,dashboards,configurations},null,2));})().catch(e=>{console.error(e); process.exit(1)}).finally(async()=>prisma.$disconnect())'
+```
+
+Reviewed Docker and migration behavior:
+
+```bash
+sed -n '1,220p' Obervability-Stack/ui-next/.dockerignore
+sed -n '1,220p' Obervability-Stack/ui-next/prisma/migrations/20250902053132_init/migration.sql
+find Obervability-Stack/ui-next/components/ui -maxdepth 1 -type f -print | sort
+sed -n '1,220p' Obervability-Stack/ui-next/components/ui/select.tsx
+sed -n '1,220p' Obervability-Stack/ui-next/lib/prisma-server.ts
+sed -n '1,220p' Obervability-Stack/ui-next/lib/prisma.ts
+sed -n '1,160p' Obervability-Stack/ui-next/tsconfig.json
+```
+
+Updated Prisma schema:
+
+```text
+Obervability-Stack/ui-next/prisma/schema.prisma
+```
+
+First migration attempt failed:
+
+```bash
+npx prisma migrate dev --name add_user_status_fields
+```
+
+Fixed by explicitly setting the local SQLite database URL:
+
+```bash
+DATABASE_URL=file:./dev.db npx prisma migrate dev --name add_user_status_fields
+```
+
+Created the dynamic API route directory:
+
+```bash
+mkdir -p Obervability-Stack/ui-next/app/api/admin/users/[userId]
+mkdir -p 'Obervability-Stack/ui-next/app/api/admin/users/[userId]'
+```
+
+Edited:
+
+```text
+Obervability-Stack/ui-next/app/api/admin/users/route.ts
+Obervability-Stack/ui-next/app/api/admin/users/[userId]/route.ts
+Obervability-Stack/ui-next/lib/auth.ts
+Obervability-Stack/ui-next/app/admin/page.tsx
+Obervability-Stack/ui-next/components/user-menu.tsx
+```
+
+Validated TypeScript:
+
+```bash
+npm run type-check
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+The first build caught a Next.js 16 dynamic route type issue. After fixing the handler signature, reran:
+
+```bash
+npm run build
+```
+
+Rebuilt and restarted the running UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified runtime behavior:
+
+```bash
+docker compose ps devops-monitor-ui
+curl -sS -i http://localhost:4000/api/admin/users | sed -n '1,20p'
+curl -sSI http://localhost:4000/admin | sed -n '1,12p'
+docker exec devops-monitor-ui node -e 'const {PrismaClient}=require("@prisma/client"); const prisma=new PrismaClient(); (async()=>{const users=await prisma.user.findMany({select:{email:true,role:true,status:true,lastLoginAt:true,disabledAt:true},orderBy:{createdAt:"asc"}}); console.log(JSON.stringify(users,null,2));})().catch(e=>{console.error(e); process.exit(1)}).finally(async()=>prisma.$disconnect())'
+```
+
+Signed in through NextAuth with a cookie jar and called the admin API as the seeded admin:
+
+```bash
+tmp_cookie=$(mktemp); csrf=$(curl -fsS -c "$tmp_cookie" http://localhost:4000/api/auth/csrf | jq -r '.csrfToken'); curl -fsS -b "$tmp_cookie" -c "$tmp_cookie" -X POST http://localhost:4000/api/auth/callback/credentials -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode "csrfToken=$csrf" --data-urlencode 'email=demo@example.com' --data-urlencode 'password=demo123' --data-urlencode 'json=true' >/tmp/devops-admin-login.json; echo '--- login ---'; cat /tmp/devops-admin-login.json; echo; echo '--- admin users ---'; curl -fsS -b "$tmp_cookie" http://localhost:4000/api/admin/users | jq '{summary, users:[.users[] | {email,role,status,lastLoginAt,dashboards:._count.dashboards,configs:._count.configurations}]}'; rm -f "$tmp_cookie" /tmp/devops-admin-login.json
+```
+
+Verified the self-role-change guardrail:
+
+```bash
+tmp_cookie=$(mktemp); csrf=$(curl -fsS -c "$tmp_cookie" http://localhost:4000/api/auth/csrf | jq -r '.csrfToken'); curl -fsS -b "$tmp_cookie" -c "$tmp_cookie" -X POST http://localhost:4000/api/auth/callback/credentials -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode "csrfToken=$csrf" --data-urlencode 'email=demo@example.com' --data-urlencode 'password=demo123' --data-urlencode 'json=true' >/dev/null; user_id=$(curl -fsS -b "$tmp_cookie" http://localhost:4000/api/admin/users | jq -r '.users[] | select(.email=="demo@example.com") | .id'); curl -sS -i -b "$tmp_cookie" -X PATCH "http://localhost:4000/api/admin/users/$user_id" -H 'Content-Type: application/json' -d '{"role":"VIEWER"}' | sed -n '1,20p'; rm -f "$tmp_cookie"
+```
+
+Ran the operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+Reviewed final status:
+
+```bash
+git status --short
+git diff --stat
+```
+
+### Problems Encountered
+
+#### Missing DATABASE_URL During Migration
+
+The first Prisma migration command failed because `DATABASE_URL` was not set in the local shell:
+
+```text
+Environment variable not found: DATABASE_URL
+```
+
+Fix:
+
+```bash
+DATABASE_URL=file:./dev.db npx prisma migrate dev --name add_user_status_fields
+```
+
+This matches the local SQLite database used by the UI app.
+
+#### zsh Dynamic Route Path Expansion
+
+Creating a directory named `[userId]` failed because zsh treated the brackets as a glob:
+
+```text
+zsh: no matches found: Obervability-Stack/ui-next/app/api/admin/users/[userId]
+```
+
+Fix:
+
+```bash
+mkdir -p 'Obervability-Stack/ui-next/app/api/admin/users/[userId]'
+```
+
+#### Next.js 16 Dynamic Route Handler Type
+
+`npm run type-check` passed, but `npm run build` failed because Next.js 16 expects dynamic route params as a promise in generated route types:
+
+```text
+context: { params: Promise<{ userId: string; }> }
+```
+
+Fix:
+
+```ts
+{ params }: { params: Promise<{ userId: string }> }
+const { userId } = await params
+```
+
+### What Changed
+
+Added durable user-management fields:
+
+```text
+status
+lastLoginAt
+disabledAt
+```
+
+Added a `UserStatus` enum:
+
+```text
+ACTIVE
+DISABLED
+```
+
+Added admin-only APIs:
+
+```text
+GET    /api/admin/users
+POST   /api/admin/users
+PATCH  /api/admin/users/[userId]
+DELETE /api/admin/users/[userId]
+```
+
+The `DELETE` action is intentionally a soft disable, not a hard delete.
+
+Added server-side guardrails:
+
+- unauthenticated requests return `401`
+- non-admin requests return `403`
+- admins cannot change their own role or status
+- the platform cannot disable or demote the last active admin
+- disabled users cannot sign in
+- successful database/OAuth logins update `lastLoginAt`
+- password hashes are never returned to the browser
+
+Rebuilt the Admin UI:
+
+- removed hardcoded users
+- removed fake system stats
+- loaded live users from Prisma
+- added live summary cards
+- added create-user form
+- added edit role/status/name/email/password flow
+- added disable/reactivate workflow
+- fixed the broken user menu link from `/admin/users` to `/admin`
+
+### Verification
+
+`npm run type-check` passed.
+
+`npm run build` passed after the Next.js dynamic route type fix.
+
+The Docker rebuild completed and the UI container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+Unauthenticated API access was rejected:
+
+```text
+HTTP/1.1 401 Unauthorized
+{"message":"Authentication required"}
+```
+
+Unauthenticated `/admin` access redirected to sign-in:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fadmin
+```
+
+Authenticated admin API access returned the real seeded users:
+
+```text
+totalUsers: 3
+activeUsers: 3
+disabledUsers: 0
+admins: 1
+editors: 1
+viewers: 1
+```
+
+Successful admin login updated `lastLoginAt`:
+
+```text
+demo@example.com lastLoginAt: 2026-04-21T09:40:37.219Z
+```
+
+The self-role-change guardrail worked:
+
+```text
+HTTP/1.1 400 Bad Request
+{"message":"You cannot change your own role or account status"}
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+This turns the Admin Panel into a real control-plane capability.
+
+Before this change, the page looked finished but could mislead an operator because it showed fake users and fake stats. Now it is backed by the actual database, protected by server-side authorization, and has safety checks that prevent common admin mistakes.
+
+### Recommended Next Step
+
+Add an audit log for user-management actions:
+
+- user created
+- role changed
+- status changed
+- password reset
+- failed admin action
+
+That will make the admin panel stronger for incident review and portfolio storytelling.
