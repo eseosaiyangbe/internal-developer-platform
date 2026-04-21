@@ -11413,3 +11413,188 @@ Add an audit log for user-management actions:
 - failed admin action
 
 That will make the admin panel stronger for incident review and portfolio storytelling.
+
+## Phase 6 Admin Navigation Split
+
+### Goal
+
+Fix the confusing admin navigation where both `Admin Panel` and `User Management` opened the same `/admin` page.
+
+This happened because `/admin/users` was previously a broken route, so the user-menu item was temporarily pointed back to `/admin` while the first real admin-management implementation was built.
+
+### Commands Run
+
+Inspected admin route references:
+
+```bash
+rg -n "Admin Panel|User Management|/admin/users|/admin" Obervability-Stack/ui-next/components Obervability-Stack/ui-next/app -S -g '!**/node_modules/**'
+find Obervability-Stack/ui-next/app/admin -maxdepth 4 -type f -print -exec sed -n '1,40p' {} \;
+sed -n '82,110p' Obervability-Stack/ui-next/components/user-menu.tsx
+```
+
+Reviewed the current admin page and git state:
+
+```bash
+sed -n '1,760p' Obervability-Stack/ui-next/app/admin/page.tsx
+git status --short && git log --oneline -3
+```
+
+Created the new route/component directories:
+
+```bash
+mkdir -p Obervability-Stack/ui-next/app/admin/users Obervability-Stack/ui-next/components/admin
+```
+
+Moved the existing user-management page into a reusable component:
+
+```text
+Obervability-Stack/ui-next/components/admin/user-management-panel.tsx
+```
+
+Created:
+
+```text
+Obervability-Stack/ui-next/app/admin/page.tsx
+Obervability-Stack/ui-next/app/admin/users/page.tsx
+```
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/components/user-menu.tsx
+```
+
+Validated TypeScript and route structure:
+
+```bash
+npm run type-check
+find Obervability-Stack/ui-next/app/admin Obervability-Stack/ui-next/components/admin -maxdepth 4 -type f -print && git diff --stat
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt the running UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified runtime behavior:
+
+```bash
+docker compose ps devops-monitor-ui
+curl -fsSI http://localhost:4000/admin | sed -n '1,8p'
+curl -fsSI http://localhost:4000/admin/users | sed -n '1,8p'
+```
+
+Signed in as admin through NextAuth and verified the admin API still returns live users:
+
+```bash
+tmp_cookie=$(mktemp); csrf=$(curl -fsS -c "$tmp_cookie" http://localhost:4000/api/auth/csrf | jq -r '.csrfToken'); curl -fsS -b "$tmp_cookie" -c "$tmp_cookie" -X POST http://localhost:4000/api/auth/callback/credentials -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode "csrfToken=$csrf" --data-urlencode 'email=demo@example.com' --data-urlencode 'password=demo123' --data-urlencode 'json=true' >/dev/null; curl -fsS -b "$tmp_cookie" http://localhost:4000/api/admin/users | jq '{summary, firstUser:.users[0] | {email,role,status}}'; rm -f "$tmp_cookie"
+```
+
+Ran the operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Problem Encountered
+
+The navigation was semantically wrong:
+
+```text
+Admin Panel      -> /admin
+User Management  -> /admin
+```
+
+This made the UI feel duplicated even though the user-management feature itself was working.
+
+### Fix
+
+Split the admin experience into two routes:
+
+```text
+/admin        -> lightweight admin overview
+/admin/users  -> dedicated user-management workspace
+```
+
+Moved the existing user-management implementation into:
+
+```text
+components/admin/user-management-panel.tsx
+```
+
+Then mounted it at:
+
+```text
+app/admin/users/page.tsx
+```
+
+Replaced `/admin` with an overview page that shows:
+
+- total users
+- active users
+- admin count
+- config/dashboard counts
+- cards for user management, roles/access, audit logs, and system settings
+
+Updated the user menu:
+
+```text
+Admin Panel      -> /admin
+User Management  -> /admin/users
+```
+
+### Verification
+
+`npm run type-check` passed.
+
+`npm run build` passed and showed both routes:
+
+```text
+/admin
+/admin/users
+```
+
+The rebuilt UI container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+Both admin routes are protected:
+
+```text
+/admin       -> 307 /auth/signin?from=%2Fadmin
+/admin/users -> 307 /auth/signin?from=%2Fadmin%2Fusers
+```
+
+Authenticated admin API check still returned live users:
+
+```text
+totalUsers: 3
+activeUsers: 3
+admins: 1
+firstUser: demo@example.com ADMIN ACTIVE
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+This makes the UI navigation match the mental model:
+
+- `Admin Panel` is the control center.
+- `User Management` is the focused workspace for operators and roles.
+
+That separation will also make the next admin improvements cleaner, especially audit logs and system settings.
