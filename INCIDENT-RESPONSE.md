@@ -1285,3 +1285,266 @@ Add better operational visibility around the FoodPulse Postgres HAProxy layer be
 - Add a FoodPulse precheck that verifies `pg-haproxy` can route to Postgres, not just that Postgres is reachable directly.
 - Add a targeted runbook step for restarting only `pg-haproxy` after database recovery if HAProxy continues to report `<NOSRV>`.
 - Revisit HAProxy health-check behavior if this repeats, because a healthy proxy should usually recover backend state without a manual restart.
+
+## IR-2026-04-21-002 - HighContainerMemoryUsage Alert On cAdvisor
+
+### Situation
+
+The user reported a warning alert:
+
+```text
+HighContainerMemoryUsage
+High container memory usage on cadvisor
+Firing
+Warning
+Service: containers
+Value: 80%
+Duration: 7m
+Description: Container memory usage is above 80% on cadvisor
+Labels:
+alertname=HighContainerMemoryUsage
+cluster=devops-monitoring
+component=memory
+id=/
+instance=cadvisor
+job=cadvisor
+service=containers
+severity=warning
+Started: 4/21/2026, 1:52:37 PM
+Updated: 4/21/2026, 1:56:22 PM
+Ends: 4/21/2026, 2:00:22 PM
+```
+
+We treated this as a real container-memory incident first, then validated whether it was a real container under pressure or a noisy alert rule.
+
+### Commands Run
+
+Checked live Docker container memory and CPU:
+
+```bash
+docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.CPUPerc}}'
+```
+
+Checked cAdvisor memory working set from Prometheus:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=container_memory_working_set_bytes%7Bjob%3D%22cadvisor%22%7D' | jq '[.data.result[] | {container:(.metric.name // .metric.container_label_com_docker_compose_service // .metric.container // .metric.id), id:.metric.id, value:(.value[1]|tonumber)}] | sort_by(.value) | reverse | .[0:15]'
+```
+
+Checked the firing alert series:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=ALERTS%7Balertname%3D%22HighContainerMemoryUsage%22%7D' | jq '.data.result[] | {state:.metric.alertstate, instance:.metric.instance, id:.metric.id, service:.metric.service, value:.value[1]}'
+```
+
+Searched the alert and recording rule definitions:
+
+```bash
+rg -n "HighContainerMemoryUsage|container_memory|cadvisor" Obervability-Stack/prometheus Obervability-Stack -S -g '!**/node_modules/**'
+```
+
+Checked the old expression directly:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query' --get --data-urlencode 'query=(container_memory_usage_bytes{job="cadvisor"} / container_spec_memory_limit_bytes{job="cadvisor"} * 100) > 80' | jq '.data.result[] | {name:(.metric.name // .metric.container_label_com_docker_compose_service // .metric.id), id:.metric.id, image:.metric.image, value:.value[1]}'
+```
+
+Checked the corrected real-container expression:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query' --get --data-urlencode 'query=(container_memory_working_set_bytes{job="cadvisor",id!="/",image!=""} / container_spec_memory_limit_bytes{job="cadvisor",id!="/",image!=""} * 100) > 80' | jq '.data.result[] | {name:(.metric.name // .metric.container_label_com_docker_compose_service // .metric.id), id:.metric.id, image:.metric.image, value:.value[1]}'
+```
+
+Checked the active Prometheus alert object:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/alerts' | jq '.data.alerts[] | select(.labels.alertname=="HighContainerMemoryUsage") | {state:.state, activeAt:.activeAt, value:.value, labels:.labels, annotations:.annotations}'
+```
+
+Reviewed the rule file:
+
+```bash
+sed -n '190,230p' Obervability-Stack/prometheus/alert_rules.yml
+sed -n '20,40p' Obervability-Stack/prometheus/recording_rules.yml
+```
+
+Edited:
+
+```text
+Obervability-Stack/prometheus/alert_rules.yml
+Obervability-Stack/prometheus/recording_rules.yml
+Obervability-Stack/docs/ALERTMANAGER_INTEGRATION.md
+INCIDENT-RESPONSE.md
+```
+
+Validated Prometheus rules:
+
+```bash
+docker exec prometheus promtool check rules /etc/prometheus/alert_rules.yml /etc/prometheus/recording_rules.yml
+```
+
+Confirmed the updated rule was visible inside the container:
+
+```bash
+docker compose exec -T prometheus sh -lc 'ls -la /etc/prometheus && grep -n "HighContainerMemoryUsage" -A8 /etc/prometheus/alert_rules.yml'
+```
+
+Reloaded Prometheus without restarting it:
+
+```bash
+curl -sS -X POST -w '\nHTTP %{http_code}\n' http://localhost:9090/-/reload
+```
+
+Confirmed lifecycle reload support:
+
+```bash
+sed -n '20,50p' Obervability-Stack/docker-compose.yml
+```
+
+Verified the corrected query and active rule state:
+
+```bash
+sleep 5; curl -fsS 'http://localhost:9090/api/v1/query' --get --data-urlencode 'query=ALERTS{alertname="HighContainerMemoryUsage"}' | jq '.data.result[] | {state:.metric.alertstate, id:.metric.id, value:.value[1]}'
+curl -fsS 'http://localhost:9090/api/v1/query' --get --data-urlencode 'query=(container_memory_working_set_bytes{job="cadvisor",id!="/",image!=""} / container_spec_memory_limit_bytes{job="cadvisor",id!="/",image!=""} * 100) > 80' | jq '.data.result'
+curl -fsS 'http://localhost:9090/api/v1/rules' | jq '.data.groups[] | select(.name=="container_alerts") | .rules[] | select(.name=="HighContainerMemoryUsage") | {query:.query, state:.state, alerts:.alerts}'
+```
+
+### Evidence
+
+No individual container was near 80% memory usage.
+
+Examples from `docker stats`:
+
+```text
+devops-monitor-ui   133.3MiB / 1GiB     13.02%
+cadvisor            52.72MiB / 512MiB   10.30%
+promtail            119.4MiB / 512MiB   23.33%
+grafana             148.5MiB / 1GiB     14.50%
+prometheus          132.6MiB / 4GiB     3.24%
+loki                142.8MiB / 2GiB     6.97%
+```
+
+The alert was firing only on the cAdvisor root cgroup:
+
+```text
+id="/"
+instance="cadvisor"
+job="cadvisor"
+value="88.19"
+```
+
+The old expression returned only the root cgroup:
+
+```json
+{
+  "name": "/",
+  "id": "/",
+  "image": null,
+  "value": "88.35001908022471"
+}
+```
+
+The corrected real-container expression returned no firing series:
+
+```json
+[]
+```
+
+After the rule reload, Prometheus reported the rule as inactive:
+
+```json
+{
+  "query": "(container_memory_working_set_bytes{id!=\"/\",image!=\"\",job=\"cadvisor\"} / container_spec_memory_limit_bytes{id!=\"/\",image!=\"\",job=\"cadvisor\"} * 100) > 80",
+  "state": "inactive",
+  "alerts": []
+}
+```
+
+### Root Cause
+
+This was a false-positive alert caused by an overly broad Prometheus rule.
+
+The old rule evaluated:
+
+```promql
+(container_memory_usage_bytes / container_spec_memory_limit_bytes * 100) > 80
+```
+
+That included the cAdvisor root cgroup:
+
+```text
+id="/"
+image=null
+```
+
+The root cgroup represents broader Docker VM / host-level memory accounting, not a specific application container. On Docker Desktop, that root series can include memory cache and platform overhead, so it can look high even when no individual container is under pressure.
+
+### Fix
+
+Updated container memory alert rules to:
+
+- exclude the root cgroup with `id!="/"`,
+- exclude non-container series with `image!=""`,
+- use `container_memory_working_set_bytes` instead of total usage bytes.
+
+Updated warning expression:
+
+```promql
+(container_memory_working_set_bytes{job="cadvisor",id!="/",image!=""} / container_spec_memory_limit_bytes{job="cadvisor",id!="/",image!=""} * 100) > 80
+```
+
+Updated critical expression:
+
+```promql
+(container_memory_working_set_bytes{job="cadvisor",id!="/",image!=""} / container_spec_memory_limit_bytes{job="cadvisor",id!="/",image!=""} * 100) > 95
+```
+
+Updated the recording rule:
+
+```promql
+(container_memory_working_set_bytes{job="cadvisor",id!="/",image!=""} / container_spec_memory_limit_bytes{job="cadvisor",id!="/",image!=""}) * 100
+```
+
+Reloaded Prometheus:
+
+```bash
+curl -sS -X POST -w '\nHTTP %{http_code}\n' http://localhost:9090/-/reload
+```
+
+### Verification
+
+Prometheus rule syntax passed:
+
+```text
+Checking /etc/prometheus/alert_rules.yml
+  SUCCESS: 40 rules found
+
+Checking /etc/prometheus/recording_rules.yml
+  SUCCESS: 34 rules found
+```
+
+Prometheus reload succeeded:
+
+```text
+HTTP 200
+```
+
+The corrected alert rule is loaded:
+
+```text
+container_memory_working_set_bytes{id!="/",image!="",job="cadvisor"}
+```
+
+The alert is inactive:
+
+```text
+state: inactive
+alerts: []
+```
+
+### Follow-Up
+
+- Keep the rule scoped to real containers only.
+- Avoid alerting on `id="/"` from cAdvisor unless the alert is explicitly named as host/Docker-VM memory pressure.
+- If we want host memory alerts, use Node Exporter host memory rules instead of cAdvisor container rules.
+- Consider adding a dedicated alert test or promtool unit test later so root-cgroup regressions are caught before reload.
