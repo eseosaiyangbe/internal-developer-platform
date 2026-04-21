@@ -10892,3 +10892,190 @@ The platform API still returned the correct local service summary:
 This is the right first step because it improves reliability without requiring every learner to create a GitHub token immediately.
 
 The next improvement should be optional `GITHUB_TOKEN` support plus a clearer UI label such as `Rate limited` or `Check unavailable` instead of the vague `Unknown`.
+
+## Phase 6 Platform Version Status Labels
+
+### Goal
+
+Continue Phase 6 by making the Version and Services pages more honest for operators.
+
+After adding latest-version caching, the UI still displayed `Unknown` when GitHub rate-limited latest-release checks. That was technically true, but it was not helpful. Operators should see whether the latest version was actually checked, rate-limited, or unavailable.
+
+### Commands Run
+
+Checked the clean starting point and latest commits:
+
+```bash
+git status --short && git log --oneline -5
+```
+
+Reviewed the Phase 6 roadmap:
+
+```bash
+sed -n '488,620p' PROJECT-ROADMAP.md
+```
+
+Searched for Phase 6 polish candidates and remaining vague/latest-version labels:
+
+```bash
+rg -n "Phase 6|Next Step|TODO|placeholder|Unknown|Rate limited|Check unavailable|GITHUB_TOKEN|demo|coming soon|Download|Support the Project|Version" PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib -S -g '!**/node_modules/**'
+```
+
+Reviewed the affected pages and shared platform service code:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/app/services/page.tsx
+sed -n '1,240p' Obervability-Stack/ui-next/app/version/page.tsx
+sed -n '1,420p' Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Edited:
+
+```text
+Obervability-Stack/ui-next/lib/platform-services.ts
+Obervability-Stack/ui-next/app/version/page.tsx
+Obervability-Stack/ui-next/app/services/page.tsx
+```
+
+Validated TypeScript and reviewed the diff:
+
+```bash
+npm run type-check
+git diff -- Obervability-Stack/ui-next/lib/platform-services.ts Obervability-Stack/ui-next/app/version/page.tsx Obervability-Stack/ui-next/app/services/page.tsx
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt and restarted the running monitor UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the running UI container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Verified the live platform API response:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | jq '{summary, services:[.services[] | {id,currentVersion,latestVersion,latestVersionStatus,latestVersionError,updateAvailable}]}'
+```
+
+Verified the protected Version route:
+
+```bash
+curl -fsSI http://localhost:4000/version
+```
+
+Ran the operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Problem Encountered
+
+The API only returned:
+
+```text
+latestVersion: "Unknown"
+```
+
+That meant the UI could not distinguish between:
+
+- GitHub rate limit
+- GitHub unavailable
+- service release metadata unavailable
+- a version that had not been checked yet
+
+This created a weak demo and operator experience because `Unknown` sounded like the platform did not know what it was doing.
+
+### Fix
+
+Added a structured latest-version check status to the platform service API.
+
+New API fields:
+
+```text
+latestVersionStatus
+latestVersionError
+```
+
+Possible status values:
+
+```text
+checked
+rate_limited
+unavailable
+```
+
+The GitHub latest-release checker now classifies HTTP `403` responses as:
+
+```text
+rate_limited
+```
+
+The Version page now displays:
+
+```text
+Rate limited
+Check unavailable
+Not checked
+```
+
+instead of always showing:
+
+```text
+Unknown
+```
+
+The Services page now uses the same language in the monitoring/logging service labels.
+
+### Verification
+
+`npm run type-check` passed.
+
+`npm run build` passed.
+
+The Docker rebuild completed and restarted the monitor UI.
+
+The running container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The platform API now reports the actual reason for missing latest versions:
+
+```text
+latestVersion: "Unknown"
+latestVersionStatus: "rate_limited"
+latestVersionError: "GitHub API rate limit reached"
+```
+
+The `/version` route still correctly redirects unauthenticated users:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fversion
+```
+
+The full operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+This makes the control plane feel more trustworthy.
+
+The platform is not pretending everything is fine, and it is not hiding behind vague wording. It now tells the operator what happened: the current versions are known locally, but the external latest-release check is currently rate-limited by GitHub.
