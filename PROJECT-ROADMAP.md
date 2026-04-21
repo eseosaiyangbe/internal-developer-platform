@@ -553,6 +553,7 @@ Latest progress:
 - FoodPulse now has a cleaner demo voting-board UI with colored restaurant labels and a live vote chart
 - the control-plane services page now lets operators open managed apps directly from the app cards
 - the services dashboard is now simplified into managed app labels, with app-specific operator pages for latency, uptime, alerts, logs, and guidance
+- the services area now includes a live app comparison view that explains each workload's architecture role, operator value, Kubernetes direction, and live health state
 
 ---
 

@@ -64,6 +64,7 @@ Show:
 - app categories
 - primary app URLs
 - clickable managed-app cards on the services page
+- the app comparison view at `http://localhost:4000/services/compare`
 - app-specific operator pages for latency, uptime, alerts, recent logs, and guidance
 - clickable operator runbook and incident drill handoff buttons on each app page
 - operator guidance
@@ -188,12 +189,13 @@ Recommended Phase 6 flow:
 
 1. Open the control plane first.
 2. Open the Services page and explain that it is now a simple managed-app launch board.
-3. Click the FoodPulse label to show its operator page, then open the live app from there.
-4. Use the app page's `Open operator runbook` button to show the Markdown handoff.
-5. Use `View incident drills` to connect the app page to the executed drill catalog.
-6. Open SwiftPay to show the flagship microservices app and its operator page.
-7. Open OpenSIS to explain legacy modernization and its Vault/platform signals.
-8. Open MemFlip as the lightweight onboarding reference.
+3. Open `Compare Apps` to explain why the workspace has a microservices app, legacy platform app, HA lab, and onboarding app.
+4. Click the FoodPulse label to show its operator page, then open the live app from there.
+5. Use the app page's `Open operator runbook` button to show the Markdown handoff.
+6. Use `View incident drills` to connect the app page to the executed drill catalog.
+7. Open SwiftPay to show the flagship microservices app and its operator page.
+8. Open OpenSIS to explain legacy modernization and its Vault/platform signals.
+9. Open MemFlip as the lightweight onboarding reference.
 
 ### 8. Close With Kubernetes Direction
 

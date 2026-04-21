@@ -11976,3 +11976,269 @@ This is important before moving further into production-like operations because 
 - compliance evidence
 - administrator accountability
 - troubleshooting unexpected access changes
+
+## 2026-04-21 - Phase 6 App Comparison View
+
+### Objective
+
+Continue Phase 6 UX and demo polish by adding a control-plane comparison view for the four managed workloads. The services page already acted as a launch board, but the demo still needed one place that clearly explained why each workload exists and how each one maps to the future Kubernetes direction.
+
+### Commands Run
+
+Checked the current git state and recent commits:
+
+```bash
+git status --short && git log --oneline -6
+```
+
+Located roadmap and runbook files:
+
+```bash
+find . -maxdepth 3 -iname '*roadmap*' -o -iname '*plan*' -o -iname '*runbook*' | sort
+```
+
+Searched for the active roadmap phase and current Phase 6 guidance:
+
+```bash
+rg -n "Phase 6|phase 6|Admin|audit|next|roadmap|Roadmap|handoff|Phase" -S . --glob '!**/node_modules/**' --glob '!**/.next/**' --glob '!**/dist/**' --glob '!**/build/**'
+```
+
+Read the Phase 6 roadmap and demo script:
+
+```bash
+sed -n '488,620p' PROJECT-ROADMAP.md
+sed -n '122,150p' README.md
+sed -n '1,240p' DEMO-WALKTHROUGH.md
+find Obervability-Stack/ui-next/app -maxdepth 3 -type f | sort | sed -n '1,180p'
+```
+
+Inspected the services UI and app inventory source:
+
+```bash
+sed -n '1,320p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,360p' Obervability-Stack/ui-next/app/services/page.tsx
+sed -n '1,360p' Obervability-Stack/ui-next/app/services/[appId]/page.tsx
+find Obervability-Stack/ui-next/components -maxdepth 3 -type f | sort | sed -n '1,180p'
+```
+
+Corrected the bracketed route path quoting and read the app detail page:
+
+```bash
+sed -n '320,760p' Obervability-Stack/ui-next/app/services/page.tsx
+sed -n '1,420p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+sed -n '1,260p' Obervability-Stack/ui-next/lib/hooks/use-monitored-apps.ts
+sed -n '1,260p' Obervability-Stack/ui-next/app/api/apps/route.ts
+```
+
+Inspected sidebar navigation behavior:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/components/sidebar.tsx
+sed -n '420,760p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+sed -n '620,740p' PROJECT-ROADMAP.md
+sed -n '260,560p' Obervability-Stack/ui-next/components/sidebar.tsx
+```
+
+Ran TypeScript validation:
+
+```bash
+npm run type-check
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt the UI container:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the rebuilt container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Verified the new route is protected:
+
+```bash
+curl -sS -I http://localhost:4000/services/compare | sed -n '1,10p'
+```
+
+Verified app inventory data used by the comparison page:
+
+```bash
+curl -fsS http://localhost:4000/api/apps | jq '{total:.summary.totalApps, owned:.summary.ownedApps, endpoints:.summary.endpoints, apps:[.apps[] | {id,name,category,namespace:.kubernetes.namespace}]}'
+```
+
+Verified live app health data used by the comparison page:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/health | jq '{total:.summary.totalApps, healthy:.summary.healthyApps, statuses:[.apps[] | {appId,status,endpoints:(.endpoints|length)}]}'
+```
+
+Ran the full operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Changes Made
+
+Added a new comparison page:
+
+```text
+Obervability-Stack/ui-next/app/services/compare/page.tsx
+```
+
+The page shows:
+
+- each app's architecture category
+- current live health state
+- endpoint count and primary latency
+- ownership model
+- Kubernetes namespace
+- operator value
+- Kubernetes migration focus
+- live audit command
+- operator risk
+- links to the app-specific operator page and live app
+
+Updated the services launch board:
+
+```text
+Obervability-Stack/ui-next/app/services/page.tsx
+```
+
+Added a `Compare Apps` button so presenters and operators can move from launch board to side-by-side workload explanation.
+
+Updated sidebar active-state behavior:
+
+```text
+Obervability-Stack/ui-next/components/sidebar.tsx
+```
+
+The `Services` navigation item now remains active for nested routes such as:
+
+```text
+/services/compare
+/services/swiftpay
+/services/opensis
+```
+
+Updated Phase 6 documentation:
+
+```text
+PROJECT-ROADMAP.md
+DEMO-WALKTHROUGH.md
+```
+
+### Problems Encountered
+
+#### Broad Search Returned Too Much Noise
+
+The first roadmap search produced a very large result set because `OpenSIS/app/assets` contains many vendored JavaScript files that include common words such as `next`.
+
+Reason:
+
+The query was intentionally broad and did not exclude every vendored asset path.
+
+Fix:
+
+Narrowed the follow-up reads to `PROJECT-ROADMAP.md`, `README.md`, `DEMO-WALKTHROUGH.md`, and the control-plane UI files.
+
+#### Bracketed Dynamic Route Path Needed Quoting Again
+
+The unquoted command failed:
+
+```text
+zsh:1: no matches found: Obervability-Stack/ui-next/app/services/[appId]/page.tsx
+```
+
+Reason:
+
+`zsh` treats square brackets as glob syntax.
+
+Fix:
+
+Quoted the route path:
+
+```bash
+sed -n '1,420p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+```
+
+#### Existing Docker Secret Warnings Remain
+
+The Docker build still reported warnings about `NEXTAUTH_SECRET` and `AUTH_MODE` being passed through `ARG` or `ENV`.
+
+Status:
+
+Not fixed in this step. This remains a production hardening item and should be handled separately so the UX/demo change does not mix with secret-management refactoring.
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed and listed:
+
+```text
+/services/compare
+```
+
+The rebuilt UI container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The new route is protected:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fservices%2Fcompare
+```
+
+The comparison page data sources returned the expected inventory:
+
+```json
+{
+  "total": 4,
+  "owned": 1,
+  "endpoints": 10
+}
+```
+
+Live app health showed all workloads healthy:
+
+```json
+{
+  "total": 4,
+  "healthy": 4
+}
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+The workspace now has a clearer mixed-architecture story:
+
+- `SwiftPay` demonstrates microservices and business telemetry.
+- `OpenSIS` demonstrates legacy platform modernization.
+- `FoodPulse` demonstrates resilience and failover operations.
+- `MemFlip` demonstrates the smallest repeatable onboarding pattern.
+
+This makes Phase 6 stronger because a new viewer can understand the purpose of the four apps from one control-plane view before drilling into individual operator pages.
