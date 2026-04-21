@@ -11598,3 +11598,381 @@ This makes the UI navigation match the mental model:
 - `User Management` is the focused workspace for operators and roles.
 
 That separation will also make the next admin improvements cleaner, especially audit logs and system settings.
+
+## 2026-04-21 - Admin Audit Logging
+
+### Objective
+
+After splitting `Admin Panel` and `User Management`, the next enterprise control was auditability. User-management actions should not be invisible because role changes, account disables, password resets, and blocked guardrail attempts are security-relevant events.
+
+### Commands Run
+
+Confirmed the current git state and recent commits:
+
+```bash
+git status --short && git log --oneline -5
+```
+
+Reviewed the current Prisma schema and admin routes before changing behavior:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/prisma/schema.prisma
+sed -n '1,280p' Obervability-Stack/ui-next/app/api/admin/users/route.ts
+sed -n '1,380p' 'Obervability-Stack/ui-next/app/api/admin/users/[userId]/route.ts'
+sed -n '1,320p' Obervability-Stack/ui-next/app/admin/page.tsx
+sed -n '1,260p' Obervability-Stack/ui-next/components/admin/user-management-panel.tsx
+find Obervability-Stack/ui-next/app/admin -maxdepth 3 -type f -print | sort
+find Obervability-Stack/ui-next/app/api/admin -maxdepth 4 -type f -print | sort
+find Obervability-Stack/ui-next/prisma/migrations -maxdepth 2 -type f -name migration.sql -print | sort | tail -10
+sed -n '1,220p' Obervability-Stack/ui-next/lib/prisma-server.ts
+sed -n '1,220p' Obervability-Stack/ui-next/package.json
+sed -n '1,220p' Obervability-Stack/ui-next/app/admin/users/page.tsx
+```
+
+Created and applied the Prisma migration:
+
+```bash
+DATABASE_URL=file:./dev.db npx prisma migrate dev --name add_admin_audit_logs
+```
+
+Reviewed the generated migration:
+
+```bash
+sed -n '1,220p' prisma/migrations/20260421191244_add_admin_audit_logs/migration.sql
+```
+
+Checked working tree changes:
+
+```bash
+git status --short
+```
+
+Ran TypeScript validation:
+
+```bash
+npm run type-check
+```
+
+Reviewed failing TypeScript locations:
+
+```bash
+nl -ba 'app/api/admin/users/[userId]/route.ts' | sed -n '56,82p'
+nl -ba app/api/admin/users/route.ts | sed -n '145,165p'
+```
+
+Ran TypeScript validation again after the fix:
+
+```bash
+npm run type-check
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Attempted to rebuild the UI container from the repository root:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Located the correct Compose files:
+
+```bash
+find . -maxdepth 3 \( -name 'docker-compose*.yml' -o -name 'compose*.yml' -o -name 'compose*.yaml' \) -print | sort
+find scripts -maxdepth 2 -type f -print | sort
+find Obervability-Stack -maxdepth 2 -type f -name 'docker-compose*.yml' -print | sort
+```
+
+Rebuilt the UI container from the observability stack directory:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Confirmed the UI container was healthy:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Reviewed the `devops-monitor-ui` Compose service configuration:
+
+```bash
+sed -n '/devops-monitor-ui:/,/^[^[:space:]]/p' docker-compose.yml
+```
+
+Verified unauthenticated audit protections:
+
+```bash
+curl -sS -i http://localhost:4000/api/admin/audit | sed -n '1,12p' && printf '\n--- page redirect ---\n' && curl -sS -I http://localhost:4000/admin/audit | sed -n '1,8p'
+```
+
+Signed in as the existing admin user and triggered a safe blocked-action probe:
+
+```bash
+tmp_cookie=$(mktemp)
+csrf=$(curl -fsS -c "$tmp_cookie" http://localhost:4000/api/auth/csrf | jq -r '.csrfToken')
+curl -fsS -b "$tmp_cookie" -c "$tmp_cookie" -X POST http://localhost:4000/api/auth/callback/credentials \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "csrfToken=$csrf" \
+  --data-urlencode 'email=demo@example.com' \
+  --data-urlencode 'password=demo123' \
+  --data-urlencode 'callbackUrl=http://localhost:4000/dashboard' >/dev/null
+user_id=$(curl -fsS -b "$tmp_cookie" http://localhost:4000/api/admin/users | jq -r '.users[] | select(.email=="demo@example.com") | .id')
+if [ -z "$user_id" ] || [ "$user_id" = "null" ]; then
+  echo "demo admin user id not found"
+  rm -f "$tmp_cookie"
+  exit 1
+fi
+printf 'Self role-change guardrail response:\n'
+curl -sS -i -b "$tmp_cookie" -X PATCH "http://localhost:4000/api/admin/users/$user_id" \
+  -H 'Content-Type: application/json' \
+  -d '{"role":"VIEWER"}' | sed -n '1,12p'
+printf '\nLatest audit summary and event:\n'
+curl -fsS -b "$tmp_cookie" http://localhost:4000/api/admin/audit | jq '{summary, latest: .events[0] | {action, actorEmail, targetUserEmail, message}}'
+rm -f "$tmp_cookie"
+```
+
+Ran the operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Changes Made
+
+Added a new Prisma model:
+
+```text
+AdminAuditLog
+```
+
+Added a new Prisma enum:
+
+```text
+AdminAuditAction
+```
+
+The audit model records:
+
+- action type
+- actor id and email
+- target user id and email
+- human-readable message
+- metadata JSON
+- creation timestamp
+
+Created a server helper:
+
+```text
+Obervability-Stack/ui-next/lib/admin-audit.ts
+```
+
+This helper writes audit records and logs audit-write failures without breaking the primary admin action. That design choice prevents the admin workflow from failing because of a secondary logging issue, while still surfacing audit-write problems in server logs.
+
+Updated admin user APIs:
+
+```text
+Obervability-Stack/ui-next/app/api/admin/users/route.ts
+Obervability-Stack/ui-next/app/api/admin/users/[userId]/route.ts
+```
+
+The API now records:
+
+- `USER_CREATED`
+- `USER_UPDATED`
+- `USER_DISABLED`
+- `USER_REACTIVATED`
+- `ROLE_CHANGED`
+- `STATUS_CHANGED`
+- `PASSWORD_CHANGED`
+- `ACTION_BLOCKED`
+
+Added a new admin audit API:
+
+```text
+Obervability-Stack/ui-next/app/api/admin/audit/route.ts
+```
+
+The endpoint is admin-only and returns:
+
+- latest 100 audit events
+- total event count
+- blocked action count
+- user change count
+- password change count
+
+Added a new admin audit page:
+
+```text
+Obervability-Stack/ui-next/app/admin/audit/page.tsx
+```
+
+Updated the Admin Panel card so `Audit Logs` now opens:
+
+```text
+/admin/audit
+```
+
+### Problems Encountered
+
+#### TypeScript Session Typing
+
+The first type-check failed:
+
+```text
+app/api/admin/users/[userId]/route.ts(67,18): error TS2339: Property 'user' does not exist on type '{}'.
+app/api/admin/users/[userId]/route.ts(68,20): error TS2339: Property 'user' does not exist on type '{}'.
+app/api/admin/users/route.ts(157,16): error TS2532: Object is possibly 'undefined'.
+```
+
+Reason:
+
+NextAuth runtime guard guarantees an admin session before those lines execute, but TypeScript did not infer that from the local `requireAdmin()` response pattern.
+
+Fix:
+
+Used guarded optional access for the actor object and simplified the local `auditActor()` helper parameter so runtime-safe session access does not fail compilation.
+
+#### Docker Compose Path
+
+The first rebuild command failed from the main repository root:
+
+```text
+no configuration file provided: not found
+```
+
+Reason:
+
+The main `DevOps-Easy-Learning` repository is the umbrella repository. The actual observability stack Compose file lives in:
+
+```text
+Obervability-Stack/docker-compose.yml
+```
+
+Fix:
+
+Ran the rebuild from the correct directory:
+
+```bash
+cd /Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack
+docker compose up -d --build devops-monitor-ui
+```
+
+#### Docker Build Secret Warnings
+
+The Docker build still reported existing warnings:
+
+```text
+SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "NEXTAUTH_SECRET")
+SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "NEXTAUTH_SECRET")
+```
+
+Reason:
+
+The current Dockerfile passes auth values through build arguments/environment. This is not ideal for production-grade secret handling.
+
+Status:
+
+Not fixed in this step because the objective was audit logging. This remains a hardening follow-up before production deployment.
+
+#### Local Build Auth And Database Warnings
+
+The local `npm run build` still showed expected warnings:
+
+```text
+NEXTAUTH_SECRET is not set or is using the default value.
+NEXTAUTH_URL is not set.
+Environment variable not found: DATABASE_URL.
+```
+
+Reason:
+
+The bare local shell does not export the same runtime environment provided by Docker Compose.
+
+Status:
+
+The build completed successfully. Docker Compose supplies the runtime values for the container.
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed and listed the new routes:
+
+```text
+/admin/audit
+/api/admin/audit
+```
+
+Unauthenticated audit API access is blocked:
+
+```text
+HTTP/1.1 401 Unauthorized
+{"message":"Authentication required"}
+```
+
+Unauthenticated audit page access redirects to sign-in:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fadmin%2Faudit
+```
+
+The safe authenticated guardrail probe behaved correctly:
+
+```text
+HTTP/1.1 400 Bad Request
+{"message":"You cannot change your own role or account status"}
+```
+
+The audit log captured the blocked attempt:
+
+```json
+{
+  "summary": {
+    "totalEvents": 1,
+    "blockedActions": 1,
+    "userChanges": 0,
+    "passwordChanges": 0
+  },
+  "latest": {
+    "action": "ACTION_BLOCKED",
+    "actorEmail": "demo@example.com",
+    "targetUserEmail": "demo@example.com",
+    "message": "Blocked self role or status change for demo@example.com"
+  }
+}
+```
+
+The rebuilt container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Why This Matters
+
+Admin user management now has accountability. Operators can review who attempted or completed privileged changes, which user was targeted, and whether the system blocked risky actions.
+
+This is important before moving further into production-like operations because auditability is a foundational control for:
+
+- access reviews
+- incident response
+- compliance evidence
+- administrator accountability
+- troubleshooting unexpected access changes
