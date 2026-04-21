@@ -10534,3 +10534,200 @@ level=error caller="error encoding and sending metric family..."
 This makes the Logs page useful for operators.
 
 The page no longer depends on every app using the same structured logging format. That is important for this workspace because it manages mixed applications: Node services, PHP/OpenSIS, HAProxy, Loki, Prometheus, Docker access logs, and older demo apps.
+
+## Phase 6 Platform Versions Page Polish
+
+### Goal
+
+Continue Phase 6 by removing the old demo-style Version page and replacing it with a real operator-facing Platform Versions page.
+
+The old page talked about downloads, starring the project, and a generic UI overhaul. That was not useful for this project because operators need to know which monitoring and logging services are running, what version each service is on, whether anything is down, and whether an update is available.
+
+### Commands Run
+
+Checked the current branch, recent commits, and roadmap/runbook context:
+
+```bash
+git status --short && git log --oneline -6
+```
+
+Searched for Phase 6 polish candidates, stale placeholders, and rough UI areas:
+
+```bash
+rg -n "Next Step|Phase 6|polish|TODO|demo|rough|stale|not working|placeholder|coming soon|Invalid|FIXME" PROJECT-ROADMAP.md JOURNEY-RUNBOOK.md README.md DEMO-WALKTHROUGH.md Obervability-Stack/ui-next/app Obervability-Stack/ui-next/components Obervability-Stack/ui-next/lib -S -g '!**/node_modules/**'
+```
+
+Listed UI app routes:
+
+```bash
+find Obervability-Stack/ui-next/app -maxdepth 2 -type f | sort
+```
+
+Reviewed the Phase 6 roadmap section:
+
+```bash
+sed -n '488,570p' PROJECT-ROADMAP.md
+```
+
+Reviewed the old Version page and the existing service/version helpers:
+
+```bash
+sed -n '1,240p' Obervability-Stack/ui-next/app/version/page.tsx
+sed -n '1,380p' Obervability-Stack/ui-next/lib/version-monitor.ts
+sed -n '1,180p' Obervability-Stack/ui-next/app/admin/page.tsx
+sed -n '1,260p' Obervability-Stack/ui-next/components/version-badge.tsx
+sed -n '1,220p' Obervability-Stack/ui-next/lib/hooks/use-platform-services.ts
+sed -n '1,380p' Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Checked the live platform service API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | jq '{total:.total, up:.up, down:.down, updatesAvailable:.updatesAvailable, services:[.services[] | {id,name,status,currentVersion,latestVersion,updateAvailable,publicUrl}]}'
+```
+
+The first `jq` summary fields returned `null` because the API uses `summary.total`, `summary.up`, `summary.down`, and `summary.updatesAvailable`. The service entries returned correctly, so the page was wired to the existing `usePlatformServices` hook instead of hand-rolling another API shape.
+
+Edited:
+
+```text
+Obervability-Stack/ui-next/app/version/page.tsx
+```
+
+Ran TypeScript validation:
+
+```bash
+npm run type-check
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt and restarted the running monitor UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the running container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Verified the protected Version route:
+
+```bash
+curl -fsSI http://localhost:4000/version
+```
+
+Verified the live platform inventory API:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | jq '{summary, services:[.services[] | {id,name,status,currentVersion,latestVersion,updateAvailable,publicUrl}]}'
+```
+
+Ran the full operator check:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+### Problem Encountered
+
+The first type-check failed because the page imported a Lucide icon named `TriangleAlert`.
+
+The installed `lucide-react` package in this app exposes the icon as `AlertTriangle`, not `TriangleAlert`.
+
+### Fix
+
+Changed the import and usage from:
+
+```tsx
+TriangleAlert
+```
+
+to:
+
+```tsx
+AlertTriangle
+```
+
+Then reran:
+
+```bash
+npm run type-check
+```
+
+The check passed after the icon name was corrected.
+
+### What Changed
+
+Replaced the old static Version page with a live Platform Versions page.
+
+The new page shows:
+
+- live service count
+- healthy service count
+- down service count
+- update count
+- monitoring services
+- logging services
+- current version
+- latest known version
+- service status
+- probe latency
+- links to each service URL
+- links to each release page
+- last checked timestamp
+- manual refresh button
+
+This keeps the page aligned with the rest of the Phase 6 direction: fewer demo screens, more operator truth.
+
+### Verification
+
+`npm run type-check` passed.
+
+`npm run build` passed.
+
+The Docker rebuild completed and recreated `devops-monitor-ui`.
+
+The running container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The `/version` route returned a `307` redirect to sign-in:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fversion
+```
+
+That is expected because `/version` is a protected operator page.
+
+The platform API reported:
+
+```text
+8 total services
+8 up
+0 down
+0 updates available
+```
+
+The full operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Known Notes
+
+The local production build still prints known environment warnings about `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and `DATABASE_URL` when running outside the full runtime environment. The build still succeeds, and the Docker runtime has the correct environment from Compose.
+
+The Docker build also prints a warning about secrets being passed as build args or environment variables. That is existing Dockerfile hygiene work and should be handled as a separate hardening task so we do not mix security refactoring into this UI polish slice.
