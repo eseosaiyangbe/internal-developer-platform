@@ -10731,3 +10731,164 @@ Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
 The local production build still prints known environment warnings about `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and `DATABASE_URL` when running outside the full runtime environment. The build still succeeds, and the Docker runtime has the correct environment from Compose.
 
 The Docker build also prints a warning about secrets being passed as build args or environment variables. That is existing Dockerfile hygiene work and should be handled as a separate hardening task so we do not mix security refactoring into this UI polish slice.
+
+## Phase 6 Platform Version Latest-Check Cache
+
+### Goal
+
+Fix the first cause of `Latest` showing `Unknown` on the Version page.
+
+The page gets current versions from local containers, but it gets latest versions from GitHub release API URLs. GitHub rate-limited the current public IP, so every latest-version request returned `403 API rate limit exceeded`.
+
+We decided to implement caching first instead of immediately requiring a GitHub token. That keeps the project easier for learners to run while reducing repeated GitHub API calls.
+
+### Commands Run
+
+Inspected the version-service data path and the live API response:
+
+```bash
+sed -n '1,420p' Obervability-Stack/ui-next/lib/platform-services.ts
+sed -n '1,220p' Obervability-Stack/ui-next/app/api/services/platform/route.ts
+curl -fsS http://localhost:4000/api/services/platform | jq '.services[] | {id,name,currentVersion,latestVersion,updateAvailable,releaseUrl,lastChecked,status}'
+```
+
+Confirmed GitHub was rate-limiting the host:
+
+```bash
+curl -fsSI https://api.github.com/repos/prometheus/prometheus/releases/latest | sed -n '1,30p'
+```
+
+Confirmed the same behavior from inside the running UI container:
+
+```bash
+docker exec devops-monitor-ui node -e "fetch('https://api.github.com/repos/prometheus/prometheus/releases/latest',{headers:{Accept:'application/vnd.github+json','User-Agent':'devops-easy-learning'}}).then(async r=>{console.log(r.status, r.statusText); console.log('rate', r.headers.get('x-ratelimit-remaining')); console.log((await r.text()).slice(0,300));}).catch(e=>{console.error(e.name, e.message); process.exit(1);})"
+docker exec devops-monitor-ui node -e "fetch('https://api.github.com/repos/prometheus/prometheus/releases/latest').then(async r=>{console.log(r.status, r.statusText); console.log((await r.text()).slice(0,300));}).catch(e=>{console.error(e.name, e.message); process.exit(1);})"
+```
+
+Converted the GitHub reset epoch into local time:
+
+```bash
+date -r 1776764427 '+%Y-%m-%d %H:%M:%S %Z'
+```
+
+Reviewed the file being changed:
+
+```bash
+sed -n '1,340p' Obervability-Stack/ui-next/lib/platform-services.ts
+cat Obervability-Stack/ui-next/package.json
+find Obervability-Stack/ui-next -maxdepth 3 -type d \( -name node_modules -o -name .next \) -prune -o -type f | sed -n '1,160p'
+```
+
+Edited:
+
+```text
+Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Validated TypeScript:
+
+```bash
+npm run type-check
+```
+
+Reviewed the code diff:
+
+```bash
+git diff -- Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+Ran the production build:
+
+```bash
+npm run build
+```
+
+Rebuilt and restarted the running UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the running UI container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Called the platform API twice through the same endpoint the Version page uses:
+
+```bash
+curl -fsS http://localhost:4000/api/services/platform | jq '{summary, versions:[.services[] | {id,latestVersion,currentVersion}]}'
+curl -fsS http://localhost:4000/api/services/platform | jq '{summary, versions:[.services[] | {id,latestVersion,currentVersion}]}'
+```
+
+Checked recent UI container logs:
+
+```bash
+docker logs --tail 80 devops-monitor-ui
+```
+
+### Problem Encountered
+
+The `Latest` value was not failing because the local services were down. Current versions were still available from local service endpoints.
+
+The failure was specifically on the external GitHub latest-release lookup:
+
+```text
+HTTP 403
+API rate limit exceeded
+x-ratelimit-remaining: 0
+```
+
+GitHub reset time decoded locally to:
+
+```text
+2026-04-21 05:40:27 EDT
+```
+
+### Fix
+
+Added an in-memory latest-version cache in:
+
+```text
+Obervability-Stack/ui-next/lib/platform-services.ts
+```
+
+The cache now:
+
+- stores successful latest-version checks for 6 hours
+- stores failed latest-version checks for 15 minutes
+- de-duplicates concurrent checks for the same release URL
+- prevents Loki and Promtail from asking the same Grafana Loki release URL twice at the same time
+- keeps the Version page functional even when GitHub is temporarily unavailable or rate-limited
+
+### Verification
+
+`npm run type-check` passed.
+
+`npm run build` passed.
+
+The Docker rebuild completed and restarted `devops-monitor-ui`.
+
+The running container was healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The platform API still returned the correct local service summary:
+
+```text
+8 total services
+8 up
+0 down
+0 updates available
+```
+
+`latestVersion` still showed `Unknown` during verification because GitHub had not lifted the active rate limit yet. That is expected. This cache prevents repeated refreshes from continuing to hammer GitHub, but it does not bypass an already-active GitHub API rate limit.
+
+### Why This Matters
+
+This is the right first step because it improves reliability without requiring every learner to create a GitHub token immediately.
+
+The next improvement should be optional `GITHUB_TOKEN` support plus a clearer UI label such as `Rate limited` or `Check unavailable` instead of the vague `Unknown`.
