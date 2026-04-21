@@ -10109,3 +10109,268 @@ Dashboard -> Managed app label -> App detail page -> Operator runbook -> Inciden
 ```
 
 That is the workflow we want reviewers, students, and future operators to understand without needing verbal patch notes.
+
+## Phase 6 Logs Page Timestamp And Retention Fix
+
+### Date
+
+2026-04-21
+
+### Goal
+
+Fix the Logs page showing `Invalid Date` and decide whether log cleanup should be manual deletion or automatic retention.
+
+The user noticed:
+
+```text
+on the log page fron side menu bar, the logs are showing invalid date
+```
+
+The user also asked whether logs should be clearable/deletable or whether we should set a retention date.
+
+### Decision
+
+Use automatic retention rather than a broad "clear logs" button.
+
+Reasoning:
+
+- logs are evidence during incident response
+- a one-click clear button can hide the timeline we need during troubleshooting
+- retention protects disk usage without destroying recent operational history
+- retention maps better to the future Kubernetes version, where log lifecycle policies are normally platform-managed
+
+For this local learning platform, we set Loki retention to 7 days:
+
+```text
+168h
+```
+
+### Commands Run
+
+Inspected the Logs page:
+
+```bash
+sed -n '1,320p' Obervability-Stack/ui-next/app/logs/page.tsx
+sed -n '320,560p' Obervability-Stack/ui-next/app/logs/page.tsx
+```
+
+Inspected the Loki API client and hook:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/lib/loki-api.ts
+sed -n '1,180p' Obervability-Stack/ui-next/lib/hooks/use-loki-logs.ts
+sed -n '1,80p' Obervability-Stack/ui-next/app/api/logs/query/route.ts
+```
+
+Located Loki and Promtail config:
+
+```bash
+find Obervability-Stack -maxdepth 3 -iname '*loki*' -o -iname '*promtail*' | sort
+sed -n '1,140p' Obervability-Stack/loki/config.yml
+sed -n '1,120p' Obervability-Stack/loki/promtail-config.yml
+```
+
+Searched for timestamp, delete, retention, and Loki references:
+
+```bash
+rg -n "retention|delete|compactor|limits_config|schema_config|storage_config|loki|Invalid Date|toLocale|timestamp|Date\(" Obervability-Stack -S -g '!**/node_modules/**'
+```
+
+Checked live log timestamps returned by the Logs API:
+
+```bash
+curl -fsS 'http://localhost:4000/api/logs/query?timeRange=15m&limit=3' | jq '.logs[] | {timestamp, line: (.line | .[0:80])}'
+```
+
+Validated timestamp conversion locally:
+
+```bash
+node - <<'NODE'
+const timestamp = '1776761544961882730';
+const numericTimestamp = Number(timestamp);
+const milliseconds = numericTimestamp > 1_000_000_000_000_000 ? numericTimestamp / 1_000_000 : numericTimestamp;
+const date = new Date(milliseconds);
+console.log(date.toLocaleString());
+console.log(Number.isNaN(date.getTime()) ? 'invalid' : 'valid');
+NODE
+```
+
+Validated the Loki config inside the running container:
+
+```bash
+docker compose exec -T loki sh -lc 'command -v loki || find / -name loki -type f 2>/dev/null | head -5'
+docker compose exec -T loki sh -lc 'loki -config.file=/etc/loki/local-config.yaml -verify-config=true'
+```
+
+Ran UI checks:
+
+```bash
+npm run type-check
+npm run build
+```
+
+Rebuilt/restarted the affected services:
+
+```bash
+docker compose up -d --build loki devops-monitor-ui
+docker compose restart loki
+```
+
+Verified runtime health and the 1-day log filter:
+
+```bash
+docker compose ps loki devops-monitor-ui
+curl -fsS http://localhost:3100/ready
+curl -fsS 'http://localhost:4000/api/logs/query?timeRange=1d&limit=1' | jq '{count: (.logs | length), first: .logs[0].timestamp, query: .query, timeRange: .filters.timeRange}'
+```
+
+Checked Loki startup logs for retention/compactor state:
+
+```bash
+docker compose logs --tail=80 loki | rg -n "retention|compactor|ready|error|invalid|failed|retention_period" -i || true
+```
+
+Reviewed and updated Loki docs:
+
+```bash
+sed -n '50,140p' Obervability-Stack/docs/LOKI_INTEGRATION.md
+```
+
+### Root Cause
+
+Loki returns log timestamps as nanoseconds since epoch:
+
+```text
+1776761544961882730
+```
+
+The Logs page was doing:
+
+```ts
+new Date(timestamp).toLocaleString()
+```
+
+That passes a nanosecond string directly into `Date`. JavaScript dates expect milliseconds or an ISO timestamp, so the browser rendered `Invalid Date`.
+
+### Fix
+
+Updated the Logs page timestamp formatter:
+
+```text
+Obervability-Stack/ui-next/app/logs/page.tsx
+```
+
+The formatter now:
+
+- detects numeric Loki timestamps
+- converts nanoseconds to milliseconds
+- falls back safely for ISO timestamps
+- returns `Unknown time` instead of `Invalid Date` if parsing fails
+
+Also fixed a related filter mismatch:
+
+```text
+Obervability-Stack/ui-next/lib/loki-api.ts
+```
+
+The UI offered `1d`, but the API only handled `24h`. Selecting `1d` previously fell back to the default 1-hour range. The API now treats `1d` and `24h` as the same 24-hour range.
+
+Configured Loki retention:
+
+```text
+Obervability-Stack/loki/config.yml
+```
+
+Added:
+
+```yaml
+retention_period: 168h
+```
+
+The compactor was already enabled with:
+
+```yaml
+retention_enabled: true
+retention_delete_delay: 2h
+```
+
+Updated documentation:
+
+```text
+Obervability-Stack/docs/LOKI_INTEGRATION.md
+```
+
+### Problems And Fixes
+
+Problem: The Logs page displayed `Invalid Date`.
+
+Fix: Convert Loki nanosecond timestamps to milliseconds before formatting.
+
+Problem: The UI exposed a `1d` time range, but the backend only handled `24h`.
+
+Fix: Add `1d` support in `getTimeRange`.
+
+Problem: Loki docs still described infinite retention.
+
+Fix: Update the Loki integration docs to describe 7-day retention.
+
+Problem: `docker compose up -d --build loki devops-monitor-ui` rebuilt the UI and kept Loki running, but Loki needed a restart to load the mounted config change.
+
+Fix:
+
+```bash
+docker compose restart loki
+```
+
+### Verification
+
+Loki config validation passed:
+
+```text
+config is valid
+```
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Next production build passed.
+
+Loki became healthy after restart:
+
+```text
+loki   Up ... (healthy)
+```
+
+The UI container became healthy after rebuild:
+
+```text
+devops-monitor-ui   Up ... (healthy)
+```
+
+The 1-day filter was accepted and returned log data:
+
+```json
+{
+  "count": 1,
+  "first": "1776761544961882730",
+  "query": "{container=~\".+\"}",
+  "timeRange": "1d"
+}
+```
+
+Local timestamp conversion returned a valid date:
+
+```text
+4/21/2026, 4:52:24 AM
+valid
+```
+
+Loki logs showed the compactor starting:
+
+```text
+compactor is ACTIVE in the ring
+this instance has been chosen to run the compactor, starting compactor
+```
