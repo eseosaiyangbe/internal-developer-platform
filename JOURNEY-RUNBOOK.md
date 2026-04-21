@@ -10374,3 +10374,163 @@ Loki logs showed the compactor starting:
 compactor is ACTIVE in the ring
 this instance has been chosen to run the compactor, starting compactor
 ```
+
+## Phase 6 Logs Page Severity Filter Fix
+
+### Date
+
+2026-04-21
+
+### Goal
+
+Fix the Logs page severity dropdown.
+
+The user reported that only `All Levels` worked, while `info`, `error`, `warn`, and `debug` did not filter correctly.
+
+### Commands Run
+
+Checked the live metadata returned by the logs API:
+
+```bash
+curl -fsS http://localhost:4000/api/logs/metadata | jq .
+```
+
+Tested each severity filter against the live API:
+
+```bash
+for level in all info error warn debug; do
+  echo "--- $level"
+  curl -fsS "http://localhost:4000/api/logs/query?timeRange=1h&severity=$level&limit=3" |
+    jq '{count:(.logs|length), query, samples:[.logs[]? | {labels, line:(.line|.[0:120])}]}'
+done
+```
+
+Read the Loki API query builder:
+
+```bash
+sed -n '130,230p' Obervability-Stack/ui-next/lib/loki-api.ts
+```
+
+Read the Logs page UI severity handling:
+
+```bash
+sed -n '1,150p' Obervability-Stack/ui-next/app/logs/page.tsx
+```
+
+Verified generated queries locally:
+
+```bash
+npx tsx -e "import { lokiAPI } from './lib/loki-api'; for (const severity of ['all','info','error','warn','debug']) console.log(severity, lokiAPI.buildQuery({severity, timeRange:'1h'}));"
+```
+
+Ran UI checks:
+
+```bash
+npm run type-check
+npm run build
+```
+
+Rebuilt the running UI:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Retested each severity filter after rebuild:
+
+```bash
+for level in all info error warn debug; do
+  echo "--- $level"
+  curl -fsS "http://localhost:4000/api/logs/query?timeRange=7d&severity=$level&limit=5" |
+    jq '{count:(.logs|length), query, samples:[.logs[]? | {severity:(if (.labels.level // .labels.severity) then (.labels.level // .labels.severity) else "inferred" end), line:(.line|.[0:120])}]}'
+done
+```
+
+Checked full error samples:
+
+```bash
+curl -fsS "http://localhost:4000/api/logs/query?timeRange=7d&severity=error&limit=10" | jq -r '.logs[].line' | sed -n '1,10p'
+```
+
+### Root Cause
+
+The old query builder assumed logs had a Loki label named `level`:
+
+```logql
+{level="error"}
+```
+
+But our Docker/Promtail logs mostly have labels such as:
+
+```text
+compose_project
+compose_service
+container
+```
+
+They do not consistently have a `level` label. That meant `info`, `error`, `warn`, and `debug` were filtering on a label that usually did not exist.
+
+### Fix
+
+Changed severity filtering to happen in the Logs API after Loki returns the recent log batch.
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/lib/loki-api.ts
+Obervability-Stack/ui-next/app/api/logs/query/route.ts
+Obervability-Stack/ui-next/app/logs/page.tsx
+```
+
+The API now:
+
+- queries the relevant Loki stream normally
+- infers severity from `level`/`severity` labels if present
+- otherwise infers severity from log-line text
+- filters the returned logs before sending them to the UI
+- fetches a larger batch when a severity filter is selected so filtering has enough rows to work with
+
+The UI now also uses the same severity inference idea for the badge color/icon, so plain Docker access logs show as `INFO` instead of defaulting incorrectly.
+
+### Verification
+
+Before the fix, live API queries looked like this:
+
+```text
+info  -> {level="info"}  -> 0 logs
+error -> {level="error"} -> 0 logs
+warn  -> {level="warn"}  -> 0 logs
+debug -> {level="debug"} -> 0 logs
+```
+
+After the fix, the query stays on the real Docker log stream:
+
+```text
+{container=~".+"}
+```
+
+Then the API applies severity filtering.
+
+Live results after rebuild:
+
+```text
+all   -> 5 logs
+info  -> 5 logs
+error -> 5 logs
+warn  -> 0 logs
+debug -> 0 logs
+```
+
+The `warn` and `debug` results were empty because there were no matching warning/debug lines in the selected range, not because the filter was broken.
+
+Error samples now contain real error-like lines:
+
+```text
+level=error caller="error encoding and sending metric family..."
+```
+
+### Why This Matters
+
+This makes the Logs page useful for operators.
+
+The page no longer depends on every app using the same structured logging format. That is important for this workspace because it manages mixed applications: Node services, PHP/OpenSIS, HAProxy, Loki, Prometheus, Docker access logs, and older demo apps.
