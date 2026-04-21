@@ -9858,3 +9858,254 @@ Notifications page: webhook history, including resolved events.
 For a future CI/CD improvement, publish `docker.io/eseosaiyangbe/opensis-ui:dev` as a multi-arch image with both `linux/amd64` and `linux/arm64` manifests. Then Mac and Linux users can both pull the same tag.
 
 For Kubernetes, keep the same principle: bootstrap should create required auth roles and runtime credentials automatically. Learners should not manually create security plumbing before the stack can start.
+
+## Phase 6 UI Polish: App Detail Runbook Handoff
+
+### Date
+
+2026-04-21
+
+### Goal
+
+Continue Phase 6 by tightening the demo/operator handoff on each managed app page.
+
+The app detail pages already showed useful operational signals:
+
+- probe latency
+- uptime
+- alerts
+- recent logs
+- first-response commands
+- local run contract
+
+The missing piece was the handoff from the UI into the Markdown runbooks. The page displayed the runbook path as text, but a presenter or learner still had to manually find the file.
+
+### Commands Run
+
+Checked roadmap status and recent project history:
+
+```bash
+rg -n "Phase|Roadmap|roadmap|Next|TODO|Kubernetes|k8s|handoff|operator|FoodPulse|OpenSIS|SwiftPay|Memflip" README.md JOURNEY-RUNBOOK.md INCIDENT-RESPONSE.md docs scripts -S
+find . -maxdepth 3 -iname '*roadmap*' -o -iname '*runbook*' -o -iname '*handoff*' | sort
+git status --short && git log --oneline -8
+```
+
+The first command printed an expected warning because this repo does not currently have a root `docs/` directory:
+
+```text
+rg: docs: No such file or directory (os error 2)
+```
+
+Read the roadmap and current Phase 6 runbook sections:
+
+```bash
+sed -n '1,260p' PROJECT-ROADMAP.md
+sed -n '6860,7310p' JOURNEY-RUNBOOK.md
+sed -n '7590,7990p' JOURNEY-RUNBOOK.md
+```
+
+Listed the app detail page files:
+
+```bash
+find Obervability-Stack/ui-next/app/services -maxdepth 3 -type f | sort
+```
+
+Tried to read the bracketed Next.js route without shell quoting:
+
+```bash
+sed -n '1,280p' Obervability-Stack/ui-next/app/services/[appId]/page.tsx
+```
+
+That failed because zsh interpreted `[appId]` as a glob pattern:
+
+```text
+zsh:1: no matches found: Obervability-Stack/ui-next/app/services/[appId]/page.tsx
+```
+
+Fixed the command by quoting the route path:
+
+```bash
+sed -n '1,360p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+sed -n '360,760p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+```
+
+Read app inventory and available operator docs:
+
+```bash
+sed -n '1,260p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '220,520p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+find Obervability-Stack/docs -maxdepth 1 -type f | sort
+```
+
+Checked relevant UI files and package scripts:
+
+```bash
+find Obervability-Stack/ui-next -maxdepth 3 -type f \( -name '*.css' -o -name '*.tsx' \) | sort | sed -n '1,160p'
+cat Obervability-Stack/ui-next/package.json
+```
+
+Reviewed the changed files:
+
+```bash
+git diff --stat
+git diff -- 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx' DEMO-WALKTHROUGH.md JOURNEY-RUNBOOK.md | sed -n '1,260p'
+```
+
+Ran the control-plane UI checks:
+
+```bash
+npm run type-check
+npm run build
+```
+
+Rebuilt and restarted the running control-plane UI container:
+
+```bash
+docker compose up -d --build devops-monitor-ui
+```
+
+Verified the rebuilt UI container:
+
+```bash
+docker compose ps devops-monitor-ui
+```
+
+Checked the protected app detail route:
+
+```bash
+curl -fsSI http://localhost:4000/services/foodpulse
+```
+
+Checked the app overview API still returned healthy FoodPulse data:
+
+```bash
+curl -fsS http://localhost:4000/api/apps/foodpulse/overview | jq '{app: .app.name, status: .health.status, alerts: (.alerts | length), logs: (.recentLogs | length)}'
+```
+
+Ran the full operator check:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### Changes Made
+
+Updated the app detail page:
+
+```text
+Obervability-Stack/ui-next/app/services/[appId]/page.tsx
+```
+
+Changes:
+
+- added a repository URL constant for stable GitHub documentation links
+- added `runbookUrl` to each app's operator guide
+- added an `Open operator runbook` button
+- added a `View incident drills` button
+- kept the local Markdown path visible for operators working from the repo
+
+Updated the demo walkthrough:
+
+```text
+DEMO-WALKTHROUGH.md
+```
+
+Changes:
+
+- added the runbook and incident-drill buttons to the control-plane demo checklist
+- updated the recommended Phase 6 flow so presenters click from app page to Markdown runbook and drill catalog
+
+### Problems And Fixes
+
+Problem: The bracketed Next.js route path failed in zsh when read without quotes.
+
+Fix: Quote bracketed route paths:
+
+```bash
+sed -n '1,360p' 'Obervability-Stack/ui-next/app/services/[appId]/page.tsx'
+```
+
+Problem: App pages showed runbook paths but did not provide a clickable documentation handoff.
+
+Fix: Add explicit action buttons:
+
+```text
+Open operator runbook
+View incident drills
+```
+
+Problem: The local `npm run build` still prints expected production-environment warnings when run outside the Compose runtime:
+
+```text
+NEXTAUTH_SECRET is not set
+NEXTAUTH_URL is not set
+DATABASE_URL is missing, using JWT-only mode
+```
+
+Fix: No code change in this slice. The build completed successfully, and these warnings are already known for the local build path.
+
+Problem: The Docker build repeated an existing Dockerfile warning about secrets in `ARG`/`ENV`:
+
+```text
+SecretsUsedInArgOrEnv
+```
+
+Fix: No code change in this slice. This is a production-hardening follow-up and should not block the Phase 6 runbook handoff polish.
+
+### Verification
+
+TypeScript passed:
+
+```text
+tsc --noEmit
+```
+
+Production build passed and still includes the managed app detail route:
+
+```text
+/services/[appId]
+```
+
+The rebuilt UI container is healthy:
+
+```text
+devops-monitor-ui   Up ... (healthy)   0.0.0.0:4000->3000/tcp
+```
+
+The protected FoodPulse detail page redirects to sign-in as expected:
+
+```text
+HTTP/1.1 307 Temporary Redirect
+location: /auth/signin?from=%2Fservices%2Ffoodpulse
+```
+
+The FoodPulse app overview API returned healthy data:
+
+```json
+{
+  "app": "FoodPulse",
+  "status": "healthy",
+  "alerts": 0,
+  "logs": 10
+}
+```
+
+The full operator check passed:
+
+```text
+Checks passed: 28/28
+Inventory validation passed.
+All monitored apps are currently healthy.
+```
+
+### Why This Matters
+
+Phase 6 is about making the platform teachable and demo-ready.
+
+This change makes the operator journey more natural:
+
+```text
+Dashboard -> Managed app label -> App detail page -> Operator runbook -> Incident drill catalog
+```
+
+That is the workflow we want reviewers, students, and future operators to understand without needing verbal patch notes.
