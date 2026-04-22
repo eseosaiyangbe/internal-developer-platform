@@ -18,7 +18,7 @@ It answers, for each repo:
 |---|---|---|---|---|---|---|---|---|
 | `Obervability-Stack` | `docker compose up -d` | `./devops-monitor.sh start` | `env.example`, `docker-compose.env.example`, `ui-next/env.example` | `http://localhost:4000` | `curl -fsS http://localhost:4000/` | n/a, this repo owns the network too | App inventory should drift away from container-specific assumptions over time | Control plane repo |
 | `SwiftPay` | `docker compose up -d` | `./scripts/validate.sh` after startup | `.env.example` | `http://localhost:8081` | `curl -fsS http://localhost:3007/health` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | Strongest candidate for early Service, Deployment, and probe mapping | Best flagship workload |
-| `OpenSIS` | `./scripts/compose-start.sh --build-local` on Apple Silicon, otherwise `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap, secret rendering, MariaDB exporter coverage, and Vault synthetic checks; arm64 operators should prefer the local build path |
+| `OpenSIS` | `./scripts/compose-start.sh --build-local` on Apple Silicon, otherwise `./scripts/compose-start.sh` | `docker compose up -d` | `.env.example` should be used at repo root | `http://localhost:8088` | `curl -I http://localhost:8088` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker`, `opensis-apache-exporter` | Already has the strongest native Kubernetes and GitOps posture | Includes Vault bootstrap, secret rendering, MariaDB exporter coverage, Vault synthetic checks, and Apache runtime metrics; arm64 operators should prefer the local build path |
 | `FoodPulse` | `cp .env.example .env && ./scripts/start.sh` | `./scripts/cluster-status.sh` after startup | `.env.example` should be used at repo root | `http://localhost:8090` | `curl -I http://localhost:8090` | `foodpulse-ui` | Good lab for StatefulSet-era concerns, with a cleaner UI/API split for future Services and probes | Workspace-owned React/Node app with observability delegated to `Obervability-Stack` |
 | `MemFlip` | `cp .env.example .env && docker compose up -d` | none yet | `.env.example` at repo root, with deeper reference in `env/env.example` | `http://localhost:8080` | `curl -fsS http://localhost:8080/api/health` | `memflip-frontend`, `memflip-backend` | Frontend and backend are now expressed through a cleaner local service boundary that maps better to future Service and probe design | Lightweight onboarding app with a clearer local browser path |
 
@@ -30,7 +30,7 @@ The following aliases match the monitored app inventory in:
 
 | App ID | Expected Alias | Repo Status |
 |---|---|---|
-| `opensis` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker` | matches `OpenSIS/docker-compose.yaml` |
+| `opensis` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker`, `opensis-apache-exporter` | matches `OpenSIS/docker-compose.yaml` |
 | `swiftpay` | `swiftpay-*` service aliases | matches `SwiftPay/docker-compose.yml` |
 | `memflip` | `memflip-frontend`, `memflip-backend` | matches `MemFlip/docker-compose.yml` |
 | `foodpulse` | `foodpulse-ui` | matches `FoodPulse/docker-compose.yml` |

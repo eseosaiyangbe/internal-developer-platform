@@ -13472,3 +13472,333 @@ Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
 - Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
 - Add Grafana panels for `opensis:vault_health`, `opensis:vault_all_required_secrets_readable`, and per-secret read status.
 - Add alerts for Vault sealed state and required secret read failures.
+
+---
+
+## 2026-04-22 05:42 EDT - OpenSIS Apache Runtime Metrics
+
+### Goal
+
+Add application runtime visibility for the OpenSIS Apache/PHP tier.
+
+The intent was to complete the OpenSIS core metrics path:
+
+- UI blackbox reachability
+- MariaDB health and saturation
+- Vault health and required secret reads
+- Apache runtime health, request traffic, bytes sent, and worker state
+
+### Commands Run
+
+Initial inspection:
+
+```bash
+git status --short
+sed -n '1,220p' OpenSIS/Dockerfile
+find OpenSIS -maxdepth 3 -type f | sort | rg 'apache|php|entrypoint|metrics|conf|Dockerfile|buildlocal'
+sed -n '1,220p' OpenSIS/docker-compose.buildlocal.yaml
+```
+
+Exporter image and Apache module checks:
+
+```bash
+docker manifest inspect lusotycoon/apache-exporter:v1.0.10 >/tmp/apache-exporter-manifest.json && jq -r '.manifests[]? | [.platform.os,.platform.architecture,.platform.variant // ""] | @tsv' /tmp/apache-exporter-manifest.json | sort -u
+docker manifest inspect bitnami/apache-exporter:latest >/tmp/bitnami-apache-exporter-manifest.json && jq -r '.manifests[]? | [.platform.os,.platform.architecture,.platform.variant // ""] | @tsv' /tmp/bitnami-apache-exporter-manifest.json | sort -u
+sed -n '1,220p' OpenSIS/docker/apache/000-default.conf && sed -n '1,220p' OpenSIS/docker/apache/security-hardening.conf
+docker compose exec -T opensis-ui apache2ctl -M | sort
+docker run --rm lusotycoon/apache-exporter:v1.0.10 --help | sed -n '1,160p'
+docker run --rm bitnami/apache-exporter:latest --help | sed -n '1,160p'
+```
+
+Static validation:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml config --quiet
+docker compose config --quiet
+docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml && docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml
+git diff --check
+```
+
+Runtime apply:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml up -d --build opensis-ui apache-exporter
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Direct Apache status and exporter validation:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml ps opensis-ui apache-exporter && docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml logs --tail=80 opensis-ui apache-exporter
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml exec -T opensis-ui sh -lc 'curl -fsS http://127.0.0.1/server-status?auto | sed -n "1,20p"'
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml exec -T apache-exporter wget -qO- http://127.0.0.1:9117/metrics | rg -n '^(apache_up|apache_accesses_total|apache_sent_kilobytes_total|apache_busy_workers|apache_idle_workers)'
+sleep 20; curl -fsS http://localhost:9090/api/v1/targets | jq -r '.data.activeTargets[] | select(.labels.job=="opensis-apache") | [.labels.job,.health,.scrapeUrl,(.lastError // "")] | @tsv'
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml exec -T apache-exporter wget -qO- http://127.0.0.1:9117/metrics | rg -n '^apache_' | sed -n '1,120p'
+```
+
+Recording-rule correction and server-status hardening:
+
+```bash
+docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml && curl -fsS -X POST http://localhost:9090/-/reload
+curl -fsS -o /tmp/opensis-status-host.txt -w '%{http_code}\n' http://localhost:8088/server-status?auto
+git diff --check
+curl -fsS -o /tmp/opensis-status-host.txt -w '%{http_code}\n' 'http://localhost:8088/server-status?auto'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:apache_up' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:apache_busy_workers' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:apache_request_rate_5m' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml config --quiet && docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml up -d --build opensis-ui apache-exporter
+curl -fsS -o /tmp/opensis-status-no-header.txt -w '%{http_code}\n' 'http://localhost:8088/server-status?auto' || true
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml exec -T apache-exporter wget -qO- http://127.0.0.1:9117/metrics | rg -n '^(apache_up|apache_workers|apache_accesses_total|apache_sent_kilobytes_total)'
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml logs --tail=50 apache-exporter opensis-ui
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml up -d --build opensis-ui apache-exporter
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml logs --tail=30 opensis-ui apache-exporter
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml exec -T apache-exporter wget -qO- http://127.0.0.1:9117/metrics | rg -n '^(apache_up|apache_workers|apache_accesses_total|apache_sent_kilobytes_total)'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:apache_up' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:apache_idle_workers' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+```
+
+Final audit validation:
+
+```bash
+./scripts/devops-monitor.sh opensis-live
+./scripts/devops-monitor.sh operator
+date '+%Y-%m-%d %H:%M:%S %Z'
+git status --short
+git diff --stat
+docker compose -f docker-compose.yaml -f docker-compose.buildlocal.yaml ps opensis-ui apache-exporter
+```
+
+### Changes Made
+
+Added:
+
+- `OpenSIS/docker/apache/status.conf`
+
+Updated:
+
+- `OpenSIS/Dockerfile`
+- `OpenSIS/docker-compose.yaml`
+- `Obervability-Stack/prometheus/prometheus.yml`
+- `Obervability-Stack/prometheus/recording_rules.yml`
+- `Obervability-Stack/scripts/opensis-live-audit.sh`
+- `METRICS-STRATEGY.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+### Why These Changes Were Made
+
+OpenSIS had blackbox UI checks, MariaDB metrics, and Vault synthetic checks, but the Apache/PHP runtime itself was still a blind spot.
+
+Apache `mod_status` is a pragmatic production-style signal for this legacy PHP runtime. It gives operators request counters, bytes sent, uptime, worker counts, load, and scoreboard state without invasive PHP application changes.
+
+The OpenSIS UI image now enables:
+
+```text
+mod_status
+ExtendedStatus On
+```
+
+The new exporter service is:
+
+```text
+apache-exporter
+```
+
+with shared control-plane alias:
+
+```text
+opensis-apache-exporter
+```
+
+Central Prometheus now scrapes:
+
+```text
+opensis-apache-exporter:9117/metrics
+```
+
+Recording rules were added:
+
+```text
+opensis:apache_up
+opensis:apache_request_rate_5m
+opensis:apache_sent_kilobytes_rate_5m
+opensis:apache_busy_workers
+opensis:apache_idle_workers
+```
+
+### Security Decision
+
+The Apache status endpoint is not left broadly readable.
+
+The endpoint requires:
+
+- source IP from loopback or private Docker/private network ranges
+- header `X-OpenSIS-Metrics: apache-exporter`
+
+The exporter sends that header with:
+
+```text
+--custom_headers=X-OpenSIS-Metrics:apache-exporter
+```
+
+This is not a replacement for real network policy in Kubernetes, but it is a good local-lab control and maps cleanly to future Service/NetworkPolicy boundaries.
+
+### Problems Encountered
+
+Problem:
+
+```text
+zsh:1: no matches found: http://localhost:8088/server-status?auto
+```
+
+Root cause:
+
+The URL contained `?auto`, and zsh treated it as a glob pattern when the URL was not quoted.
+
+Resolution:
+
+Quoted the URL:
+
+```bash
+curl -fsS -o /tmp/opensis-status-host.txt -w '%{http_code}\n' 'http://localhost:8088/server-status?auto'
+```
+
+Problem:
+
+```text
+Initial recording rules expected apache_busy_workers and apache_idle_workers.
+```
+
+Root cause:
+
+The Apache exporter actually exposes worker counts as:
+
+```text
+apache_workers{state="busy"}
+apache_workers{state="idle"}
+```
+
+Resolution:
+
+Updated recording rules to use the real metric shape.
+
+Problem:
+
+```text
+Host access to /server-status?auto initially returned 200.
+```
+
+Root cause:
+
+The initial Apache status config allowed private IP ranges so the exporter could scrape from Docker networking. Host access through the loopback-published app port still appeared from a Docker bridge address.
+
+Resolution:
+
+Added the required metrics header check. Host access without the header now returns:
+
+```text
+403
+```
+
+Problem:
+
+```text
+Apache emitted AH00558 server name warnings on startup.
+```
+
+Resolution:
+
+Added:
+
+```text
+ServerName localhost
+```
+
+to the enabled Apache status/runtime configuration.
+
+### Verification
+
+Exporter image platform support included ARM64:
+
+```text
+linux  arm64  v8
+```
+
+OpenSIS and observability Compose validation passed:
+
+```text
+docker compose config --quiet
+```
+
+Prometheus config and rules passed:
+
+```text
+SUCCESS: /etc/prometheus/prometheus.yml is valid prometheus config file syntax
+SUCCESS: 64 rules found
+```
+
+OpenSIS UI and Apache exporter were running:
+
+```text
+opensis-ui                Up ... healthy
+opensis-apache-exporter   Up
+```
+
+Apache status returned internal runtime data from inside the container:
+
+```text
+ServerVersion: Apache/2.4.66 (Debian) PHP/8.2.30
+ServerMPM: prefork
+Total Accesses: 9
+Total kBytes: 51
+```
+
+Apache exporter returned:
+
+```text
+apache_accesses_total 8
+apache_sent_kilobytes_total 36
+apache_up 1
+apache_workers{state="busy"} 1
+apache_workers{state="idle"} 5
+```
+
+Host access to the status endpoint without the metrics header was denied:
+
+```text
+403
+```
+
+Central Prometheus target was up:
+
+```text
+opensis-apache  up  http://opensis-apache-exporter:9117/metrics
+```
+
+Recording rules returned data:
+
+```text
+opensis:apache_up  1
+opensis:apache_busy_workers  1
+opensis:apache_idle_workers  5
+opensis:apache_request_rate_5m  0.06873993800309985
+```
+
+OpenSIS live audit passed:
+
+```text
+Checks passed: 39/39
+OpenSIS live integration audit passed
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Follow-Up Work
+
+- Add Grafana panels for OpenSIS Apache, Vault, and MariaDB recording rules.
+- Add actionable alerts for Apache exporter down, Apache runtime down, no idle workers, Vault sealed, Vault required-secret read failure, and MariaDB down.
+- Map these Docker Compose exporter patterns to Kubernetes Services and ServiceMonitors during the k3s phase.
