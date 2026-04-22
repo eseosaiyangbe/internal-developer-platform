@@ -111,6 +111,7 @@ Implementation status:
 - The API is scraped by central Prometheus at `foodpulse-api:4567/metrics`.
 - Recording rules are namespaced under `foodpulse:*`.
 - HTTP request count, error count, and request-duration histogram metrics are exported by the API with bounded labels.
+- The app-specific Grafana dashboard is provisioned as `FoodPulse Operations` using `foodpulse:*` and managed-app probe recording rules.
 
 ## Recommended Service Objectives
 
@@ -137,6 +138,6 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add FoodPulse, MemFlip, and SwiftPay Grafana dashboards based on the same recording-rule pattern.
+1. Add MemFlip and SwiftPay Grafana dashboards based on the same recording-rule pattern.
 2. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
 3. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.

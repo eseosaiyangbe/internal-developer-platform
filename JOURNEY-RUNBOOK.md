@@ -14389,3 +14389,186 @@ Continue the dashboard pattern in this order:
 1. FoodPulse operations dashboard
 2. MemFlip onboarding dashboard
 3. SwiftPay money-flow dashboard
+
+## 2026-04-22 06:15 EDT - FoodPulse Grafana Operations Dashboard
+
+### Objective
+
+Continue the app-specific Grafana dashboard rollout with FoodPulse after completing OpenSIS.
+
+FoodPulse was selected second because it represents the resilience and voting-behavior story. The goal was to expose the central signals we already have without pretending that every HA dependency is centrally exported yet.
+
+Current central FoodPulse coverage includes:
+
+- blackbox UI availability and latency
+- API scrape health
+- API request rate
+- API error ratio
+- API p95 latency
+- vote rate
+- pageviews
+- leading venue votes
+- API process memory
+- firing alert count for the FoodPulse service
+
+### Commands Run
+
+Checked the branch state, FoodPulse recording rules, alert rules, scrape config, and existing dashboard inventory:
+
+```bash
+git status --short --branch
+rg -n "foodpulse" Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/prometheus/prometheus.yml METRICS-STRATEGY.md
+find Obervability-Stack/grafana/dashboards -maxdepth 3 -type f -print | sort
+sed -n '1,180p' Obervability-Stack/grafana/dashboards/dashboard.yml && sed -n '90,125p' METRICS-STRATEGY.md
+```
+
+Validated the new dashboard JSON and every PromQL expression:
+
+```bash
+jq empty Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); query_status=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded" | jq -r '.status'); printf '%s\t%s\n' "$query_status" "$expr"; done
+jq '{title,uid,panels: [.panels[] | {id,title,type,exprs: [.targets[]?.expr]}]}' Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json | sed -n '1,260p'
+git diff --check
+```
+
+Reloaded Grafana dashboard provisioning and verified the dashboard through Grafana APIs:
+
+```bash
+curl -fsS -u admin:admin -X POST http://localhost:3000/api/admin/provisioning/dashboards/reload
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/foodpulse-operations | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, panels: (.dashboard.panels|length), url: .meta.url}'
+curl -fsS -u admin:admin 'http://localhost:3000/api/search?query=FoodPulse' | jq -r '.[] | [.title,.uid,.folderTitle,.url] | @tsv'
+docker exec grafana sh -c 'tail -n 80 /var/log/grafana/grafana.log 2>/dev/null || tail -n 80 /var/lib/grafana/grafana.log 2>/dev/null' | rg -n "foodpulse|FoodPulse|failed|error|duplicate|Cannot read directory|failed to search"
+```
+
+Ran the operator check:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Captured timestamp and worktree state:
+
+```bash
+date '+%Y-%m-%d %H:%M %Z'
+git status --short && git diff --stat
+```
+
+### What Changed
+
+Added:
+
+```text
+Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json
+```
+
+The dashboard is titled:
+
+```text
+FoodPulse Operations
+```
+
+It contains 13 panels:
+
+- `UI Probe`
+- `API Scrape`
+- `API Error Ratio`
+- `API p95 Latency`
+- `Firing Alerts`
+- `FoodPulse Probe Latency`
+- `API Request Rate`
+- `API Error Ratio Trend`
+- `API Latency Trend`
+- `API Process Memory`
+- `Vote Rate`
+- `Pageviews`
+- `Leading Venue Votes`
+
+Updated:
+
+```text
+METRICS-STRATEGY.md
+```
+
+FoodPulse now records dashboard coverage as implemented, and the remaining dashboard backlog is MemFlip and SwiftPay.
+
+### Why We Did This
+
+FoodPulse is the resilience and voting lab. The dashboard needs to show whether the user-facing path is alive, whether the API is healthy, whether requests are failing or slowing down, and whether voting behavior is moving.
+
+We intentionally did not add panels for PostgreSQL primary/replica health, HAProxy backend health, Redis Sentinel state, or failover topology yet because those are not centrally exported into the shared Prometheus stack today. Adding fake or unavailable panels would weaken the dashboard. The honest production-grade choice is to show the central metrics we actually have and leave dependency topology as a future instrumentation step.
+
+### Problems Found And Fixes
+
+No code conflict was present before editing.
+
+The main design constraint was metric truthfulness. `METRICS-STRATEGY.md` lists FoodPulse dependency health as a target, but current central recording rules only cover API, UI probe, and voting/business signals. The dashboard therefore avoids dependency panels until those exporters or synthetic checks are centrally wired.
+
+The Grafana provider cleanup from the previous OpenSIS step worked correctly for this new dashboard. Unlike the existing OpenSIS dashboard record in the local Grafana volume, the new FoodPulse dashboard provisioned directly under:
+
+```text
+Application Monitoring
+```
+
+### Validation
+
+Dashboard JSON passed:
+
+```text
+jq empty Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json
+```
+
+All dashboard PromQL expressions returned `success`:
+
+```text
+success	app:probe_latency_p95_seconds{app="foodpulse"}
+success	count(ALERTS{service="foodpulse",alertstate="firing"}) or vector(0)
+success	foodpulse:api_process_resident_memory_bytes
+success	foodpulse:api_up
+success	foodpulse:http_error_ratio_5m
+success	foodpulse:http_p95_latency_seconds
+success	foodpulse:http_request_rate_5m
+success	foodpulse:leading_venue_votes
+success	foodpulse:pageviews
+success	foodpulse:votes_rate_5m
+success	max(probe_success{job="blackbox-http",app="foodpulse"})
+```
+
+Grafana provisioning reload succeeded:
+
+```text
+{"message":"Dashboards config reloaded"}
+```
+
+The dashboard loaded through the Grafana API:
+
+```text
+title: FoodPulse Operations
+uid: foodpulse-operations
+folderTitle: Application Monitoring
+panels: 13
+url: /d/foodpulse-operations/foodpulse-operations
+```
+
+Grafana search found the dashboard:
+
+```text
+FoodPulse Operations	foodpulse-operations	Application Monitoring	/d/foodpulse-operations/foodpulse-operations
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+OpenSIS: healthy | primary=OpenSIS UI | latency=72ms | browser=http://localhost:8088
+SwiftPay: healthy | primary=SwiftPay Frontend | latency=2ms | browser=http://localhost:8081
+MemFlip: healthy | primary=MemFlip Frontend | latency=5ms | browser=http://localhost:8080
+FoodPulse: healthy | primary=FoodPulse UI | latency=3ms | browser=http://localhost:8090
+```
+
+### Next Step
+
+Continue the dashboard pattern in this order:
+
+1. MemFlip onboarding dashboard
+2. SwiftPay money-flow dashboard
