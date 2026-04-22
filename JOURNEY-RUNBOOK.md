@@ -15025,3 +15025,125 @@ The app-specific Grafana dashboard rollout is complete. The next production-matu
 
 - SLO burn-rate alerting after enough stable historical data exists.
 - Kubernetes preparation by mapping the Prometheus scrape jobs and dashboards to k3s-friendly `ServiceMonitor` and Grafana provisioning patterns.
+
+## 2026-04-22 - OpenSIS Vault Alert Incident Resolution
+
+### Why This Step Happened
+
+The user reported four active OpenSIS-centered alerts from the Observability Stack:
+
+```text
+NodeDown
+OpenSISVaultSyntheticExporterDown
+OpenSISVaultUnhealthy
+OpenSISVaultRequiredSecretReadFailed
+```
+
+The user also asked why the OpenSIS Operations dashboard appeared in Grafana `General` instead of `Application Monitoring`.
+
+### What We Found
+
+The OpenSIS Vault synthetic exporter container was running and correctly attached to `observability-net` with alias `opensis-vault-checker`, but Prometheus could not scrape `/metrics`.
+
+Exporter logs showed:
+
+```text
+FileNotFoundError: [Errno 2] No such file or directory: '/vault/approle-app/secret_id'
+```
+
+The real mounted AppRole volumes were:
+
+```text
+app_runtime_approle
+db_runtime_approle
+```
+
+Both volumes had `role_id` but were missing `secret_id`. The Vault bootstrap script was correctly configured to generate both files, so the issue was runtime drift after bootstrap. The Vault agents were consuming the shared `secret_id` files, which left the synthetic exporter unable to authenticate and read the required OpenSIS Vault secrets.
+
+The OpenSIS Grafana dashboard placement issue was stale live Grafana metadata. The dashboard file belonged in `Application Monitoring`, but the existing Grafana database entry still placed it in `General`.
+
+### Changes Made
+
+Updated the OpenSIS Vault synthetic exporter:
+
+```text
+OpenSIS/observability/vault-synthetic-exporter.py
+```
+
+The exporter now handles missing AppRole credential files as failed synthetic checks instead of crashing the entire `/metrics` endpoint.
+
+Updated both OpenSIS Vault agent configs:
+
+```text
+OpenSIS/vault-agent/app-config/agent-app.hcl
+OpenSIS/vault-agent/db-config/agent-db.hcl
+```
+
+Added:
+
+```hcl
+remove_secret_id_file_after_reading = false
+```
+
+This keeps the shared AppRole `secret_id` files available for both Vault agents and the synthetic exporter in the current Docker Compose architecture.
+
+### Commands Run
+
+The full command trail, evidence, root cause, and validation for this incident is documented in:
+
+```text
+INCIDENT-RESPONSE.md
+```
+
+Key repair commands:
+
+```bash
+docker compose -f OpenSIS/docker-compose.yaml up --force-recreate vault-bootstrap
+docker compose -f OpenSIS/docker-compose.yaml up -d --force-recreate vault-agent-app vault-agent-db vault-synthetic-exporter
+```
+
+Grafana dashboard folder correction:
+
+```bash
+APP_FOLDER_UID=$(curl -fsS -u admin:admin http://localhost:3000/api/folders | jq -r '.[] | select(.title=="Application Monitoring") | .uid')
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations \
+  | jq --arg folderUid "$APP_FOLDER_UID" '{dashboard: .dashboard, folderUid: $folderUid, overwrite: true, message: "Move OpenSIS Operations to Application Monitoring"}' \
+  | curl -fsS -u admin:admin -H 'Content-Type: application/json' -X POST http://localhost:3000/api/dashboards/db -d @- \
+  | jq '{status, slug, uid, url, version}'
+```
+
+### Validation
+
+OpenSIS Vault synthetic metrics now return healthy values:
+
+```text
+up{job="opensis-vault"} = 1
+opensis_vault_health_status = 1
+opensis_vault_secret_read_success = 1
+```
+
+Prometheus and Alertmanager returned no active alerts for the four OpenSIS Vault alerts.
+
+OpenSIS live audit passed:
+
+```text
+Checks passed: 39/39
+OpenSIS live integration audit passed
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+Grafana now reports:
+
+```text
+OpenSIS Operations    opensis-operations    Application Monitoring    /d/opensis-operations/opensis-operations
+```
+
+### Production Follow-Up
+
+The current fix is appropriate for the Docker Compose learning environment. Before Kubernetes production hardening, OpenSIS should use a dedicated synthetic-exporter Vault role instead of sharing app and database agent AppRole files.

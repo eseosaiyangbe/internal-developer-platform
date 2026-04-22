@@ -1548,3 +1548,168 @@ alerts: []
 - Avoid alerting on `id="/"` from cAdvisor unless the alert is explicitly named as host/Docker-VM memory pressure.
 - If we want host memory alerts, use Node Exporter host memory rules instead of cAdvisor container rules.
 - Consider adding a dedicated alert test or promtool unit test later so root-cgroup regressions are caught before reload.
+
+## IR-2026-04-22-001 - OpenSIS Vault Synthetic Exporter And Required Secret Alerts
+
+### Situation
+
+On 2026-04-22, the user reported four active Observability Stack alerts centered on OpenSIS Vault:
+
+```text
+NodeDown
+OpenSISVaultSyntheticExporterDown
+OpenSISVaultUnhealthy
+OpenSISVaultRequiredSecretReadFailed
+```
+
+The OpenSIS Operations Grafana dashboard was also visible under the `General` folder instead of `Application Monitoring`.
+
+### Severity
+
+Warning to critical, application-specific.
+
+The affected service was OpenSIS Vault observability. The OpenSIS application itself remained reachable, but the Vault synthetic monitoring path was degraded and created misleading node-down and Vault-secret-read alerts.
+
+### Commands Run
+
+```bash
+git status --short --branch
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, folderId: .meta.folderId, provisioned: .meta.provisioned, provisionedExternalId: .meta.provisionedExternalId, canSave: .meta.canSave, url: .meta.url}'
+curl -fsS 'http://localhost:9090/api/v1/alerts' | jq -r '.data.alerts[] | [.labels.alertname,.state,.labels.severity,.labels.service,.labels.component,.labels.instance,.annotations.description] | @tsv'
+curl -fsS 'http://localhost:9093/api/v2/alerts' | jq -r '.[] | [.labels.alertname,.status.state,.labels.severity,.labels.service,.labels.component,.labels.instance,.annotations.description] | @tsv'
+docker compose -f OpenSIS/docker-compose.yaml ps -a
+docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | rg 'opensis|vault|checker|mariadb|apache'
+sed -n '235,285p' OpenSIS/docker-compose.yaml
+sed -n '210,235p' Obervability-Stack/prometheus/prometheus.yml
+docker inspect opensis-vault-synthetic-exporter | jq '.[] | {name:.Name, networks:.NetworkSettings.Networks | with_entries(.value |= {aliases:.Aliases, ip:.IPAddress})}'
+docker exec prometheus sh -lc 'wget -qO- --timeout=3 http://opensis-vault-checker:9105/metrics | head -40'
+docker logs --tail=120 opensis-vault-synthetic-exporter
+sed -n '1,260p' OpenSIS/observability/vault-synthetic-exporter.py
+docker exec opensis-vault-synthetic-exporter sh -lc 'ps aux; echo; ls -la /vault/approle-app /vault/approle-db; echo; wget -S -O- --timeout=5 http://127.0.0.1:9105/metrics | head -60'
+curl -fsS 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22opensis-vault%22%7D' | jq '.data.result'
+docker exec opensis-vault-synthetic-exporter sh -lc 'echo app; ls -la /vault/approle-app; echo db; ls -la /vault/approle-db'
+docker run --rm -v devops-easy-learning_app_runtime_approle:/app -v devops-easy-learning_db_runtime_approle:/db alpine:3.20 sh -lc 'echo app volume; ls -la /app; echo db volume; ls -la /db'
+sed -n '1,220p' OpenSIS/scripts/bootstrap.sh
+docker logs --tail=160 vault-bootstrap
+docker inspect opensis-vault-synthetic-exporter vault-bootstrap vault-agent-app vault-agent-db | jq '.[] | {name:.Name, mounts:[.Mounts[] | {type:.Type,name:.Name,destination:.Destination,source:.Source}]}'
+docker volume ls | rg 'approle|opensis|devops|app_runtime|db_runtime'
+docker run --rm -v app_runtime_approle:/app:ro -v db_runtime_approle:/db:ro alpine:3.20 sh -lc 'echo app volume; ls -la /app; echo db volume; ls -la /db'
+docker logs --tail=80 vault-agent-app
+docker logs --tail=80 vault-agent-db
+sed -n '1,220p' OpenSIS/vault-agent/app-config/agent-app.hcl
+sed -n '1,220p' OpenSIS/vault-agent/db-config/agent-db.hcl
+rg -n "remove_secret_id_file_after_reading|secret_id_file_path|role_id_file_path" OpenSIS/vault-agent OpenSIS -g '*.hcl'
+docker compose -f OpenSIS/docker-compose.yaml up --force-recreate vault-bootstrap
+docker compose -f OpenSIS/docker-compose.yaml up -d --force-recreate vault-agent-app vault-agent-db vault-synthetic-exporter
+docker exec opensis-vault-synthetic-exporter sh -lc 'echo app; ls -la /vault/approle-app; echo db; ls -la /vault/approle-db'
+docker logs --tail=40 vault-agent-app
+docker logs --tail=40 vault-agent-db
+docker logs --tail=40 opensis-vault-synthetic-exporter
+docker exec prometheus sh -lc 'wget -qO- --timeout=5 http://opensis-vault-checker:9105/metrics | head -80'
+curl -fsS 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22opensis-vault%22%7D' | jq '.data.result'
+curl -fsS 'http://localhost:9090/api/v1/query?query=opensis_vault_secret_read_success' | jq '.data.result'
+curl -fsS 'http://localhost:9090/api/v1/query?query=opensis_vault_health_status' | jq '.data.result'
+APP_FOLDER_UID=$(curl -fsS -u admin:admin http://localhost:3000/api/folders | jq -r '.[] | select(.title=="Application Monitoring") | .uid')
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations | jq --arg folderUid "$APP_FOLDER_UID" '{dashboard: .dashboard, folderUid: $folderUid, overwrite: true, message: "Move OpenSIS Operations to Application Monitoring"}' | curl -fsS -u admin:admin -H 'Content-Type: application/json' -X POST http://localhost:3000/api/dashboards/db -d @- | jq '{status, slug, uid, url, version}'
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, folderId: .meta.folderId, provisioned: .meta.provisioned, canSave: .meta.canSave, url: .meta.url}'
+curl -fsS -u admin:admin 'http://localhost:3000/api/search?query=OpenSIS%20Operations' | jq -r '.[] | [.title,.uid,.folderTitle,.url] | @tsv'
+sleep 75; curl -fsS 'http://localhost:9090/api/v1/alerts' | jq -r '.data.alerts[] | select(.labels.alertname|test("NodeDown|OpenSISVaultSyntheticExporterDown|OpenSISVaultUnhealthy|OpenSISVaultRequiredSecretReadFailed")) | [.labels.alertname,.state,.labels.severity,.labels.service,.labels.component,.labels.instance,.annotations.description] | @tsv'
+curl -fsS 'http://localhost:9093/api/v2/alerts' | jq -r '.[] | select(.labels.alertname|test("NodeDown|OpenSISVaultSyntheticExporterDown|OpenSISVaultUnhealthy|OpenSISVaultRequiredSecretReadFailed")) | [.labels.alertname,.status.state,.labels.severity,.labels.service,.labels.component,.labels.instance,.annotations.description] | @tsv'
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+./Obervability-Stack/scripts/devops-monitor.sh operator
+curl -fsS 'http://localhost:9090/api/v1/alerts' | jq -r '.data.alerts[] | [.labels.alertname,.state,.labels.severity,.labels.service,.labels.component,.labels.instance] | @tsv'
+curl -fsS 'http://localhost:9093/api/v2/alerts' | jq -r '.[] | [.labels.alertname,.status.state,.labels.severity,.labels.service,.labels.component,.labels.instance] | @tsv'
+date '+%Y-%m-%d %H:%M %Z'
+```
+
+The prefixed-volume command was a mistaken inspection of unrelated volumes. The correct live volumes are `app_runtime_approle` and `db_runtime_approle`.
+
+### Evidence Found
+
+Prometheus initially had the OpenSIS Vault synthetic scrape target down:
+
+```text
+up{job="opensis-vault",instance="opensis-vault-checker:9105"} = 0
+```
+
+The exporter was running and had the expected network alias, but every `/metrics` request crashed with:
+
+```text
+FileNotFoundError: [Errno 2] No such file or directory: '/vault/approle-app/secret_id'
+```
+
+The live AppRole credential directories contained `role_id` only. The `secret_id` files were missing from both the app and database AppRole volumes.
+
+### Root Cause
+
+There were two contributing root causes:
+
+- The OpenSIS Vault synthetic exporter did not handle missing AppRole credential files safely. A missing `secret_id` raised an unhandled exception and broke the entire `/metrics` response.
+- The Vault agents consumed the shared AppRole `secret_id` files from the live Docker volumes. Because the synthetic exporter also depended on those files, the exporter lost the credential material needed for its synthetic secret-read checks.
+
+The Grafana dashboard folder issue had a separate root cause: the OpenSIS dashboard had stale live Grafana database metadata from an earlier provisioning state and remained in `General` even though the intended folder is `Application Monitoring`.
+
+### Fix Applied
+
+Updated the synthetic exporter so missing AppRole files are emitted as failed secret-read metrics instead of crashing the scrape endpoint.
+
+Updated both Vault agent configurations to preserve the AppRole secret-id file:
+
+```hcl
+remove_secret_id_file_after_reading = false
+```
+
+Re-ran `vault-bootstrap` to regenerate `role_id` and `secret_id` into the correct live volumes.
+
+Recreated `vault-agent-app`, `vault-agent-db`, and `vault-synthetic-exporter` so they loaded the corrected configuration and exporter code.
+
+Moved the live OpenSIS Grafana dashboard from `General` to `Application Monitoring` through the Grafana API.
+
+### Validation
+
+The exporter now returns metrics from inside Prometheus:
+
+```text
+opensis_vault_health_status 1
+opensis_vault_api_up 1
+opensis_vault_sealed 0
+opensis_vault_secret_read_success{secret="opensis-app",path="kv/data/dev/opensis-app"} 1
+opensis_vault_secret_read_status_code{secret="opensis-app",path="kv/data/dev/opensis-app"} 200
+opensis_vault_secret_read_success{secret="opensis-db",path="kv/data/dev/opensis-db"} 1
+opensis_vault_secret_read_status_code{secret="opensis-db",path="kv/data/dev/opensis-db"} 200
+```
+
+Prometheus and Alertmanager returned no active alerts for:
+
+```text
+NodeDown
+OpenSISVaultSyntheticExporterDown
+OpenSISVaultUnhealthy
+OpenSISVaultRequiredSecretReadFailed
+```
+
+The OpenSIS live integration audit passed:
+
+```text
+Checks passed: 39/39
+OpenSIS live integration audit passed
+```
+
+The operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+Grafana confirmed the OpenSIS dashboard is now in the correct folder:
+
+```text
+OpenSIS Operations    opensis-operations    Application Monitoring    /d/opensis-operations/opensis-operations
+```
+
+### Follow-Up
+
+For production hardening, OpenSIS should eventually use a dedicated AppRole for the synthetic exporter instead of sharing the app and database agents' AppRole files. This will reduce credential coupling and make future Kubernetes Secret or Vault Agent Injector migration cleaner.
+
+When moving to Kubernetes, model these credentials as separate Vault roles and Kubernetes-auth bindings rather than shared writable volumes.
