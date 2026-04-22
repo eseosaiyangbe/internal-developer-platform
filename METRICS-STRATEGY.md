@@ -138,5 +138,5 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 ## Next Implementation Backlog
 
 1. Add app-specific Grafana dashboards based on the new recording rules.
-2. Add SLO burn-rate style alerts after the recording rules have enough stable data.
+2. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
 3. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.

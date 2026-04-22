@@ -13802,3 +13802,242 @@ Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
 - Add Grafana panels for OpenSIS Apache, Vault, and MariaDB recording rules.
 - Add actionable alerts for Apache exporter down, Apache runtime down, no idle workers, Vault sealed, Vault required-secret read failure, and MariaDB down.
 - Map these Docker Compose exporter patterns to Kubernetes Services and ServiceMonitors during the k3s phase.
+
+## 2026-04-22 05:47 EDT - Managed App Recording Rule Alerts
+
+### Objective
+
+Turn the new managed-app recording rules into actionable Prometheus alerts before moving further into dashboards and Kubernetes packaging.
+
+This step follows the metrics roadmap by adding alert coverage for the signals we already made real:
+
+- OpenSIS MariaDB, Vault, and Apache runtime signals.
+- MemFlip backend health, error ratio, and latency.
+- FoodPulse API scrape health, error ratio, and latency.
+
+### Commands Run
+
+Checked the working tree and inspected the existing alert and recording-rule structure:
+
+```bash
+git status --short
+sed -n '1,380p' Obervability-Stack/prometheus/alert_rules.yml
+sed -n '1,260p' Obervability-Stack/prometheus/recording_rules.yml
+rg -n "runbook_url|opensis|foodpulse|memflip|swiftpay|High" Obervability-Stack/prometheus/alert_rules.yml METRICS-STRATEGY.md INCIDENT-RESPONSE.md
+sed -n '360,760p' Obervability-Stack/prometheus/alert_rules.yml
+rg -n "managed_app|OpenSISMariaDB|FoodPulse|MemFlip|application_alerts|recording" Obervability-Stack/prometheus/alert_rules.yml METRICS-STRATEGY.md JOURNEY-RUNBOOK.md INCIDENT-RESPONSE.md
+sed -n '240,430p' Obervability-Stack/prometheus/alert_rules.yml
+sed -n '120,155p' METRICS-STRATEGY.md
+tail -n 80 JOURNEY-RUNBOOK.md
+rg --files Obervability-Stack/docs | sort
+rg -n "OPENSIS|FOODPULSE|MEMFLIP|Operator Runbook|runbook" Obervability-Stack/docs Obervability-Stack/ui-next/lib -g '!**/node_modules/**'
+```
+
+Confirmed Prometheus was running before validating rule changes:
+
+```bash
+date '+%Y-%m-%d %H:%M %Z'
+docker compose -f Obervability-Stack/docker-compose.yml ps prometheus
+git diff -- Obervability-Stack/prometheus/alert_rules.yml METRICS-STRATEGY.md JOURNEY-RUNBOOK.md | sed -n '1,260p'
+```
+
+### What Changed
+
+Added a dedicated `managed_app_signal_alerts` group in:
+
+```text
+Obervability-Stack/prometheus/alert_rules.yml
+```
+
+New OpenSIS alerts:
+
+- `OpenSISMariaDBExporterDown`
+- `OpenSISMariaDBDown`
+- `OpenSISMariaDBConnectionUsageHigh`
+- `OpenSISMariaDBSlowQueriesDetected`
+- `OpenSISVaultSyntheticExporterDown`
+- `OpenSISVaultUnhealthy`
+- `OpenSISVaultRequiredSecretReadFailed`
+- `OpenSISApacheExporterDown`
+- `OpenSISApacheRuntimeDown`
+- `OpenSISApacheNoIdleWorkers`
+
+New MemFlip alerts:
+
+- `MemFlipBackendMetricsDown`
+- `MemFlipAppHealthDown`
+- `MemFlipHighAPIErrorRatio`
+- `MemFlipHighAPILatency`
+
+New FoodPulse alerts:
+
+- `FoodPulseAPIMetricsDown`
+- `FoodPulseHighAPIErrorRatio`
+- `FoodPulseHighAPILatency`
+
+Updated:
+
+```text
+METRICS-STRATEGY.md
+```
+
+The backlog now keeps Grafana dashboards next and clarifies that SLO burn-rate alerts should wait until enough stable historical data exists.
+
+### Why We Did This
+
+Recording rules made the raw metrics easier to query, but they did not yet create operator action. These alerts turn the metrics into production-style symptoms an operator can respond to.
+
+The new alerts intentionally avoid traffic-volume-only conditions. High request rate by itself is not an outage. The alert set focuses instead on:
+
+- telemetry foundations being down
+- application health being down
+- database availability and pressure
+- Vault secret-read failures
+- Apache worker exhaustion
+- persistent API error ratio
+- persistent API latency
+
+### Problems Found And Fixes
+
+No file-level conflict was present before editing.
+
+The main design problem was avoiding duplicate alert noise. The existing `application_alerts` group already covered broad blackbox and SwiftPay-specific symptoms. Instead of mixing the new rules into that group, we created `managed_app_signal_alerts` so the new alerts are clearly tied to managed-app recording rules and can later map cleanly to Kubernetes `PrometheusRule` resources.
+
+### Validation
+
+Checked Prometheus rule syntax:
+
+```bash
+docker compose -f Obervability-Stack/docker-compose.yml exec -T prometheus promtool check rules /etc/prometheus/alert_rules.yml /etc/prometheus/recording_rules.yml
+```
+
+Result:
+
+```text
+Checking /etc/prometheus/alert_rules.yml
+  SUCCESS: 57 rules found
+
+Checking /etc/prometheus/recording_rules.yml
+  SUCCESS: 64 rules found
+```
+
+Checked formatting:
+
+```bash
+git diff --check
+```
+
+Result: no output, which means no whitespace errors were detected.
+
+Reloaded Prometheus:
+
+```bash
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Confirmed the reload status and live rule group:
+
+```bash
+curl -fsS http://localhost:9090/api/v1/status/config | jq -r '.data.yaml' | rg -n "rule_files|alert_rules|recording_rules" -C 3
+curl -fsS http://localhost:9090/api/v1/status/runtimeinfo | jq -r '["reloadConfigSuccess=" + (.data.reloadConfigSuccess|tostring), "lastConfigTime=" + .data.lastConfigTime] | .[]'
+curl -fsS http://localhost:9090/api/v1/rules | jq -r '.data.groups[].name' | sort
+docker compose -f Obervability-Stack/docker-compose.yml exec -T prometheus sh -c "grep -n 'managed_app_signal_alerts' /etc/prometheus/alert_rules.yml"
+```
+
+Result:
+
+```text
+reloadConfigSuccess=true
+lastConfigTime=2026-04-22T09:48:21Z
+managed_app_signal_alerts
+464:  - name: managed_app_signal_alerts
+```
+
+The first live alert query used the wrong JSON field shape and returned no rows:
+
+```bash
+curl -fsS http://localhost:9090/api/v1/rules | jq -r '.data.groups[] | select(.name=="managed_app_signal_alerts") | .rules[] | [.name,.state] | @tsv'
+```
+
+Fix:
+
+Use the alert-rule fields explicitly:
+
+```bash
+curl -fsS http://localhost:9090/api/v1/rules | jq -r '.data.groups[] | select(.name=="managed_app_signal_alerts") | .rules[] | [.name, .type, .state] | @tsv'
+curl -fsS 'http://localhost:9090/api/v1/alerts' | jq -r '.data.alerts[] | select(.labels.service=="opensis" or .labels.service=="foodpulse" or .labels.service=="memflip") | [.labels.alertname,.state,.labels.severity,.labels.component] | @tsv'
+curl -fsS http://localhost:9090/api/v1/rules | jq '.data.groups[] | select(.name=="managed_app_signal_alerts") | .rules[0]'
+```
+
+Result:
+
+```text
+OpenSISMariaDBExporterDown	alerting	inactive
+OpenSISMariaDBDown	alerting	inactive
+OpenSISMariaDBConnectionUsageHigh	alerting	inactive
+OpenSISMariaDBSlowQueriesDetected	alerting	inactive
+OpenSISVaultSyntheticExporterDown	alerting	inactive
+OpenSISVaultUnhealthy	alerting	inactive
+OpenSISVaultRequiredSecretReadFailed	alerting	inactive
+OpenSISApacheExporterDown	alerting	inactive
+OpenSISApacheRuntimeDown	alerting	inactive
+OpenSISApacheNoIdleWorkers	alerting	inactive
+MemFlipBackendMetricsDown	alerting	inactive
+MemFlipAppHealthDown	alerting	inactive
+MemFlipHighAPIErrorRatio	alerting	inactive
+MemFlipHighAPILatency	alerting	inactive
+FoodPulseAPIMetricsDown	alerting	inactive
+FoodPulseHighAPIErrorRatio	alerting	inactive
+FoodPulseHighAPILatency	alerting	inactive
+```
+
+No OpenSIS, MemFlip, or FoodPulse alerts were firing after the reload.
+
+Tried the root-level operator command:
+
+```bash
+./scripts/devops-monitor.sh operator
+```
+
+Problem:
+
+```text
+zsh:1: no such file or directory: ./scripts/devops-monitor.sh
+```
+
+Fix:
+
+Run the script from its real repo-root path:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Result:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+OpenSIS: healthy | primary=OpenSIS UI | latency=47ms | browser=http://localhost:8088
+SwiftPay: healthy | primary=SwiftPay Frontend | latency=1ms | browser=http://localhost:8081
+MemFlip: healthy | primary=MemFlip Frontend | latency=5ms | browser=http://localhost:8080
+FoodPulse: healthy | primary=FoodPulse UI | latency=1ms | browser=http://localhost:8090
+```
+
+The operator script prints follow-up commands as `./scripts/devops-monitor.sh ...` because those paths are relative to `Obervability-Stack`. From the repository root, use `./Obervability-Stack/scripts/devops-monitor.sh ...`.
+
+Checked the final worktree summary:
+
+```bash
+git diff --stat
+git status --short
+```
+
+Result:
+
+```text
+JOURNEY-RUNBOOK.md                            | 239 +++++++++++++++++++++++++
+METRICS-STRATEGY.md                           |   2 +-
+Obervability-Stack/prometheus/alert_rules.yml | 240 ++++++++++++++++++++++++++
+3 files changed, 480 insertions(+), 1 deletion(-)
+```
