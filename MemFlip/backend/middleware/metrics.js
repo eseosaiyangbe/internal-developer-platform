@@ -40,7 +40,7 @@ const httpErrorsTotal = new prometheus.Counter({
 const gameScoresTotal = new prometheus.Counter({
   name: 'game_scores_total',
   help: 'Total number of game scores submitted',
-  labelNames: ['difficulty', 'username', 'score_range']
+  labelNames: ['difficulty', 'score_range']
 });
 
 const activeGamesGauge = new prometheus.Gauge({
@@ -254,9 +254,9 @@ const metricsEndpoint = async (req, res) => {
 // ========================================
 
 const updateGameMetrics = {
-  recordScore: (difficulty, username, score, timeSeconds) => {
+  recordScore: (difficulty, _username, score, timeSeconds) => {
     const scoreRange = getScoreRange(score);
-    gameScoresTotal.labels(difficulty, username, scoreRange).inc();
+    gameScoresTotal.labels(difficulty, scoreRange).inc();
     gameCompletionTime.labels(difficulty, 'completed').observe(timeSeconds);
   },
   

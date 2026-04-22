@@ -116,6 +116,7 @@ Read operational incident investigations here:
 | [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | How the repos fit together as one platform |
 | [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | Startup commands, ports, health checks, and aliases |
 | [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
+| [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | Production-grade metrics standards for the control plane and managed apps |
 | [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) | Dedicated incident response log for alerts, outages, fixes, and follow-ups |
 | [Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md](Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md) | Standard first-response workflow |
 

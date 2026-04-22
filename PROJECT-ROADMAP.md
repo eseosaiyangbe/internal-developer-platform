@@ -102,6 +102,7 @@ Phase 6 will be considered complete when:
 
 - the control-plane UI clearly tells the platform story
 - each app has a polished demo path and operator handoff path
+- app and platform metrics have a documented standard with central scrape coverage for exposed metric endpoints
 - the dashboard language is beginner-friendly without hiding real operational detail
 - stale UI duplicates and visual inconsistencies are removed
 - the project can be demoed end-to-end without needing verbal patch notes

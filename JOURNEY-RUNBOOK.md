@@ -12449,3 +12449,272 @@ Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
 ### Why This Matters
 
 The Demo Center makes Phase 6 more usable for real presentations. Instead of asking someone to keep several Markdown files, URLs, and commands in their head, the control plane now gives a single guided presenter path with live readiness and direct operational links.
+
+---
+
+## 2026-04-22 05:09 EDT - Metrics Strategy And Central App Scrape Coverage
+
+### Goal
+
+Turn the metrics recommendations into a clean first implementation slice without overloading the roadmap.
+
+The intent was to:
+
+- document the production-grade metrics strategy for the control plane and managed apps
+- scrape existing MemFlip and FoodPulse application metric endpoints from central Prometheus
+- keep the changes Kubernetes-minded by using stable Docker service aliases that map cleanly to future service names
+- remove unsafe high-cardinality labels from MemFlip metrics
+- validate the changes through Prometheus and existing operator audit paths
+
+### Commands Run
+
+Initial inspection:
+
+```bash
+git status --short
+sed -n '1,240p' Obervability-Stack/prometheus/prometheus.yml
+sed -n '1,320p' Obervability-Stack/prometheus/recording_rules.yml
+sed -n '1,220p' FoodPulse/docker-compose.yml
+sed -n '1,220p' MemFlip/backend/middleware/metrics.js
+sed -n '220,520p' MemFlip/backend/middleware/metrics.js
+sed -n '220,520p' FoodPulse/docker-compose.yml
+ls -1
+tail -n 80 JOURNEY-RUNBOOK.md
+sed -n '1,180p' README.md
+sed -n '1,240p' PROJECT-ROADMAP.md
+rg -n "Phase 6|metrics|Metric|observability" PROJECT-ROADMAP.md README.md WORKSPACE-ARCHITECTURE.md
+```
+
+Static validation:
+
+```bash
+docker compose config --quiet
+docker compose config --quiet
+git diff --check
+git diff --stat
+docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml
+docker compose exec -T prometheus promtool check rules /etc/prometheus/alert_rules.yml /etc/prometheus/recording_rules.yml
+git status --short
+```
+
+Runtime update:
+
+```bash
+docker compose up -d --force-recreate foodpulse-api
+docker compose up -d --build backend
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Live scrape and metric verification:
+
+```bash
+sleep 20; curl -fsS http://localhost:9090/api/v1/targets | jq -r '.data.activeTargets[] | select(.labels.job=="memflip-backend" or .labels.job=="foodpulse-api") | [.labels.job,.health,.scrapeUrl,(.lastError // "")] | @tsv'
+curl -fsS http://localhost:3101/metrics | rg -n '^game_scores_total' | head -n 10
+curl -fsS http://localhost:3102/metrics | rg -n '^(foodpulse_votes_total|foodpulse_pageviews|foodpulse_api_process_resident_memory_bytes)' | head -n 20
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=up{job=~"memflip-backend|foodpulse-api"}' | jq -r '.data.result[] | [.metric.job,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=memflip:app_health' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse:api_up' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+./scripts/devops-monitor.sh operator
+```
+
+Troubleshooting and follow-up validation:
+
+```bash
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=app_health_status{job="memflip-backend"}' | jq -r '.data.result[] | [.metric.service,.metric.component,.value[1]] | @tsv'
+curl -fsS http://localhost:3101/metrics | rg -n '^app_health_status'
+docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml && curl -fsS -X POST http://localhost:9090/-/reload
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=memflip:app_health' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse:api_up' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+./scripts/devops-monitor.sh memflip-live
+./scripts/devops-monitor.sh foodpulse-live
+docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml
+rg -n "game_scores_total|score|username" Obervability-Stack/scripts/memflip-live-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/memflip-live-audit.sh
+sed -n '250,292p' Obervability-Stack/scripts/memflip-live-audit.sh
+./scripts/devops-monitor.sh memflip-live
+git diff --check
+git diff --stat -- . ':!JOURNEY-RUNBOOK.md'
+git status --short
+date '+%Y-%m-%d %H:%M:%S %Z'
+```
+
+### Changes Made
+
+Added:
+
+- `METRICS-STRATEGY.md`
+
+Updated:
+
+- `FoodPulse/docker-compose.yml`
+- `MemFlip/backend/middleware/metrics.js`
+- `Obervability-Stack/prometheus/prometheus.yml`
+- `Obervability-Stack/prometheus/recording_rules.yml`
+- `Obervability-Stack/scripts/memflip-live-audit.sh`
+- `README.md`
+- `PROJECT-ROADMAP.md`
+
+### Why These Changes Were Made
+
+`METRICS-STRATEGY.md` was added so the project has one canonical standard for metrics instead of scattered recommendations. It defines golden signals, platform metrics, app metrics, label rules, recommended service objectives, and the next telemetry backlog.
+
+FoodPulse API was added to `observability-net` with alias `foodpulse-api` because the API already exposes `/metrics`, but central Prometheus could not scrape it over Docker DNS while it was only attached to `foodpulse-net`.
+
+Central Prometheus now scrapes:
+
+```text
+memflip-backend:3001/metrics
+foodpulse-api:4567/metrics
+```
+
+Recording rules were added under stable namespaces:
+
+```text
+memflip:*
+foodpulse:*
+app:probe_*
+```
+
+The MemFlip `game_scores_total` metric stopped using `username` as a label. This was required because user-specific labels create high cardinality, increase Prometheus memory pressure, and can leak identity-shaped data into telemetry.
+
+The README and roadmap were updated so the metrics standard is discoverable and Phase 6 has a clear observability-quality completion signal.
+
+### Problems Encountered
+
+Problem:
+
+```text
+MemFlip build reported 4 npm audit findings and warned that npm ci --only=production should be replaced by npm ci --omit=dev.
+```
+
+Resolution:
+
+This was documented as a follow-up risk and not mixed into the metrics slice. The build completed and the backend started successfully. Dependency remediation should be handled as a separate hardening task because it can alter package resolution and runtime behavior.
+
+Problem:
+
+```text
+memflip:app_health returned 0 even though Prometheus was scraping MemFlip successfully.
+```
+
+Root cause:
+
+The first recording rule used:
+
+```promql
+min(app_health_status{job="memflip-backend"} or vector(0))
+```
+
+The fallback `vector(0)` participated in the `min`, so the result became `0` even when all MemFlip health series were `1`.
+
+Resolution:
+
+The rule was corrected to:
+
+```promql
+min(app_health_status{job="memflip-backend"}) or vector(0)
+```
+
+This preserves the fallback only when the metric is absent.
+
+Problem:
+
+```text
+./scripts/devops-monitor.sh memflip-live failed 33/34 after username was removed from game_scores_total.
+```
+
+Root cause:
+
+The audit script still expected the old label shape:
+
+```text
+game_scores_total{difficulty="easy",username="..."}
+```
+
+Resolution:
+
+The audit now checks the bounded production-safe label shape:
+
+```text
+game_scores_total{difficulty="easy",score_range="beginner"}
+```
+
+### Verification
+
+Compose validation passed for FoodPulse and the observability stack:
+
+```text
+docker compose config --quiet
+```
+
+Prometheus configuration and rules passed:
+
+```text
+SUCCESS: /etc/prometheus/prometheus.yml is valid prometheus config file syntax
+SUCCESS: 40 rules found
+SUCCESS: 48 rules found
+```
+
+New scrape targets are up:
+
+```text
+foodpulse-api    up    http://foodpulse-api:4567/metrics
+memflip-backend  up    http://memflip-backend:3001/metrics
+```
+
+Prometheus query verification passed:
+
+```text
+foodpulse-api     1
+memflip-backend   1
+memflip:app_health 1
+foodpulse:api_up   1
+```
+
+MemFlip metric label verification confirmed that `username` is no longer used:
+
+```text
+game_scores_total{difficulty="easy",score_range="beginner"} 9
+```
+
+FoodPulse metric verification confirmed API metrics are exposed:
+
+```text
+foodpulse_api_process_resident_memory_bytes 65327104
+foodpulse_pageviews 9316
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+FoodPulse live integration audit passed:
+
+```text
+Checks passed: 16/16
+FoodPulse live integration audit passed
+```
+
+MemFlip live integration audit passed after updating the metric expectation:
+
+```text
+Checks passed: 34/34
+MemFlip live integration audit passed
+```
+
+Whitespace validation passed:
+
+```text
+git diff --check
+```
+
+### Follow-Up Work
+
+- Replace MemFlip Docker build command usage of `npm ci --only=production` with `npm ci --omit=dev`.
+- Review and remediate MemFlip dependency audit findings in a dedicated dependency-hardening task.
+- Add FoodPulse HTTP request duration, request total, and error counters.
+- Add central OpenSIS database/runtime exporter coverage.
+- Build Grafana dashboards from the new `memflip:*`, `foodpulse:*`, and `app:probe_*` recording rules.
