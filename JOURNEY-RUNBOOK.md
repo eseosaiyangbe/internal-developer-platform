@@ -14791,3 +14791,237 @@ FoodPulse: healthy | primary=FoodPulse UI | latency=1ms | browser=http://localho
 ### Next Step
 
 Complete this dashboard rollout with the SwiftPay money-flow dashboard.
+
+## 2026-04-22 15:25 EDT - SwiftPay Grafana Money-Flow Dashboard
+
+### Objective
+
+Complete the app-specific Grafana dashboard rollout with SwiftPay.
+
+SwiftPay was selected last because it is the flagship money-flow workload and already had the deepest alert coverage. The dashboard needed to focus on operationally important transaction signals:
+
+- frontend and service probe health
+- metrics scrape health for each SwiftPay microservice
+- pending transactions
+- pending amount
+- completed transfers
+- transaction queue depth
+- transaction failure rate
+- wallet failure rate
+- wallet circuit breaker state
+- firing alert count
+
+### Commands Run
+
+Checked repo state, SwiftPay recording rules, alert rules, scrape config, and existing dashboard inventory:
+
+```bash
+git status --short --branch
+rg -n "swiftpay" Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/prometheus/prometheus.yml METRICS-STRATEGY.md
+find Obervability-Stack/grafana/dashboards/application -maxdepth 1 -type f -print | sort
+sed -n '52,78p' METRICS-STRATEGY.md
+```
+
+Validated available SwiftPay Prometheus expressions before designing the dashboard:
+
+```bash
+sed -n '40,62p' METRICS-STRATEGY.md
+for expr in 'swiftpay:pending_transactions' 'swiftpay:pending_amount' 'swiftpay:transaction_queue_depth' 'swiftpay:completed_transfers_total' 'swiftpay:transaction_failure_rate_5m' 'swiftpay:wallet_failed_transfer_rate_5m' 'swiftpay:wallet_circuit_breaker_state' 'count(ALERTS{service="swiftpay",alertstate="firing"}) or vector(0)' 'up{job=~"swiftpay-.+"}' 'probe_success{job="blackbox-http",app="swiftpay"}' 'probe_duration_seconds{job="blackbox-http",app="swiftpay"}'; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); response=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded"); query_status=$(printf '%s' "$response" | jq -r '.status'); result_count=$(printf '%s' "$response" | jq -r '.data.result | length'); printf '%s\t%s\t%s\n' "$query_status" "$result_count" "$expr"; done
+curl -fsS 'http://localhost:9090/api/v1/query?query=probe_success%7Bjob%3D%22blackbox-http%22%2Capp%3D%22swiftpay%22%7D' | jq -r '.data.result[] | [.metric.component,.metric.instance,.value[1]] | @tsv'
+curl -fsS 'http://localhost:9090/api/v1/query?query=up%7Bjob%3D~%22swiftpay-.%2B%22%7D' | jq -r '.data.result[] | [.metric.job,.metric.instance,.value[1]] | @tsv'
+```
+
+Validated the new dashboard JSON and every dashboard PromQL expression:
+
+```bash
+jq empty Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); response=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded"); query_status=$(printf '%s' "$response" | jq -r '.status'); result_count=$(printf '%s' "$response" | jq -r '.data.result | length'); printf '%s\t%s\t%s\n' "$query_status" "$result_count" "$expr"; done
+jq '{title,uid,panels: [.panels[] | {id,title,type,exprs: [.targets[]?.expr]}]}' Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json | sed -n '1,280p'
+git diff --check
+```
+
+Reloaded Grafana provisioning and verified the dashboard:
+
+```bash
+curl -fsS -u admin:admin -X POST http://localhost:3000/api/admin/provisioning/dashboards/reload
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/swiftpay-money-flow | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, panels: (.dashboard.panels|length), url: .meta.url}'
+curl -fsS -u admin:admin 'http://localhost:3000/api/search?query=SwiftPay' | jq -r '.[] | [.title,.uid,.folderTitle,.url] | @tsv'
+docker exec grafana sh -c 'tail -n 80 /var/log/grafana/grafana.log 2>/dev/null || tail -n 80 /var/lib/grafana/grafana.log 2>/dev/null' | rg -n "swiftpay|SwiftPay|failed|error|duplicate|Cannot read directory|failed to search"
+```
+
+Ran the operator check and captured timestamp/worktree state:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+date '+%Y-%m-%d %H:%M %Z'
+git status --short && git diff --stat
+```
+
+### What Changed
+
+Added:
+
+```text
+Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json
+```
+
+The dashboard is titled:
+
+```text
+SwiftPay Money Flow
+```
+
+It contains 13 panels:
+
+- `All Probes`
+- `All Scrapes`
+- `Pending Transactions`
+- `Pending Amount`
+- `Wallet Circuit`
+- `Firing Alerts`
+- `SwiftPay Probe Latency`
+- `Completed Transfers`
+- `Pending Money Movement`
+- `Transaction Queue Depth`
+- `Failure Rates`
+- `Service Metrics Scrapes`
+- `Component Probes`
+
+Updated:
+
+```text
+METRICS-STRATEGY.md
+```
+
+SwiftPay now records dashboard coverage as implemented. The app-specific dashboard rollout is now complete for:
+
+- OpenSIS
+- FoodPulse
+- MemFlip
+- SwiftPay
+
+### Why We Did This
+
+SwiftPay is the money-flow story. This dashboard gives an operator one place to answer the highest-value operational questions:
+
+- Are all SwiftPay service health probes passing?
+- Is Prometheus scraping all SwiftPay microservices?
+- Are transactions stuck pending?
+- Is money stuck in pending state?
+- Is the transaction queue backing up?
+- Are transaction or wallet failures appearing?
+- Is the wallet circuit breaker open?
+- Are alerts firing for SwiftPay?
+
+The dashboard intentionally uses `swiftpay:*` recording rules where available so the panel contract stays stable when we later move the implementation into Kubernetes and ServiceMonitor resources.
+
+### Problems Found And Fixes
+
+#### 1. Failure-rate rules returned no data when there were no failures
+
+Pre-dashboard validation showed:
+
+```text
+success	0	swiftpay:transaction_failure_rate_5m
+success	0	swiftpay:wallet_failed_transfer_rate_5m
+```
+
+This is not a Prometheus syntax problem, but it is an operator experience problem. A healthy no-failure state should display as zero, not missing data.
+
+Fix:
+
+The dashboard uses zero fallbacks:
+
+```text
+swiftpay:transaction_failure_rate_5m or vector(0)
+swiftpay:wallet_failed_transfer_rate_5m or vector(0)
+```
+
+#### 2. Probe and scrape label shapes were verified before panel design
+
+SwiftPay blackbox components were verified:
+
+```text
+api-gateway	http://swiftpay-api-gateway:3000/health	1
+auth-service	http://swiftpay-auth-service:3004/health	1
+frontend	http://swiftpay-frontend/	1
+notification-service	http://swiftpay-notification-service:3003/health	1
+transaction-service	http://swiftpay-transaction-service:3002/health	1
+wallet-service	http://swiftpay-wallet-service:3001/health	1
+```
+
+SwiftPay scrape targets were verified:
+
+```text
+swiftpay-api-gateway	swiftpay-api-gateway:3000	1
+swiftpay-auth-service	swiftpay-auth-service:3004	1
+swiftpay-notification-service	swiftpay-notification-service:3003	1
+swiftpay-transaction-service	swiftpay-transaction-service:3002	1
+swiftpay-wallet-service	swiftpay-wallet-service:3001	1
+```
+
+### Validation
+
+Dashboard JSON passed:
+
+```text
+jq empty Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json
+```
+
+All dashboard PromQL expressions returned `success` and at least one result:
+
+```text
+success	1	count(ALERTS{service="swiftpay",alertstate="firing"}) or vector(0)
+success	1	min(probe_success{job="blackbox-http",app="swiftpay"})
+success	1	min(up{job=~"swiftpay-.+"})
+success	6	probe_duration_seconds{job="blackbox-http",app="swiftpay"}
+success	6	probe_success{job="blackbox-http",app="swiftpay"}
+success	1	swiftpay:completed_transfers_total
+success	1	swiftpay:pending_amount
+success	1	swiftpay:pending_transactions
+success	1	swiftpay:transaction_failure_rate_5m or vector(0)
+success	1	swiftpay:transaction_queue_depth
+success	1	swiftpay:wallet_circuit_breaker_state
+success	1	swiftpay:wallet_failed_transfer_rate_5m or vector(0)
+success	5	up{job=~"swiftpay-.+"}
+```
+
+Grafana provisioning reload succeeded:
+
+```text
+{"message":"Dashboards config reloaded"}
+```
+
+The dashboard loaded through the Grafana API:
+
+```text
+title: SwiftPay Money Flow
+uid: swiftpay-money-flow
+folderTitle: Application Monitoring
+panels: 13
+url: /d/swiftpay-money-flow/swiftpay-money-flow
+```
+
+Grafana search found the dashboard:
+
+```text
+SwiftPay Money Flow	swiftpay-money-flow	Application Monitoring	/d/swiftpay-money-flow/swiftpay-money-flow
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+OpenSIS: healthy | primary=OpenSIS UI | latency=132ms | browser=http://localhost:8088
+SwiftPay: healthy | primary=SwiftPay Frontend | latency=1ms | browser=http://localhost:8081
+MemFlip: healthy | primary=MemFlip Frontend | latency=6ms | browser=http://localhost:8080
+FoodPulse: healthy | primary=FoodPulse UI | latency=3ms | browser=http://localhost:8090
+```
+
+### Next Step
+
+The app-specific Grafana dashboard rollout is complete. The next production-maturity step is to decide between:
+
+- SLO burn-rate alerting after enough stable historical data exists.
+- Kubernetes preparation by mapping the Prometheus scrape jobs and dashboards to k3s-friendly `ServiceMonitor` and Grafana provisioning patterns.

@@ -52,6 +52,7 @@ Track:
 - Circuit breaker state and dependency failure counters.
 
 Primary recording rules already exist under the `swiftpay:*` namespace.
+The app-specific Grafana dashboard is provisioned as `SwiftPay Money Flow` using `swiftpay:*`, blackbox probe, and service scrape signals.
 
 ### OpenSIS
 
@@ -139,6 +140,5 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add the SwiftPay Grafana dashboard based on the same recording-rule pattern.
-2. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
-3. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
+1. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
+2. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
