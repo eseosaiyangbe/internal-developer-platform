@@ -1713,3 +1713,199 @@ OpenSIS Operations    opensis-operations    Application Monitoring    /d/opensis
 For production hardening, OpenSIS should eventually use a dedicated AppRole for the synthetic exporter instead of sharing the app and database agents' AppRole files. This will reduce credential coupling and make future Kubernetes Secret or Vault Agent Injector migration cleaner.
 
 When moving to Kubernetes, model these credentials as separate Vault roles and Kubernetes-auth bindings rather than shared writable volumes.
+
+## IR-2026-04-22-002 - Notification Inbox And Resolved History Not Displaying
+
+### Situation
+
+On 2026-04-22, the user reported that resolved history and notifications were no longer showing in the Observability Stack UI, even though the same view had worked before.
+
+### Severity
+
+Warning, control-plane visibility issue.
+
+The monitoring stack and Alertmanager delivery path were still running, but operators could not see the local notification inbox or resolved alert history in the UI.
+
+### Commands Run
+
+```bash
+git status --short --branch
+rg -n "resolved|notification|notifications|alert history|history" Obervability-Stack/ui-next Obervability-Stack -g '!node_modules' -g '!dist' -g '!build'
+docker compose -f Obervability-Stack/docker-compose.yml ps -a
+docker logs --tail=120 devops-monitor-ui
+curl -fsS 'http://localhost:4000/api/notifications/webhook?limit=20' | jq '{count: (.notifications|length), summary, notifications: [.notifications[] | {id,status,title,severity,service,alertname:.labels.alertname,receivedAt,startsAt,endsAt}]}'
+curl -fsS 'http://localhost:4000/api/alerts/history?limit=20' | jq '.'
+sed -n '1,220p' Obervability-Stack/ui-next/lib/notification-inbox.ts
+sed -n '1,140p' Obervability-Stack/ui-next/app/api/notifications/webhook/route.ts
+sed -n '1,260p' Obervability-Stack/ui-next/lib/notification-service.ts
+find Obervability-Stack/ui-next/app/api -maxdepth 4 -type f | sort | rg 'alert|notification|history'
+docker exec devops-monitor-ui sh -lc 'echo NOTIFICATION_STORE_PATH=$NOTIFICATION_STORE_PATH; ls -la /app/data || true; if [ -f "$NOTIFICATION_STORE_PATH" ]; then wc -c "$NOTIFICATION_STORE_PATH"; head -80 "$NOTIFICATION_STORE_PATH"; else echo missing-store-file; fi'
+docker inspect devops-monitor-ui | jq '.[0].Mounts'
+docker logs --tail=300 devops-monitor-ui | rg -n "Failed to|notification|webhook|Received alert|ENOENT|SyntaxError|local-inbox|clear|DELETE"
+sed -n '330,370p' Obervability-Stack/docker-compose.yml
+docker exec devops-monitor-ui sh -lc 'node -e "const fs=require(\"fs\"); const p=process.env.NOTIFICATION_STORE_PATH; const data=JSON.parse(fs.readFileSync(p,\"utf8\")); console.log({path:p,count:data.length,first:data[0]&&{status:data[0].status,title:data[0].title,receivedAt:data[0].receivedAt}})"'
+docker exec devops-monitor-ui sh -lc 'find /tmp /app -maxdepth 3 -name "*notification*" -type f -ls 2>/dev/null'
+docker exec devops-monitor-ui sh -lc 'wget -qO- "http://127.0.0.1:3000/api/notifications/webhook?limit=5" | head -c 2000'
+docker exec devops-monitor-ui sh -lc 'grep -R "devops-monitor-notifications\|notification-events\|listNotificationEvents\|MAX_EVENTS" -n /app/.next/standalone 2>/dev/null | head -40'
+docker exec devops-monitor-ui sh -lc 'tail -80 /app/data/notification-events.json'
+docker exec devops-monitor-ui sh -lc 'nl -ba /app/data/notification-events.json | sed -n "700,750p"'
+sed -n '1,220p' Obervability-Stack/ui-next/app/notifications/page.tsx
+sed -n '1,220p' Obervability-Stack/ui-next/lib/hooks/use-notification-inbox.ts
+```
+
+Repaired the live notification store:
+
+```bash
+docker exec devops-monitor-ui sh -lc 'STORE="$NOTIFICATION_STORE_PATH"; BACKUP="$STORE.corrupt-$(date +%Y%m%d%H%M%S)"; cp "$STORE" "$BACKUP"; node - "$STORE" <<'"'"'NODE'"'"'
+const fs = require("fs");
+const store = process.argv[2];
+const content = fs.readFileSync(store, "utf8");
+let parsed;
+for (let index = content.indexOf("]"); index !== -1; index = content.indexOf("]", index + 1)) {
+  const candidate = content.slice(0, index + 1);
+  try {
+    const value = JSON.parse(candidate);
+    if (Array.isArray(value)) {
+      parsed = value;
+      break;
+    }
+  } catch (_) {}
+}
+if (!parsed) {
+  throw new Error("Unable to recover a valid JSON notification array prefix");
+}
+fs.writeFileSync(store, JSON.stringify(parsed, null, 2));
+console.log(JSON.stringify({ repaired: true, events: parsed.length, store }));
+NODE
+node -e "const fs=require(\"fs\"); const p=process.env.NOTIFICATION_STORE_PATH; const data=JSON.parse(fs.readFileSync(p,\"utf8\")); console.log(JSON.stringify({valid:true,count:data.length,first:data[0]&&{status:data[0].status,title:data[0].title}}));"'
+```
+
+Rebuilt and recreated the UI after the source fix:
+
+```bash
+docker compose -f Obervability-Stack/docker-compose.yml up -d --build devops-monitor-ui
+```
+
+Sent a safe local regression test notification:
+
+```bash
+curl -fsS -X POST 'http://localhost:4000/api/notifications/webhook' -H 'Content-Type: application/json' --data '{"receiver":"web.hook","status":"resolved","alerts":[{"status":"resolved","labels":{"alertname":"NotificationStoreRegressionTest","severity":"info","app":"observability","service":"notification-inbox","component":"storage","instance":"local-test"},"annotations":{"summary":"Notification store regression test resolved","description":"Safe local regression test for notification inbox storage.","runbook_url":"http://localhost:4000/notifications"},"startsAt":"2026-04-22T19:50:00Z","endsAt":"2026-04-22T19:55:00Z","fingerprint":"notification-store-regression-test"}]}' | jq '.'
+```
+
+Verified the fixed API and store:
+
+```bash
+curl -fsS 'http://localhost:4000/api/notifications/webhook?limit=5' | jq '{count: (.notifications|length), summary, notifications: [.notifications[] | {status,title,severity,service,alertname:.labels.alertname,receivedAt}]}'
+curl -fsS 'http://localhost:4000/api/alerts' | jq '{activeCount: (.alerts|length), services, severities}'
+docker exec devops-monitor-ui sh -lc 'node -e "const fs=require(\"fs\"); const p=process.env.NOTIFICATION_STORE_PATH; const data=JSON.parse(fs.readFileSync(p,\"utf8\")); console.log(JSON.stringify({valid:true,count:data.length,resolved:data.filter(e=>e.status===\"resolved\").length,firing:data.filter(e=>e.status===\"firing\").length}));"'
+git diff --check
+date '+%Y-%m-%d %H:%M %Z'
+```
+
+### Evidence Found
+
+Alertmanager webhooks were received by the UI container. Logs included resolved OpenSIS events such as:
+
+```text
+Received alert webhook
+status: resolved
+alertname: NodeDown
+alertname: OpenSISVaultSyntheticExporterDown
+alertname: OpenSISVaultUnhealthy
+alertname: OpenSISVaultRequiredSecretReadFailed
+```
+
+The notification file existed at:
+
+```text
+/app/data/notification-events.json
+```
+
+The file was mounted on the persistent Docker volume:
+
+```text
+obervability-stack_devops_monitor_ui_data -> /app/data
+```
+
+The API returned an empty inbox because the JSON store was corrupt:
+
+```text
+SyntaxError: Unexpected non-whitespace character after JSON at position 30599
+```
+
+The file contained a complete valid JSON array followed by partial trailing content:
+
+```text
+]Vault synthetic exporter is down"
+    }
+  }
+]
+```
+
+### Root Cause
+
+The local notification inbox storage used read-modify-write JSON file writes without serialization or atomic replacement. Multiple Alertmanager webhook deliveries arrived close together, and concurrent writes corrupted `notification-events.json`.
+
+The API then treated the invalid JSON as an empty inbox, making notifications and resolved history appear missing.
+
+The Alerts page also had a `History` button that looked clickable but had no action attached.
+
+### Fix Applied
+
+Repaired the live notification store by backing up the corrupt file and preserving the valid JSON array prefix.
+
+Updated `Obervability-Stack/ui-next/lib/notification-inbox.ts` to:
+
+- serialize notification inbox mutations in-process,
+- write to a temporary file first,
+- atomically rename the temporary file into place.
+
+Updated `Obervability-Stack/ui-next/app/alerts/page.tsx` so the `History` button opens `/notifications`.
+
+Rebuilt and recreated `devops-monitor-ui`.
+
+### Validation
+
+The notification inbox API returned data again after the safe regression test:
+
+```text
+summary.total = 26
+summary.firing = 22
+summary.resolved = 4
+```
+
+The first notification after validation was:
+
+```text
+NotificationStoreRegressionTest
+status = resolved
+```
+
+The notification file parsed successfully in the running container:
+
+```text
+valid=true
+count=26
+resolved=4
+firing=22
+```
+
+The regression-test notification was then deleted so the UI only shows real operational events. Final store state:
+
+```text
+valid=true
+count=25
+resolved=3
+firing=22
+hasRegressionTest=false
+```
+
+The active alerts API returned zero current alerts, which is expected after the OpenSIS incident was resolved:
+
+```text
+activeCount=0
+```
+
+### Follow-Up
+
+For a production-grade control plane, replace JSON-file notification storage with SQLite/PostgreSQL and a retention policy. The current atomic file write is acceptable for this local Docker Compose learning stack, but database-backed event storage is the correct Kubernetes-ready path.

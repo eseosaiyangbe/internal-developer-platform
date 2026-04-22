@@ -15147,3 +15147,107 @@ OpenSIS Operations    opensis-operations    Application Monitoring    /d/opensis
 ### Production Follow-Up
 
 The current fix is appropriate for the Docker Compose learning environment. Before Kubernetes production hardening, OpenSIS should use a dedicated synthetic-exporter Vault role instead of sharing app and database agent AppRole files.
+
+## 2026-04-22 - Restored Notification Inbox And Resolved Alert History
+
+### Why This Step Happened
+
+The user reported that resolved history and notifications were no longer showing in the Observability Stack UI.
+
+### What We Found
+
+Alertmanager was still delivering webhooks to the UI container. The UI logs showed resolved OpenSIS alert notifications were received.
+
+The local notification file existed:
+
+```text
+/app/data/notification-events.json
+```
+
+However, the file was corrupted JSON. The API returned an empty inbox because the JSON parser failed.
+
+The corrupt tail looked like a concurrent write collision:
+
+```text
+]Vault synthetic exporter is down"
+    }
+  }
+]
+```
+
+The Alerts page also had a `History` button with no action attached.
+
+### Changes Made
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/lib/notification-inbox.ts
+```
+
+The local notification inbox now serializes write operations and writes atomically through a temporary file before renaming it into place.
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/app/alerts/page.tsx
+```
+
+The `History` button now opens the Notification Inbox at `/notifications`, where resolved alert history is stored.
+
+### Runtime Repair
+
+Backed up and repaired the live notification store inside the running container volume. The repaired store preserved 25 existing notification events.
+
+Rebuilt and recreated the UI:
+
+```bash
+docker compose -f Obervability-Stack/docker-compose.yml up -d --build devops-monitor-ui
+```
+
+Sent a safe local regression notification:
+
+```bash
+curl -fsS -X POST 'http://localhost:4000/api/notifications/webhook' -H 'Content-Type: application/json' --data '{"receiver":"web.hook","status":"resolved","alerts":[{"status":"resolved","labels":{"alertname":"NotificationStoreRegressionTest","severity":"info","app":"observability","service":"notification-inbox","component":"storage","instance":"local-test"},"annotations":{"summary":"Notification store regression test resolved","description":"Safe local regression test for notification inbox storage.","runbook_url":"http://localhost:4000/notifications"},"startsAt":"2026-04-22T19:50:00Z","endsAt":"2026-04-22T19:55:00Z","fingerprint":"notification-store-regression-test"}]}' | jq '.'
+```
+
+### Validation
+
+The notification API returned events again after the safe regression test:
+
+```text
+summary.total = 26
+summary.firing = 22
+summary.resolved = 4
+```
+
+The repaired store parses successfully:
+
+```text
+valid=true
+count=26
+resolved=4
+firing=22
+```
+
+The regression-test notification was removed after validation. Final store state:
+
+```text
+valid=true
+count=25
+resolved=3
+firing=22
+hasRegressionTest=false
+```
+
+The active alerts API returned:
+
+```text
+activeCount=0
+```
+
+This is expected because active alerts come from Alertmanager's current alert feed, while resolved history comes from the local Notification Inbox.
+
+### Production Follow-Up
+
+The atomic JSON-file fix is suitable for the current local Docker Compose stack. For Kubernetes and production-grade retention, move notification history to SQLite/PostgreSQL and enforce retention through a scheduled cleanup job or database TTL policy.
