@@ -13247,3 +13247,228 @@ git diff --check
 - Add OpenSIS Vault health and secret-read synthetic checks to central Prometheus.
 - Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
 - Add Grafana panels for `opensis:*` database health and saturation.
+
+---
+
+## 2026-04-22 05:32 EDT - OpenSIS Vault Synthetic Checks
+
+### Goal
+
+Add production-style Vault synthetic checks for OpenSIS.
+
+The intent was to prove more than port reachability:
+
+- Vault API is reachable
+- Vault is initialized and unsealed
+- the OpenSIS app secret path is readable through its AppRole
+- the OpenSIS DB secret path is readable through its AppRole
+- central Prometheus records these checks
+- the OpenSIS operator audit validates the new signals
+
+### Commands Run
+
+Initial inspection:
+
+```bash
+git status --short
+sed -n '1,260p' OpenSIS/docker-compose.yaml
+sed -n '260,430p' OpenSIS/docker-compose.yaml
+find OpenSIS -maxdepth 3 -type f | sort | rg 'vault|observability|scripts'
+```
+
+AppRole and Vault bootstrap inspection:
+
+```bash
+docker compose exec -T vault-agent-app sh -lc 'find /vault/approle -maxdepth 2 -type f -print -exec sh -c "printf \"--- %s\n\" \"$1\"; sed -n \"1,5p\" \"$1\"" sh {} \;'
+docker compose exec -T vault-agent-db sh -lc 'find /vault/approle -maxdepth 2 -type f -print -exec sh -c "printf \"--- %s\n\" \"$1\"; sed -n \"1,5p\" \"$1\"" sh {} \;'
+sed -n '1,220p' OpenSIS/scripts/bootstrap.sh
+sed -n '1,120p' OpenSIS/vault-bootstrap/policies/opensis-app-policy.hcl && sed -n '1,120p' OpenSIS/vault-bootstrap/policies/opensis-db-policy.hcl
+```
+
+Static validation:
+
+```bash
+python3 -m py_compile OpenSIS/observability/vault-synthetic-exporter.py && chmod +x OpenSIS/observability/vault-synthetic-exporter.py && git diff --check
+docker compose config --quiet
+docker compose config --quiet
+docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml && docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml
+```
+
+Runtime apply:
+
+```bash
+docker compose up -d vault-synthetic-exporter
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Direct checker and Prometheus target validation:
+
+```bash
+docker compose ps vault-synthetic-exporter && docker compose logs --tail=60 vault-synthetic-exporter
+docker compose exec -T vault-synthetic-exporter wget -qO- http://127.0.0.1:9105/metrics | rg -n '^(opensis_vault_health_status|opensis_vault_api_up|opensis_vault_secret_read_success|opensis_vault_secret_read_status_code)'
+sleep 20; curl -fsS http://localhost:9090/api/v1/targets | jq -r '.data.activeTargets[] | select(.labels.job=="opensis-vault") | [.labels.job,.health,.scrapeUrl,(.lastError // "")] | @tsv'
+```
+
+Recording-rule and audit validation:
+
+```bash
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:vault_health' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:vault_secret_read_success' | jq -r '.data.result[] | [.metric.secret,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:vault_all_required_secrets_readable' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+./scripts/devops-monitor.sh opensis-live
+./scripts/devops-monitor.sh operator
+date '+%Y-%m-%d %H:%M:%S %Z'
+git status --short
+git diff --stat
+```
+
+### Changes Made
+
+Added:
+
+- `OpenSIS/observability/vault-synthetic-exporter.py`
+
+Updated:
+
+- `OpenSIS/docker-compose.yaml`
+- `Obervability-Stack/prometheus/prometheus.yml`
+- `Obervability-Stack/prometheus/recording_rules.yml`
+- `Obervability-Stack/scripts/opensis-live-audit.sh`
+- `METRICS-STRATEGY.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+### Why These Changes Were Made
+
+OpenSIS depends on Vault for rendered app and database secrets. A simple Vault port check is not enough because Vault can be reachable while a required policy, AppRole, or secret path is broken.
+
+The new service:
+
+```text
+vault-synthetic-exporter
+```
+
+exposes Prometheus metrics through:
+
+```text
+opensis-vault-checker:9105/metrics
+```
+
+It checks:
+
+```text
+kv/data/dev/opensis-app
+kv/data/dev/opensis-db
+```
+
+using the existing OpenSIS AppRole credentials mounted from:
+
+```text
+app_runtime_approle
+db_runtime_approle
+```
+
+This was intentionally chosen over reading the Vault root token. The root token exists in the local lab for bootstrap, but using it for monitoring would be the wrong operational pattern. The AppRole path proves the same class of access the application and database depend on.
+
+### Problems Encountered
+
+Problem:
+
+```text
+sed: : No such file or directory
+```
+
+Root cause:
+
+The initial command used a nested `sh -c` pattern incorrectly while trying to print AppRole file contents from inside the Vault agent containers.
+
+Resolution:
+
+The command still proved the AppRole files existed:
+
+```text
+/vault/approle/secret_id
+/vault/approle/role_id
+```
+
+Then the implementation relied on the known AppRole volume paths in Compose rather than printing sensitive credential values.
+
+Problem:
+
+```text
+Need to prove secret readability without exposing Vault root-token behavior.
+```
+
+Resolution:
+
+Implemented a small Python exporter that authenticates separately through the app and DB AppRoles and reads only the matching required secret path.
+
+### Verification
+
+Python syntax validation passed:
+
+```text
+python3 -m py_compile OpenSIS/observability/vault-synthetic-exporter.py
+```
+
+OpenSIS and observability Compose validation passed:
+
+```text
+docker compose config --quiet
+```
+
+Prometheus config and recording rules passed:
+
+```text
+SUCCESS: /etc/prometheus/prometheus.yml is valid prometheus config file syntax
+SUCCESS: 59 rules found
+```
+
+The checker started successfully:
+
+```text
+opensis-vault-synthetic-exporter listening on 9105
+```
+
+Direct checker metrics returned:
+
+```text
+opensis_vault_health_status 1
+opensis_vault_api_up 1
+opensis_vault_secret_read_success{secret="opensis-app",path="kv/data/dev/opensis-app"} 1
+opensis_vault_secret_read_success{secret="opensis-db",path="kv/data/dev/opensis-db"} 1
+```
+
+Central Prometheus target was up:
+
+```text
+opensis-vault  up  http://opensis-vault-checker:9105/metrics
+```
+
+Recording rules returned healthy values:
+
+```text
+opensis:vault_health  1
+opensis-app  1
+opensis-db   1
+opensis:vault_all_required_secrets_readable  1
+```
+
+OpenSIS live audit passed:
+
+```text
+Checks passed: 33/33
+OpenSIS live integration audit passed
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+### Follow-Up Work
+
+- Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
+- Add Grafana panels for `opensis:vault_health`, `opensis:vault_all_required_secrets_readable`, and per-secret read status.
+- Add alerts for Vault sealed state and required secret read failures.

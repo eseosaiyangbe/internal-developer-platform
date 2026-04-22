@@ -70,7 +70,9 @@ Implementation status:
 - Central coverage includes blackbox UI reachability.
 - MariaDB is exported through `opensis-mysqld-exporter:9104` and recording rules are namespaced under `opensis:*`.
 - The exporter uses a dedicated database user instead of root credentials.
-- The next production-grade improvement is application runtime visibility for Apache/PHP and Vault secret-read synthetic checks.
+- Vault health and required secret-read checks are exported through `opensis-vault-checker:9105`.
+- The Vault synthetic checker authenticates through the existing OpenSIS AppRoles instead of using the Vault root token.
+- The next production-grade improvement is application runtime visibility for Apache/PHP.
 
 ### MemFlip
 
@@ -134,8 +136,7 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add Vault health and secret-read synthetic checks for OpenSIS.
-2. Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
-3. Add app-specific Grafana dashboards based on the new recording rules.
-4. Add SLO burn-rate style alerts after the recording rules have enough stable data.
-5. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
+1. Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
+2. Add app-specific Grafana dashboards based on the new recording rules.
+3. Add SLO burn-rate style alerts after the recording rules have enough stable data.
+4. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
