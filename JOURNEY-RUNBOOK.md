@@ -14041,3 +14041,351 @@ METRICS-STRATEGY.md                           |   2 +-
 Obervability-Stack/prometheus/alert_rules.yml | 240 ++++++++++++++++++++++++++
 3 files changed, 480 insertions(+), 1 deletion(-)
 ```
+
+## 2026-04-22 05:59 EDT - OpenSIS Grafana Operations Dashboard
+
+### Objective
+
+Start the app-specific Grafana dashboard work in the recommended order by building the OpenSIS dashboard first.
+
+OpenSIS was selected first because it now has the richest managed-app signal set:
+
+- blackbox UI availability and latency
+- MariaDB availability, connection saturation, and slow-query rate
+- Vault health and required secret-read checks
+- Apache runtime availability, request rate, worker pressure, and egress rate
+- firing alert count for the OpenSIS service
+
+### Commands Run
+
+Inspected the current Grafana provisioning layout and existing dashboard conventions:
+
+```bash
+find Obervability-Stack -maxdepth 5 -type f \( -iname '*dashboard*' -o -iname '*.json' -o -iname '*.yml' -o -iname '*.yaml' \) | sort
+rg -n "dashboard|dashboards|grafana|provision" Obervability-Stack/docker-compose.yml Obervability-Stack/grafana Obervability-Stack/docs METRICS-STRATEGY.md PROJECT-ROADMAP.md -g '!**/node_modules/**'
+git status --short --branch
+sed -n '1,260p' Obervability-Stack/docker-compose.yml
+sed -n '1,140p' Obervability-Stack/grafana/dashboards/dashboard.yml
+jq '{title, uid, schemaVersion, refresh, panels: [.panels[] | {id,title,type,targets: [.targets[]? | {expr, legendFormat}]}]}' Obervability-Stack/grafana/dashboards/node-exporter.json | sed -n '1,240p'
+find Obervability-Stack/grafana/dashboards -maxdepth 3 -type d -print | sort
+sed -n '1,120p' Obervability-Stack/grafana/datasources/datasource.yml
+```
+
+Created the application dashboard provider directory:
+
+```bash
+mkdir -p Obervability-Stack/grafana/dashboards/application
+```
+
+Validated the new dashboard JSON:
+
+```bash
+jq empty Obervability-Stack/grafana/dashboards/application/opensis-operations.json
+python3 -m json.tool Obervability-Stack/grafana/dashboards/application/opensis-operations.json >/tmp/opensis-dashboard.pretty.json
+git diff --check
+```
+
+Checked live Grafana datasource UIDs:
+
+```bash
+curl -fsS -u admin:admin http://localhost:3000/api/datasources | jq -r '.[] | [.name,.uid,.type,.url] | @tsv'
+```
+
+Restarted Grafana after provisioning changes:
+
+```bash
+docker compose -f Obervability-Stack/docker-compose.yml restart grafana
+for i in {1..30}; do if curl -fsS http://localhost:3000/api/health >/tmp/grafana-health.json; then cat /tmp/grafana-health.json; exit 0; fi; sleep 2; done; exit 1
+```
+
+Confirmed datasource UIDs and dashboard availability through Grafana APIs:
+
+```bash
+curl -fsS -u admin:admin http://localhost:3000/api/datasources | jq -r '.[] | [.name,.uid,.type,.url] | @tsv'
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, panels: (.dashboard.panels|length), url: .meta.url}'
+curl -fsS -u admin:admin 'http://localhost:3000/api/search?query=OpenSIS' | jq -r '.[] | [.title,.uid,.folderTitle,.url] | @tsv'
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/opensis-operations | jq -r '.dashboard.panels[] | [.id,.title,.type,([.targets[]?.expr] | join(" | "))] | @tsv'
+```
+
+Cleaned up the dashboard provider model so app and system dashboards have dedicated directories:
+
+```bash
+mkdir -p Obervability-Stack/grafana/dashboards/system Obervability-Stack/grafana/dashboards/infrastructure Obervability-Stack/grafana/dashboards/alerting
+git mv Obervability-Stack/grafana/dashboards/node-exporter.json Obervability-Stack/grafana/dashboards/system/node-exporter.json
+docker compose -f Obervability-Stack/docker-compose.yml restart grafana
+for i in {1..30}; do if curl -fsS http://localhost:3000/api/health >/tmp/grafana-health.json; then cat /tmp/grafana-health.json; exit 0; fi; sleep 2; done; exit 1
+```
+
+After review, removed the empty `infrastructure` and `alerting` provider directories from the active provider model because empty directories cannot be reliably tracked in Git without placeholder files, and placeholder files can be misread by Grafana provisioning:
+
+```bash
+rmdir Obervability-Stack/grafana/dashboards/infrastructure Obervability-Stack/grafana/dashboards/alerting
+```
+
+Inspected the mounted provisioning files inside the Grafana container:
+
+```bash
+docker exec grafana sh -c 'echo ---dashboard.yml---; sed -n "1,90p" /etc/grafana/provisioning/dashboards/dashboard.yml; echo ---dirs---; find /etc/grafana/provisioning/dashboards -maxdepth 2 -type d -print; echo ---files---; find /etc/grafana/provisioning/dashboards -maxdepth 3 -type f -print'
+docker exec grafana sh -c 'tail -n 220 /var/log/grafana/grafana.log 2>/dev/null || tail -n 220 /var/lib/grafana/grafana.log 2>/dev/null' | sed -n '120,220p'
+find Obervability-Stack/grafana/dashboards -maxdepth 3 -type d -print && find Obervability-Stack/grafana/dashboards -maxdepth 3 -type f -print | sort
+```
+
+Reloaded Grafana provisioning:
+
+```bash
+curl -fsS -u admin:admin -X POST http://localhost:3000/api/admin/provisioning/datasources/reload
+curl -fsS -u admin:admin -X POST http://localhost:3000/api/admin/provisioning/dashboards/reload
+```
+
+Validated each dashboard PromQL expression against Prometheus:
+
+```bash
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/opensis-operations.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); status=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded" | jq -r '.status'); printf '%s\t%s\n' "$status" "$expr"; done
+```
+
+The first query-validation helper failed because `status` is read-only in zsh:
+
+```text
+zsh:1: read-only variable: status
+```
+
+Fix:
+
+Use a different variable name:
+
+```bash
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/opensis-operations.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); query_status=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded" | jq -r '.status'); printf '%s\t%s\n' "$query_status" "$expr"; done
+```
+
+Ran the operator check:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+### What Changed
+
+Added:
+
+```text
+Obervability-Stack/grafana/dashboards/application/opensis-operations.json
+```
+
+The dashboard is titled:
+
+```text
+OpenSIS Operations
+```
+
+It contains 12 panels:
+
+- `UI Probe`
+- `MariaDB`
+- `Vault Health`
+- `Apache Runtime`
+- `Firing Alerts`
+- `OpenSIS Probe Latency`
+- `Apache Request Rate`
+- `MariaDB Connection Usage`
+- `MariaDB Slow Queries`
+- `Vault Required Secret Reads`
+- `Apache Worker Pool`
+- `Apache Egress`
+
+Updated:
+
+```text
+Obervability-Stack/grafana/datasources/datasource.yml
+```
+
+The datasource provisioning now assigns stable UIDs:
+
+```text
+Prometheus    prometheus
+Loki          loki
+Alertmanager  alertmanager
+Jaeger        jaeger
+TestData      testdata
+```
+
+Updated:
+
+```text
+Obervability-Stack/grafana/dashboards/dashboard.yml
+```
+
+The broad recursive default provider was removed. Dashboards now have explicit provider directories for active dashboard types:
+
+- `system`
+- `application`
+
+`infrastructure` and `alerting` providers should be added when real dashboards exist for those categories.
+
+Moved:
+
+```text
+Obervability-Stack/grafana/dashboards/node-exporter.json
+```
+
+to:
+
+```text
+Obervability-Stack/grafana/dashboards/system/node-exporter.json
+```
+
+Updated:
+
+```text
+METRICS-STRATEGY.md
+```
+
+OpenSIS now records dashboard coverage as implemented, and the next dashboard backlog is FoodPulse, MemFlip, and SwiftPay.
+
+### Why We Did This
+
+The previous metrics work gave us raw signals and recording rules. Grafana turns those signals into an operator-facing view.
+
+This matters because a real platform does not ask an operator to remember PromQL during an incident. The dashboard should answer the first questions quickly:
+
+- Is the app reachable?
+- Is the database up and saturated?
+- Is Vault healthy and are required secrets readable?
+- Is Apache serving traffic?
+- Are Apache workers becoming exhausted?
+- Are OpenSIS alerts firing?
+
+The dashboard is also Kubernetes-minded. It uses recording rules and stable datasource UIDs, so the same panel queries can later move behind Kubernetes `ServiceMonitor` and Grafana provisioning without rewriting the operational story.
+
+### Problems Found And Fixes
+
+#### 1. Grafana datasource UIDs were auto-generated
+
+Live Grafana initially showed generated datasource UIDs:
+
+```text
+Prometheus  PBFA97CFB590B2093
+Loki        P8E80F9AEF21F6940
+```
+
+That is fragile for provisioned dashboards because a recreated Grafana volume can change UIDs.
+
+Fix:
+
+Added stable `uid` values in `Obervability-Stack/grafana/datasources/datasource.yml`.
+
+#### 2. Dashboard provider directories were referenced but missing
+
+`dashboard.yml` referenced `system`, `application`, `infrastructure`, and `alerting`, but those directories were not all present.
+
+Fix:
+
+Created the active provider directories and moved the node exporter dashboard into `system`.
+
+Follow-up correction:
+
+Removed inactive empty providers for `infrastructure` and `alerting`. They should not be active until there are real dashboards to provision.
+
+#### 3. The broad default provider caught subdirectory dashboards
+
+The original default provider pointed at the dashboard root and used `foldersFromFilesStructure: true`. That could catch dashboards from subdirectories before the app-specific provider.
+
+Fix:
+
+Removed the broad default provider and made each provider explicit.
+
+#### 4. Existing Grafana volume kept older folder metadata
+
+After the provider cleanup, the live API still reported the OpenSIS and node exporter dashboards under `General`.
+
+Evidence:
+
+```text
+OpenSIS Operations  opensis-operations  /d/opensis-operations/opensis-operations
+Node Exporter Dashboard  node-exporter  /d/node-exporter/node-exporter-dashboard
+```
+
+Grafana's live database already had provisioned dashboard records from the previous provider layout. We did not wipe the Grafana volume because that would be destructive to local state and unnecessary for the code change.
+
+Decision:
+
+Leave the code in the correct future-safe shape and document that existing local Grafana state may keep old folder metadata until the volume is recreated or manually cleaned. Fresh environments should provision with the explicit provider layout.
+
+#### 5. zsh reserves `status`
+
+The first PromQL validation loop used `status` as a variable and failed:
+
+```text
+zsh:1: read-only variable: status
+```
+
+Fix:
+
+Renamed the variable to `query_status`.
+
+### Validation
+
+Grafana health passed after restart:
+
+```text
+{
+  "commit": "81d85ce802",
+  "database": "ok",
+  "version": "10.0.0"
+}
+```
+
+Datasource UIDs are now stable:
+
+```text
+Alertmanager  alertmanager  alertmanager  http://alertmanager:9093
+Jaeger        jaeger        jaeger        http://jaeger:16686
+Loki          loki          loki          http://loki:3100
+Prometheus    prometheus    prometheus    http://prometheus:9090
+TestData      testdata      testdata
+```
+
+The OpenSIS dashboard loads through the Grafana API:
+
+```text
+title: OpenSIS Operations
+uid: opensis-operations
+panels: 12
+url: /d/opensis-operations/opensis-operations
+```
+
+All dashboard PromQL expressions returned `success`:
+
+```text
+success	app:probe_latency_p95_seconds{app="opensis"}
+success	count(ALERTS{service="opensis",alertstate="firing"}) or vector(0)
+success	max(probe_success{job="blackbox-http",app="opensis"})
+success	opensis:apache_busy_workers
+success	opensis:apache_idle_workers
+success	opensis:apache_request_rate_5m
+success	opensis:apache_sent_kilobytes_rate_5m * 1024
+success	opensis:apache_up
+success	opensis:mariadb_connection_usage_percent
+success	opensis:mariadb_slow_queries_rate_5m
+success	opensis:mariadb_up
+success	opensis:vault_health
+success	opensis:vault_secret_read_success
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+OpenSIS: healthy | primary=OpenSIS UI | latency=62ms | browser=http://localhost:8088
+SwiftPay: healthy | primary=SwiftPay Frontend | latency=1ms | browser=http://localhost:8081
+MemFlip: healthy | primary=MemFlip Frontend | latency=4ms | browser=http://localhost:8080
+FoodPulse: healthy | primary=FoodPulse UI | latency=3ms | browser=http://localhost:8090
+```
+
+### Next Step
+
+Continue the dashboard pattern in this order:
+
+1. FoodPulse operations dashboard
+2. MemFlip onboarding dashboard
+3. SwiftPay money-flow dashboard

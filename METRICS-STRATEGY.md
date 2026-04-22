@@ -73,7 +73,7 @@ Implementation status:
 - Vault health and required secret-read checks are exported through `opensis-vault-checker:9105`.
 - The Vault synthetic checker authenticates through the existing OpenSIS AppRoles instead of using the Vault root token.
 - Apache runtime metrics are exported through `opensis-apache-exporter:9117` using Apache `mod_status`.
-- The next production-grade improvement is Grafana dashboards and actionable alerts for the new `opensis:*` signals.
+- The first app-specific Grafana dashboard is provisioned as `OpenSIS Operations` using the new `opensis:*` and managed-app probe recording rules.
 
 ### MemFlip
 
@@ -137,6 +137,6 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add app-specific Grafana dashboards based on the new recording rules.
+1. Add FoodPulse, MemFlip, and SwiftPay Grafana dashboards based on the same recording-rule pattern.
 2. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
 3. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
