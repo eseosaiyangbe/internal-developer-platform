@@ -14572,3 +14572,222 @@ Continue the dashboard pattern in this order:
 
 1. MemFlip onboarding dashboard
 2. SwiftPay money-flow dashboard
+
+## 2026-04-22 15:18 EDT - MemFlip Grafana Onboarding Dashboard
+
+### Objective
+
+Continue the app-specific Grafana dashboard rollout with MemFlip after OpenSIS and FoodPulse.
+
+MemFlip was selected third because it represents the smallest repeatable app onboarding pattern. The dashboard should teach what a lightweight app needs to expose to become a first-class managed workload:
+
+- frontend probe health
+- backend probe health
+- backend metrics scrape health
+- app health signal
+- request rate
+- error ratio
+- p95 latency
+- active games
+- completed games
+- firing alert count
+
+### Commands Run
+
+Checked repo state, MemFlip recording rules, alert rules, scrape config, and current dashboard inventory:
+
+```bash
+git status --short --branch
+rg -n "memflip" Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/prometheus/prometheus.yml METRICS-STRATEGY.md
+find Obervability-Stack/grafana/dashboards/application -maxdepth 1 -type f -print | sort
+sed -n '78,105p' METRICS-STRATEGY.md
+```
+
+Validated the dashboard JSON and PromQL expressions:
+
+```bash
+jq empty Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); query_status=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded" | jq -r '.status'); result_count=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded" | jq -r '.data.result | length'); printf '%s\t%s\t%s\n' "$query_status" "$result_count" "$expr"; done
+curl -fsS 'http://localhost:9090/api/v1/query?query=probe_success%7Bjob%3D%22blackbox-http%22%2Capp%3D%22memflip%22%7D' | jq -r '.data.result[] | [.metric.component,.metric.instance,.value[1]] | @tsv'
+git diff --check
+```
+
+The first validation pass found that the MemFlip error-ratio recording rule returned no series when no error metric samples existed:
+
+```text
+success	0	memflip:http_error_ratio_5m
+```
+
+Fixed the dashboard expression by using a zero fallback:
+
+```text
+memflip:http_error_ratio_5m or vector(0)
+```
+
+Revalidated:
+
+```bash
+jq empty Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json
+jq -r '.. | objects | select(has("expr")) | .expr' Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json | sort -u | while IFS= read -r expr; do encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$expr"); response=$(curl -fsS "http://localhost:9090/api/v1/query?query=$encoded"); query_status=$(printf '%s' "$response" | jq -r '.status'); result_count=$(printf '%s' "$response" | jq -r '.data.result | length'); printf '%s\t%s\t%s\n' "$query_status" "$result_count" "$expr"; done
+jq '{title,uid,panels: [.panels[] | {id,title,type,exprs: [.targets[]?.expr]}]}' Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json | sed -n '1,260p'
+```
+
+Reloaded Grafana provisioning and checked the dashboard:
+
+```bash
+curl -fsS -u admin:admin -X POST http://localhost:3000/api/admin/provisioning/dashboards/reload
+curl -fsS -u admin:admin http://localhost:3000/api/dashboards/uid/memflip-onboarding | jq '{title: .dashboard.title, uid: .dashboard.uid, folderTitle: .meta.folderTitle, panels: (.dashboard.panels|length), url: .meta.url}'
+curl -fsS -u admin:admin 'http://localhost:3000/api/search?query=MemFlip' | jq -r '.[] | [.title,.uid,.folderTitle,.url] | @tsv'
+docker exec grafana sh -c 'tail -n 80 /var/log/grafana/grafana.log 2>/dev/null || tail -n 80 /var/lib/grafana/grafana.log 2>/dev/null' | rg -n "memflip|MemFlip|failed|error|duplicate|Cannot read directory|failed to search"
+```
+
+Ran the operator check and captured timestamp/worktree state:
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+date '+%Y-%m-%d %H:%M %Z'
+git status --short && git diff --stat
+```
+
+### What Changed
+
+Added:
+
+```text
+Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json
+```
+
+The dashboard is titled:
+
+```text
+MemFlip Onboarding
+```
+
+It contains 12 panels:
+
+- `Frontend Probe`
+- `Backend Probe`
+- `App Health`
+- `API Error Ratio`
+- `Firing Alerts`
+- `MemFlip Probe Latency`
+- `Backend Request Rate`
+- `Backend Error Ratio Trend`
+- `Backend Latency Trend`
+- `Active Games`
+- `Completed Games`
+- `Backend Metrics Scrape`
+
+Updated:
+
+```text
+METRICS-STRATEGY.md
+```
+
+MemFlip now records dashboard coverage as implemented, and the remaining app dashboard backlog is SwiftPay.
+
+### Why We Did This
+
+MemFlip is not the flagship workload. Its value is showing the smallest repeatable onboarding path for a browser-first app:
+
+- blackbox probes prove user-facing reachability
+- backend scrape health proves central Prometheus can collect app metrics
+- app health proves the backend can report its own internal state
+- request, error, and latency panels provide a basic service-quality view
+- active/completed game panels prove the app is doing business work
+
+This is the right dashboard pattern for small services we onboard later. It is intentionally compact compared with OpenSIS and FoodPulse.
+
+### Problems Found And Fixes
+
+#### 1. Error ratio returned no data when there were no errors
+
+Initial validation showed:
+
+```text
+success	0	memflip:http_error_ratio_5m
+```
+
+That is a bad dashboard experience because a healthy zero-error state can look like missing telemetry.
+
+Fix:
+
+The dashboard uses:
+
+```text
+memflip:http_error_ratio_5m or vector(0)
+```
+
+This keeps the panel honest: if no error series exists, the dashboard displays `0`.
+
+#### 2. Probe labels were verified before relying on component filters
+
+Checked live blackbox probe labels:
+
+```text
+backend	http://memflip-backend:3001/health	1
+frontend	http://memflip-frontend/api/health	1
+```
+
+This confirmed that `component="frontend"` and `component="backend"` are safe for the dashboard stat panels.
+
+### Validation
+
+Dashboard JSON passed:
+
+```text
+jq empty Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json
+```
+
+All dashboard PromQL expressions returned `success` and at least one result after the error-ratio fallback:
+
+```text
+success	1	count(ALERTS{service="memflip",alertstate="firing"}) or vector(0)
+success	1	max(probe_success{job="blackbox-http",app="memflip",component="backend"})
+success	1	max(probe_success{job="blackbox-http",app="memflip",component="frontend"})
+success	1	memflip:active_games
+success	1	memflip:app_health
+success	1	memflip:games_completed_rate_5m
+success	1	memflip:http_error_ratio_5m or vector(0)
+success	1	memflip:http_p95_latency_seconds
+success	1	memflip:http_request_rate_5m
+success	2	probe_duration_seconds{job="blackbox-http",app="memflip"}
+success	1	up{job="memflip-backend"}
+```
+
+Grafana provisioning reload succeeded:
+
+```text
+{"message":"Dashboards config reloaded"}
+```
+
+The dashboard loaded through the Grafana API:
+
+```text
+title: MemFlip Onboarding
+uid: memflip-onboarding
+folderTitle: Application Monitoring
+panels: 12
+url: /d/memflip-onboarding/memflip-onboarding
+```
+
+Grafana search found the dashboard:
+
+```text
+MemFlip Onboarding	memflip-onboarding	Application Monitoring	/d/memflip-onboarding/memflip-onboarding
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+OpenSIS: healthy | primary=OpenSIS UI | latency=81ms | browser=http://localhost:8088
+SwiftPay: healthy | primary=SwiftPay Frontend | latency=0ms | browser=http://localhost:8081
+MemFlip: healthy | primary=MemFlip Frontend | latency=2ms | browser=http://localhost:8080
+FoodPulse: healthy | primary=FoodPulse UI | latency=1ms | browser=http://localhost:8090
+```
+
+### Next Step
+
+Complete this dashboard rollout with the SwiftPay money-flow dashboard.

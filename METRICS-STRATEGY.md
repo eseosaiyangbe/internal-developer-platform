@@ -92,6 +92,7 @@ Implementation status:
 - The backend is scraped by central Prometheus through `memflip-backend:3001`.
 - Recording rules are namespaced under `memflip:*`.
 - Username was removed from the game score metric label set to avoid high-cardinality telemetry.
+- The app-specific Grafana dashboard is provisioned as `MemFlip Onboarding` using `memflip:*`, blackbox probe, and backend scrape recording rules.
 
 ### FoodPulse
 
@@ -138,6 +139,6 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add MemFlip and SwiftPay Grafana dashboards based on the same recording-rule pattern.
+1. Add the SwiftPay Grafana dashboard based on the same recording-rule pattern.
 2. Add SLO burn-rate style alerts after the recording rules have enough stable historical data.
 3. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
