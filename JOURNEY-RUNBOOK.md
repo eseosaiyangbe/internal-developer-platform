@@ -12718,3 +12718,240 @@ git diff --check
 - Add FoodPulse HTTP request duration, request total, and error counters.
 - Add central OpenSIS database/runtime exporter coverage.
 - Build Grafana dashboards from the new `memflip:*`, `foodpulse:*`, and `app:probe_*` recording rules.
+
+---
+
+## 2026-04-22 05:17 EDT - FoodPulse API HTTP Metrics
+
+### Goal
+
+Complete the next metrics roadmap step by adding production-grade HTTP metrics to the FoodPulse API.
+
+The intent was to track:
+
+- request count
+- error count
+- p95 latency
+- central Prometheus recording rules
+- operator audit coverage for the new metrics path
+
+### Commands Run
+
+Commit the previous metrics strategy checkpoint:
+
+```bash
+git status --short
+git diff --stat
+git branch --show-current
+git add FoodPulse/docker-compose.yml JOURNEY-RUNBOOK.md MemFlip/backend/middleware/metrics.js Obervability-Stack/prometheus/prometheus.yml Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/scripts/memflip-live-audit.sh PROJECT-ROADMAP.md README.md METRICS-STRATEGY.md && git commit -m "Add managed app metrics strategy"
+```
+
+Inspect FoodPulse API and current git state:
+
+```bash
+sed -n '1,260p' FoodPulse/api/src/index.js
+sed -n '260,620p' FoodPulse/api/src/index.js
+cat FoodPulse/api/package.json
+git status --short
+```
+
+Validate syntax and Prometheus rules:
+
+```bash
+node --check src/index.js
+docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml
+git diff --check
+```
+
+Rebuild/restart FoodPulse API and reload Prometheus:
+
+```bash
+docker compose up -d --build foodpulse-api
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Generate traffic and verify direct API metrics:
+
+```bash
+curl -fsS http://localhost:3102/health >/dev/null && curl -fsS http://localhost:3102/api/getstats >/dev/null && curl -fsS http://localhost:3102/api/venues >/dev/null && curl -fsS http://localhost:3102/api/vote >/dev/null || true; curl -fsS http://localhost:3102/metrics | rg -n '^(foodpulse_http_requests_total|foodpulse_http_errors_total|foodpulse_http_request_duration_seconds_bucket)' | head -n 40
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse_http_requests_total{job="foodpulse-api"}' | jq -r '.data.result[] | [.metric.route,.metric.status_code,.value[1]] | @tsv' | head -n 20
+sleep 20; curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse:http_p95_latency_seconds' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+curl -fsS http://localhost:3102/api/venues | jq -r '.venues[0].slug'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse:http_request_rate_5m' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=foodpulse:http_error_rate_5m' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+```
+
+Extend and verify the FoodPulse operator audit:
+
+```bash
+sed -n '1,260p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+./scripts/devops-monitor.sh foodpulse-live
+./scripts/devops-monitor.sh operator
+git diff --check
+date '+%Y-%m-%d %H:%M:%S %Z'
+git status --short
+git diff --stat
+```
+
+### Changes Made
+
+Updated:
+
+- `FoodPulse/api/src/index.js`
+- `Obervability-Stack/prometheus/recording_rules.yml`
+- `Obervability-Stack/scripts/foodpulse-live-audit.sh`
+- `METRICS-STRATEGY.md`
+
+### Why These Changes Were Made
+
+FoodPulse previously exported useful business metrics, but it did not expose HTTP service metrics. That meant operators could see votes and pageviews, but not request throughput, error throughput, or latency from the API itself.
+
+The API now exports:
+
+```text
+foodpulse_http_requests_total
+foodpulse_http_errors_total
+foodpulse_http_request_duration_seconds
+```
+
+The metric labels are intentionally bounded:
+
+```text
+method
+route
+status_code
+error_class
+```
+
+No user input, session ID, request ID, or free-form value is used as a label.
+
+Central recording rules were added:
+
+```text
+foodpulse:http_request_rate_5m
+foodpulse:http_error_rate_5m
+foodpulse:http_error_ratio_5m
+foodpulse:http_p95_latency_seconds
+```
+
+The FoodPulse live audit now checks central Prometheus for:
+
+- FoodPulse API scrape health
+- FoodPulse HTTP request metrics
+- FoodPulse p95 latency recording rule data
+
+### Problems Encountered
+
+Problem:
+
+```text
+curl: (22) The requested URL returned error: 400
+```
+
+Root cause:
+
+The command intentionally called:
+
+```text
+http://localhost:3102/api/vote
+```
+
+without the required `venueSlug` or `restaurant` query parameter.
+
+Resolution:
+
+This was left as an intentional negative-path check. It verified that `foodpulse_http_errors_total` records client errors correctly.
+
+Problem:
+
+```text
+The previous metrics strategy slice was still uncommitted at the start of this step.
+```
+
+Resolution:
+
+Committed it first as:
+
+```text
+23b3323 Add managed app metrics strategy
+```
+
+This created a clean checkpoint before modifying FoodPulse API instrumentation.
+
+### Verification
+
+FoodPulse API syntax validation passed:
+
+```text
+node --check src/index.js
+```
+
+Prometheus recording rules passed:
+
+```text
+SUCCESS: 52 rules found
+```
+
+FoodPulse API image rebuilt and restarted successfully:
+
+```text
+Image foodpulse-api:local Built
+Container foodpulse-api Started
+```
+
+FoodPulse API image dependency install reported:
+
+```text
+found 0 vulnerabilities
+```
+
+Direct `/metrics` output included HTTP histogram data:
+
+```text
+foodpulse_http_request_duration_seconds_bucket{le="0.05",method="GET",route="/health",status_code="200"} 1
+foodpulse_http_request_duration_seconds_bucket{le="0.005",method="GET",route="/api/vote",status_code="400"} 1
+```
+
+Prometheus saw FoodPulse HTTP request metrics:
+
+```text
+/api/getstats  200  3
+/api/health    200  1
+/api/venues    200  1
+/api/vote      400  1
+/metrics       200  2
+```
+
+Prometheus recording rules returned data:
+
+```text
+foodpulse:http_p95_latency_seconds  0.22764321213706512
+foodpulse:http_request_rate_5m      0.010129777777777777
+foodpulse:http_error_rate_5m        0
+```
+
+FoodPulse live audit passed after adding metric checks:
+
+```text
+Checks passed: 23/23
+FoodPulse live integration audit passed
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+Whitespace validation passed:
+
+```text
+git diff --check
+```
+
+### Follow-Up Work
+
+- Decide whether to expose these FoodPulse HTTP metrics directly on the app detail page in the control-plane UI.
+- Add OpenSIS MariaDB exporter coverage as the next metrics maturity step.
+- Add Grafana dashboards using the new FoodPulse recording rules.

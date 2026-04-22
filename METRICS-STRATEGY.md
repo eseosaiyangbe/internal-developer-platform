@@ -102,6 +102,7 @@ Implementation status:
 - The API is attached to `observability-net` as `foodpulse-api`.
 - The API is scraped by central Prometheus at `foodpulse-api:4567/metrics`.
 - Recording rules are namespaced under `foodpulse:*`.
+- HTTP request count, error count, and request-duration histogram metrics are exported by the API with bounded labels.
 
 ## Recommended Service Objectives
 
@@ -128,9 +129,8 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add FoodPulse HTTP request duration, request total, and error counters in the API middleware.
-2. Add OpenSIS MariaDB exporter coverage to the central stack.
-3. Add Vault health and secret-read synthetic checks for OpenSIS.
-4. Add app-specific Grafana dashboards based on the new recording rules.
-5. Add SLO burn-rate style alerts after the recording rules have enough stable data.
-6. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
+1. Add OpenSIS MariaDB exporter coverage to the central stack.
+2. Add Vault health and secret-read synthetic checks for OpenSIS.
+3. Add app-specific Grafana dashboards based on the new recording rules.
+4. Add SLO burn-rate style alerts after the recording rules have enough stable data.
+5. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.
