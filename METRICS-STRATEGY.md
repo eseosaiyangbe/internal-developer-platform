@@ -65,7 +65,12 @@ Track:
 - Vault availability and secret-read path health.
 - Login flow health and operator-relevant error patterns from logs.
 
-Current central coverage is blackbox-first. The next production-grade improvement is adding MariaDB and application runtime exporters to the shared observability stack.
+Implementation status:
+
+- Central coverage includes blackbox UI reachability.
+- MariaDB is exported through `opensis-mysqld-exporter:9104` and recording rules are namespaced under `opensis:*`.
+- The exporter uses a dedicated database user instead of root credentials.
+- The next production-grade improvement is application runtime visibility for Apache/PHP and Vault secret-read synthetic checks.
 
 ### MemFlip
 
@@ -129,8 +134,8 @@ Alerts should be actionable and tied to runbooks. The preferred pattern is:
 
 ## Next Implementation Backlog
 
-1. Add OpenSIS MariaDB exporter coverage to the central stack.
-2. Add Vault health and secret-read synthetic checks for OpenSIS.
+1. Add Vault health and secret-read synthetic checks for OpenSIS.
+2. Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
 3. Add app-specific Grafana dashboards based on the new recording rules.
 4. Add SLO burn-rate style alerts after the recording rules have enough stable data.
 5. Add Kubernetes `ServiceMonitor` or scrape annotations when the project moves to k3s.

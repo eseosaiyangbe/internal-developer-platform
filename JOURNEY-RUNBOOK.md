@@ -12955,3 +12955,295 @@ git diff --check
 - Decide whether to expose these FoodPulse HTTP metrics directly on the app detail page in the control-plane UI.
 - Add OpenSIS MariaDB exporter coverage as the next metrics maturity step.
 - Add Grafana dashboards using the new FoodPulse recording rules.
+
+---
+
+## 2026-04-22 05:25 EDT - OpenSIS MariaDB Exporter Coverage
+
+### Goal
+
+Add deeper OpenSIS observability by promoting MariaDB metrics into the shared control plane.
+
+The intent was to move OpenSIS beyond UI blackbox checks and give operators database-level visibility for:
+
+- MariaDB exporter/database health
+- active connections
+- connection utilization
+- slow query rate
+- operator audit validation
+
+### Commands Run
+
+Initial inspection:
+
+```bash
+git status --short
+sed -n '1,280p' OpenSIS/docker-compose.yml
+find OpenSIS -maxdepth 3 -type f \( -name '*prometheus*' -o -name '*exporter*' -o -name '*.env*' -o -name '*runbook*' \) | sort
+sed -n '1,240p' OpenSIS/observability/prometheus/prometheus.yml
+find OpenSIS -maxdepth 4 -type f \( -name 'docker-compose*.yml' -o -name 'compose*.yml' -o -name 'Dockerfile' \) | sort
+rg -n "mysqld-exporter|opensis-db|observability-net|mysql|mariadb|3306|9104" OpenSIS
+sed -n '1,260p' OpenSIS/observability/mysqld-exporter-my.cnf
+sed -n '1,260p' WORKSPACE-SETUP-MATRIX.md
+sed -n '220,390p' OpenSIS/docker-compose.yaml
+sed -n '1,140p' OpenSIS/docker-compose.yaml
+sed -n '140,230p' OpenSIS/docker-compose.yaml
+sed -n '1,220p' OpenSIS/scripts/compose-start.sh
+```
+
+Exporter behavior and credential model checks:
+
+```bash
+sed -n '1,120p' OpenSIS/vault-agent/db-templates/db.env.tpl
+sed -n '1,120p' OpenSIS/vault-agent/app-templates/app.env.tpl
+docker compose ps
+docker run --rm prom/mysqld-exporter:v0.17.2 --help | sed -n '1,120p'
+docker run --rm --entrypoint which prom/mysqld-exporter:v0.17.2 mysqld_exporter
+sed -n '1,120p' OpenSIS/scripts/mariadb-entrypoint.sh
+docker compose exec -T opensis-db sh -lc '. /run/secrets/db.env && mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -Nse "SELECT user, host FROM mysql.user ORDER BY user, host"'
+sed -n '1,160p' OpenSIS/scripts/seed.sh
+sed -n '1,140p' OpenSIS/.env.example
+sed -n '1,140p' OpenSIS/.env
+git ls-files OpenSIS/.env OpenSIS/.env.example
+```
+
+Audit and recording-rule inspection:
+
+```bash
+sed -n '1,300p' Obervability-Stack/scripts/opensis-live-audit.sh
+rg -n "opensis|mariadb|mysql|recording" Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/prometheus/prometheus.yml METRICS-STRATEGY.md WORKSPACE-SETUP-MATRIX.md
+```
+
+Static validation:
+
+```bash
+chmod +x OpenSIS/observability/mysqld-exporter-entrypoint.sh && git diff --check
+docker compose config --quiet
+docker compose config --quiet
+docker compose exec -T prometheus promtool check config /etc/prometheus/prometheus.yml && docker compose exec -T prometheus promtool check rules /etc/prometheus/recording_rules.yml
+```
+
+Runtime apply:
+
+```bash
+docker compose up -d --force-recreate opensis-db mysqld-exporter
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+Direct exporter and OpenSIS UI validation:
+
+```bash
+docker compose ps opensis-db mysqld-exporter opensis-ui
+docker compose logs --tail=80 opensis-db mysqld-exporter
+docker compose exec -T mysqld-exporter wget -qO- http://127.0.0.1:9104/metrics | rg -n '^(mysql_up|mysql_global_status_threads_connected|mysql_global_variables_max_connections|mysql_global_status_slow_queries)' | head -n 20
+curl -fsS http://localhost:8088/ >/tmp/opensis-root.html && printf 'opensis-ui-ok\n'
+```
+
+Exporter privilege fix and revalidation:
+
+```bash
+docker compose up -d --force-recreate mysqld-exporter
+git diff --check
+docker compose logs --tail=40 mysqld-exporter
+docker compose exec -T mysqld-exporter wget -qO- http://127.0.0.1:9104/metrics | rg -n '^(mysql_up|mysql_global_status_threads_connected|mysql_global_variables_max_connections|mysql_global_status_slow_queries)' | head -n 20
+sleep 20; curl -fsS http://localhost:9090/api/v1/targets | jq -r '.data.activeTargets[] | select(.labels.job=="opensis-mariadb") | [.labels.job,.health,.scrapeUrl,(.lastError // "")] | @tsv'
+```
+
+Control-plane query and audit validation:
+
+```bash
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:mariadb_up' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=opensis:mariadb_connection_usage_percent' | jq -r '.data.result[] | [.metric.__name__,.value[1]] | @tsv'
+./scripts/devops-monitor.sh opensis-live
+./scripts/devops-monitor.sh operator
+date '+%Y-%m-%d %H:%M:%S %Z'
+git status --short
+git diff --stat
+git ls-files -s OpenSIS/observability/mysqld-exporter-entrypoint.sh
+```
+
+### Changes Made
+
+Added:
+
+- `OpenSIS/observability/mysqld-exporter-entrypoint.sh`
+
+Updated:
+
+- `OpenSIS/.env.example`
+- `OpenSIS/docker-compose.yaml`
+- `OpenSIS/scripts/mariadb-entrypoint.sh`
+- `Obervability-Stack/prometheus/prometheus.yml`
+- `Obervability-Stack/prometheus/recording_rules.yml`
+- `Obervability-Stack/scripts/opensis-live-audit.sh`
+- `METRICS-STRATEGY.md`
+- `WORKSPACE-SETUP-MATRIX.md`
+
+### Why These Changes Were Made
+
+OpenSIS previously had central UI blackbox coverage, but the shared control plane could not see MariaDB health or saturation. That left a blind spot for a legacy monolith where database availability is one of the most important operator signals.
+
+The OpenSIS Compose stack now includes:
+
+```text
+mysqld-exporter
+```
+
+with this shared control-plane alias:
+
+```text
+opensis-mysqld-exporter
+```
+
+Central Prometheus now scrapes:
+
+```text
+opensis-mysqld-exporter:9104/metrics
+```
+
+Recording rules were added under:
+
+```text
+opensis:*
+```
+
+The exporter uses a dedicated MariaDB user:
+
+```text
+opensis_exporter
+```
+
+instead of scraping with root credentials. The database entrypoint reconciles this user and grants only the exporter-oriented permissions required for the enabled collectors.
+
+### Problems Encountered
+
+Problem:
+
+```text
+sed: OpenSIS/docker-compose.yml: No such file or directory
+```
+
+Root cause:
+
+The OpenSIS Compose file is named:
+
+```text
+OpenSIS/docker-compose.yaml
+```
+
+Resolution:
+
+Located the active Compose file with:
+
+```bash
+find OpenSIS -maxdepth 4 -type f \( -name 'docker-compose*.yml' -o -name 'compose*.yml' -o -name 'Dockerfile' \) | sort
+```
+
+Problem:
+
+```text
+Error from scraper scraper=slave_status target=opensis-db:3306 err="Error 1227 (42000): Access denied; you need (at least one of) the SUPER, SLAVE MONITOR privilege(s) for this operation"
+```
+
+Root cause:
+
+`mysqld_exporter` enables the `slave_status` collector by default, but this OpenSIS local lab is not running MariaDB replication and the exporter user should not receive unnecessary broad replication privileges.
+
+Resolution:
+
+Disabled the unused collector:
+
+```text
+--no-collect.slave_status
+```
+
+This removed the privilege error while preserving the database metrics needed for this lab.
+
+Problem:
+
+```text
+The old DATA_SOURCE_NAME exporter pattern is no longer the correct path for current mysqld_exporter versions.
+```
+
+Root cause:
+
+Current `mysqld_exporter` versions use a `my.cnf` style config file or explicit command-line arguments.
+
+Resolution:
+
+Generated `/tmp/mysqld-exporter.cnf` at container runtime from environment variables and executed:
+
+```text
+/bin/mysqld_exporter --config.my-cnf=/tmp/mysqld-exporter.cnf --mysqld.address=opensis-db:3306
+```
+
+### Verification
+
+OpenSIS and observability Compose validation passed:
+
+```text
+docker compose config --quiet
+```
+
+Prometheus config and recording rules passed:
+
+```text
+SUCCESS: /etc/prometheus/prometheus.yml is valid prometheus config file syntax
+SUCCESS: 56 rules found
+```
+
+OpenSIS containers were healthy/running:
+
+```text
+opensis-db                Up ... healthy
+opensis-mysqld-exporter   Up
+opensis-ui                Up ... healthy
+```
+
+Exporter direct metrics returned:
+
+```text
+mysql_global_status_slow_queries 0
+mysql_global_status_threads_connected 1
+mysql_global_variables_max_connections 151
+mysql_up 1
+```
+
+Central Prometheus target was up:
+
+```text
+opensis-mariadb  up  http://opensis-mysqld-exporter:9104/metrics
+```
+
+Recording rules returned data:
+
+```text
+opensis:mariadb_up  1
+opensis:mariadb_connection_usage_percent  0.6622516556291391
+```
+
+OpenSIS live audit passed:
+
+```text
+Checks passed: 24/24
+OpenSIS live integration audit passed
+```
+
+Operator check passed:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+Whitespace validation passed:
+
+```text
+git diff --check
+```
+
+### Follow-Up Work
+
+- Add OpenSIS Vault health and secret-read synthetic checks to central Prometheus.
+- Add OpenSIS Apache/PHP request instrumentation or exporter coverage.
+- Add Grafana panels for `opensis:*` database health and saturation.
