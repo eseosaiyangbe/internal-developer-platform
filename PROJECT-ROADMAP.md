@@ -81,24 +81,31 @@ The work is divided into seven phases.
 | 3. Control plane hardening | Complete | Static-plus-live audit paths now exist for SwiftPay, MemFlip, OpenSIS, and FoodPulse |
 | 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
 | 5. Operator workflows and incident drills | Complete | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and five executed drills are now in place |
-| 6. UX and demo polish | In progress | Operational flows are real; next step is making the portfolio demo feel polished and teachable |
-| 7. Production-style maturity and portfolio packaging | Not started | Final packaging phase after platform behavior is coherent |
+| 6. UX and demo polish | Complete | Control-plane story, demo center, comparison view, app handoff pages, and live demo validation now meet the Phase 6 standard |
+| 7. Production-style maturity and portfolio packaging | In progress | Phase 7 can now start from a stable, demo-ready control plane instead of compensating for UX gaps |
 
 ## Current Focus
 
-We are currently entering **Phase 6: UX and demo polish**.
+We are currently entering **Phase 7: production-style maturity and portfolio packaging**.
 
-Phase 5 is complete. Its completed intent was:
+Phase 6 is complete. Its completed intent was:
 
-- turn the integrated apps into a teachable operations lab
-- define the standard first-response workflow for the workspace
-- connect symptoms to the right app-specific drills and audits
-- move from app onboarding into documented diagnosis and recovery patterns
-- build one app operator runbook pattern that can be reused across SwiftPay, MemFlip, OpenSIS, and FoodPulse
+- turn the integrated workspace into a teachable, portfolio-grade control plane
+- make the platform story visible before a presenter drills into individual apps
+- give every managed workload a consistent operator handoff page
+- remove stale branding and UX residue that caused verbal explanation overhead
+- prove the demo path with live browser checks and live operator audits instead of trusting static screenshots
 
 ## Current Definition Of Done
 
-Phase 6 will be considered complete when:
+Phase 7 will be considered successful when:
+
+- the project has a credible production narrative beyond local Docker Compose
+- architecture, screenshots, and diagrams make the platform understandable without a live walkthrough
+- packaging materials show why this workspace is a serious platform engineering portfolio piece
+- Kubernetes migration guidance is concrete enough to become an implementation plan
+
+Phase 6 completed when:
 
 - the control-plane UI clearly tells the platform story
 - each app has a polished demo path and operator handoff path
@@ -544,7 +551,7 @@ Create demo flows:
 
 ### Current Status
 
-In progress.
+Complete.
 
 Latest progress:
 
@@ -556,6 +563,25 @@ Latest progress:
 - the services dashboard is now simplified into managed app labels, with app-specific operator pages for latency, uptime, alerts, logs, and guidance
 - the services area now includes a live app comparison view that explains each workload's architecture role, operator value, Kubernetes direction, and live health state
 - the control plane now includes a Demo Center that turns the Markdown walkthrough into a guided UI presenter path with live readiness, commands, talking points, and reference links
+- the public landing page and control-plane chrome now use `DevOps Easy Learning` branding instead of stale prototype naming
+- the Demo Center, compare view, dashboard, and per-app operator pages were verified live in the browser from the control plane
+- `opensis-live`, `swiftpay-live`, `foodpulse-live`, and `memflip-live` were re-run as Phase 6 exit checks
+- the SwiftPay live audit now waits for Prometheus to observe the synthetic transfer before asserting metric success, removing a timing-based demo failure
+
+Phase 6 exit evidence:
+
+- control-plane smoke check passed `28/28`
+- `opensis-live` passed `39/39`
+- `swiftpay-live` passed `44/44`
+- `foodpulse-live` passed `23/23`
+- `memflip-live` passed `34/34`
+
+Phase 6 accepted because:
+
+- the dashboard, landing page, compare view, and Demo Center now tell one coherent platform story
+- every app page exposes probe latency, uptime, alerts, recent logs, and operator guidance
+- platform service labels show real health and version data from the live API
+- the remaining visible loading state is a normal live refresh behavior, not a verbal patch note
 
 ---
 

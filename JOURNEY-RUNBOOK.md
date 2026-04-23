@@ -15251,3 +15251,147 @@ This is expected because active alerts come from Alertmanager's current alert fe
 ### Production Follow-Up
 
 The atomic JSON-file fix is suitable for the current local Docker Compose stack. For Kubernetes and production-grade retention, move notification history to SQLite/PostgreSQL and enforce retention through a scheduled cleanup job or database TTL policy.
+
+## 2026-04-23 - Phase 6 Demo Certification And Closeout
+
+### Why This Step Happened
+
+Before moving into Phase 7, we needed to prove that the control plane could be demonstrated end to end without relying on verbal explanations to cover stale branding, hidden routes, or fragile operator checks.
+
+The target for this pass was explicit:
+
+- run the full demo path from the control plane
+- capture any remaining rough edges
+- fix the last control-plane UX inconsistencies
+- confirm each app page had a polished operator handoff
+- lock the final Phase 6 acceptance criteria
+
+### Commands Run
+
+```bash
+./Obervability-Stack/scripts/devops-monitor.sh operator
+curl -fsS http://localhost:4000/api/apps/health | jq .
+curl -fsS http://localhost:4000/api/services/platform | jq .
+docker compose -f Obervability-Stack/docker-compose.yml up -d --build devops-monitor-ui
+./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+```
+
+Browser verification was also executed through the local Playwright CLI against:
+
+- `/`
+- `/demo`
+- `/services/compare`
+- `/services/opensis`
+- `/services/swiftpay`
+- `/services/foodpulse`
+- `/services/memflip`
+
+### What We Found
+
+The first browser sweep exposed three Phase 6 blockers:
+
+1. The Demo Center and compare pages redirected to sign-in, which broke the presenter path.
+2. The landing page still described the old prototype product instead of the real DevOps Easy Learning portfolio story.
+3. The control-plane chrome still carried stale branding such as `DevOps Monitor`, `Monitoring in a Box`, and `Harshhaa`.
+
+The command-line sweep also exposed one real audit defect:
+
+4. `swiftpay-live` completed the synthetic transfer correctly, but the Prometheus assertions checked the completed-transfer metric before the scrape and recording-rule path had caught up.
+
+### Fixes Applied
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/proxy.ts
+```
+
+Public read-only presenter routes now bypass auth so `/dashboard`, `/demo`, `/services`, `/services/compare`, app detail pages, alerts, and notifications can be shown directly from the control plane.
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/components/landing-page.tsx
+```
+
+The landing page now tells the actual product story: one control plane managing SwiftPay, OpenSIS, FoodPulse, and MemFlip.
+
+Updated:
+
+```text
+Obervability-Stack/ui-next/components/sidebar.tsx
+Obervability-Stack/ui-next/lib/config/site-config.ts
+Obervability-Stack/ui-next/lib/config/types.ts
+Obervability-Stack/ui-next/app/dashboard/page.tsx
+Obervability-Stack/ui-next/lib/config/multi-tenant-manager.ts
+Obervability-Stack/ui-next/lib/hooks/use-multi-tenant-config.ts
+Obervability-Stack/ui-next/lib/hooks/use-config.ts
+Obervability-Stack/ui-next/next.config.js
+```
+
+The control-plane metadata, defaults, sidebar, dashboard title, and site configuration now use `DevOps Easy Learning` branding. A small migration guard was also added so stale local site-config data does not silently reintroduce the retired product name.
+
+Updated:
+
+```text
+Obervability-Stack/scripts/swiftpay-live-audit.sh
+```
+
+The SwiftPay live audit now records the completed-transfer metric baseline before the synthetic transaction, then waits for Prometheus and the recording rule to observe the new transfer. This removed a timing-based false failure from the demo path.
+
+### Validation
+
+Control-plane smoke check:
+
+```text
+Checks passed: 28/28
+Apps: 4 total | 4 healthy | 0 degraded | 0 down | 0 unknown
+```
+
+Platform services API:
+
+```text
+summary.total = 8
+summary.up = 8
+summary.down = 0
+```
+
+The platform services endpoint now returns live current versions and latest-release checks for Prometheus, Grafana, Alertmanager, Loki, Promtail, Node Exporter, Blackbox Exporter, and cAdvisor.
+
+Per-app live audits:
+
+```text
+opensis-live  passed 39/39
+swiftpay-live passed 44/44
+foodpulse-live passed 23/23
+memflip-live  passed 34/34
+```
+
+Browser verification confirmed:
+
+- the landing page opens with the correct DevOps Easy Learning identity
+- the Demo Center is public and loads the guided presenter path
+- the compare page explains all four workloads from the control plane
+- each managed app page exposes probe latency, uptime, alerts, recent logs, and operator guidance
+
+### Phase 6 Acceptance Locked
+
+Phase 6 is complete.
+
+Acceptance is now evidence-backed against the roadmap criteria:
+
+- the control-plane UI clearly tells the platform story
+- each app has a polished demo path and operator handoff path
+- app and platform metrics have a documented standard with live scrape coverage
+- dashboard and page language stay approachable without hiding operational detail
+- stale branding and UI residue were removed from the main control-plane path
+- the workspace can be demoed end to end from the control plane without verbal patch notes
+
+### Remaining Non-Blocking Follow-Up
+
+The sidebar service-status cards briefly show `Checking` before the live platform API refresh completes. This is an acceptable live-loading state, not a Phase 6 blocker.
+
+For Phase 7 and the future Kubernetes move, the next focus should shift from demo readiness to packaging, architecture narrative, screenshots, diagrams, and production-style deployment framing.
