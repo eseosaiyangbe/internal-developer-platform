@@ -15412,3 +15412,14 @@ INCIDENT-RESPONSE.md
 We changed the disk alert rules to preserve `mountpoint` so the next recurrence is actionable directly from the alert payload, then reloaded Prometheus successfully. This deliberately increases alert cardinality because the same runtime disk appears under several mountpoints.
 
 The full incident record, commands, findings, and follow-up recommendations are documented in `INCIDENT-RESPONSE.md` under `IR-2026-04-24-001 - HighDiskUsage Recurrence on node-exporter`.
+
+We then contained the most obvious storage failure mode in `FoodPulse`. `foodpulse-redis-master` had been writing to Docker's default unbounded `json-file` logger, which allowed one Redis log file to grow to `31.7G`. We added bounded Docker log rotation for the Redis HA path and recreated those containers.
+
+Result:
+
+```text
+/var/lib/docker/containers dropped to 142.1M
+/mnt/lima-colima/docker dropped to 13.2G
+```
+
+The disk alert did not fully clear because containerd and Docker rootfs usage are still substantial, but the runaway log-growth path is now contained.

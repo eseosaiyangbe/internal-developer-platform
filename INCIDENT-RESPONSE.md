@@ -707,6 +707,58 @@ If alert volume becomes too noisy, replace the raw mountpoint-level rule with a 
 2. add a separate diagnostic panel or recording rule that maps the hottest device back to the most relevant mountpoint
 ```
 
+### Follow-Up Remediation - FoodPulse Redis Log Rotation
+
+The `31.7G` Docker log file on `foodpulse-redis-master` was too large to leave as a future-action item. The root cause was not abnormal Redis output volume by itself; it was the absence of any Docker log rotation on the FoodPulse Redis HA path.
+
+Applied a bounded `json-file` logging policy in `FoodPulse/docker-compose.yml`:
+
+```text
+driver: json-file
+max-size: 10m
+max-file: 5
+```
+
+Applied this policy to:
+
+```text
+foodpulse-redis-master
+foodpulse-redis-replica1
+foodpulse-redis-replica2
+foodpulse-redis-sentinel01
+foodpulse-redis-sentinel02
+foodpulse-redis-sentinel03
+foodpulse-redis-haproxy
+```
+
+Recreated the Redis and HAProxy containers so the oversized historical log file was replaced with fresh bounded log files.
+
+#### Verification
+
+Live Docker logging policy after recreation:
+
+```text
+foodpulse-redis-master  json-file max-size=10m max-file=5
+foodpulse-redis-haproxy json-file max-size=10m max-file=5
+```
+
+Container-log storage after recreation:
+
+```text
+142.1M /host/var/lib/docker/containers
+```
+
+Runtime storage breakdown after remediation:
+
+```text
+13.2G /host/mnt/lima-colima/docker
+11.9G /host/mnt/lima-colima/containerd
+8.5G  /host/var/lib/docker/rootfs
+4.4G  /host/var/lib/docker/volumes
+```
+
+This contained the runaway log-growth failure mode, but it did not fully clear the disk alert. `/dev/vdb1` remained at roughly `87%`, which means there is still broader Docker/containerd runtime pressure to reduce separately.
+
 Core monitoring services remained healthy:
 
 ```text
