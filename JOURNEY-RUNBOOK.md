@@ -15395,3 +15395,20 @@ Acceptance is now evidence-backed against the roadmap criteria:
 The sidebar service-status cards briefly show `Checking` before the live platform API refresh completes. This is an acceptable live-loading state, not a Phase 6 blocker.
 
 For Phase 7 and the future Kubernetes move, the next focus should shift from demo readiness to packaging, architecture narrative, screenshots, diagrams, and production-style deployment framing.
+
+## 2026-04-24 - HighDiskUsage Recurrence Triage
+
+We investigated a fresh `HighDiskUsage` alert on `node-exporter` to verify whether the alert pipeline had regressed or whether the filesystem pressure was genuine.
+
+The alert was real. `/dev/vdb1` inside the monitored Linux runtime was above threshold, and the dominant contributor was Docker storage under the Colima/Lima VM. The biggest single offender was a `31.7G` JSON log file from `foodpulse-redis-master`.
+
+Updated:
+
+```text
+Obervability-Stack/prometheus/alert_rules.yml
+INCIDENT-RESPONSE.md
+```
+
+We changed the disk alert rules to preserve `mountpoint` so the next recurrence is actionable directly from the alert payload, then reloaded Prometheus successfully. This deliberately increases alert cardinality because the same runtime disk appears under several mountpoints.
+
+The full incident record, commands, findings, and follow-up recommendations are documented in `INCIDENT-RESPONSE.md` under `IR-2026-04-24-001 - HighDiskUsage Recurrence on node-exporter`.

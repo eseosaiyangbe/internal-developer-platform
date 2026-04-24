@@ -560,6 +560,153 @@ Prometheus rule validation:
 SUCCESS: 40 rules found
 ```
 
+## IR-2026-04-24-001 - HighDiskUsage Recurrence on node-exporter
+
+### Situation
+
+Alertmanager showed `HighDiskUsage` still firing on `node-exporter` even though the resolve pipeline itself was healthy. The active alert was tied to `/dev/vdb1`, and the immediate concern was whether this was another alerting false positive or a real storage regression.
+
+This time the alert was genuine. The monitored Linux runtime disk was still above threshold, and the biggest single contributor was runaway Docker JSON log growth from `foodpulse-redis-master`.
+
+### Commands Run
+
+Checked the active Prometheus rules and alerts:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/rules' | jq '.data.groups[]?.rules[]? | select(.name=="HighDiskUsage" or .name=="CriticalDiskUsage")'
+curl -fsS 'http://localhost:9090/api/v1/alerts' | jq '.data.alerts[]? | select(.labels.alertname=="HighDiskUsage")'
+```
+
+Queried Prometheus directly for `/dev/vdb1` usage and the mountpoints exposed by node-exporter:
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=sort_desc(((node_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cdevice%3D%22%2Fdev%2Fvdb1%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D-node_filesystem_avail_bytes%7Bjob%3D%22node-exporter%22%2Cdevice%3D%22%2Fdev%2Fvdb1%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D)%2Fnode_filesystem_size_bytes%7Bjob%3D%22node-exporter%22%2Cdevice%3D%22%2Fdev%2Fvdb1%22%2Cfstype!~%22tmpfs%7Coverlay%7Csquashfs%7Crpc_pipefs%7Cnsfs%7Cautofs%7Cdevtmpfs%22%7D)*100)' | jq '.data.result'
+```
+
+Inspected the Linux runtime disk from inside a read-only helper container:
+
+```bash
+docker run --rm -v /:/host:ro alpine sh -lc '
+  echo "Top runtime mount usage";
+  du -sh /host/mnt/lima-colima /host/var/lib/docker /host/var/lib/containerd 2>/dev/null | sort -hr;
+  echo;
+  echo "Largest docker subpaths";
+  du -sh /host/var/lib/docker/* 2>/dev/null | sort -hr | head -20;
+  echo;
+  echo "Largest container log directories";
+  du -sh /host/var/lib/docker/containers/* 2>/dev/null | sort -hr | head -10;
+'
+```
+
+Mapped the largest container directory back to a running workload:
+
+```bash
+docker ps -a --no-trunc --format '{{.ID}} {{.Names}} {{.Status}}'
+docker inspect --format '{{.Name}} {{.LogPath}}' 6a48e3f17d09a8c7d961884daba1f54a2e82868679bf14b97a1cd8f0083c226b
+```
+
+Validated and reloaded the updated Prometheus rules:
+
+```bash
+docker exec prometheus promtool check rules /etc/prometheus/alert_rules.yml
+curl -fsS -X POST http://localhost:9090/-/reload
+```
+
+### Problems Found
+
+Prometheus was correctly reporting `/dev/vdb1` above the alert threshold:
+
+```text
+87.82334075185345% used on /dev/vdb1
+```
+
+Node-exporter exposed the same underlying runtime disk through multiple mountpoints:
+
+```text
+/mnt/lima-colima
+/var/lib/cni
+/var/lib/containerd
+/var/lib/docker
+/var/lib/ramalama
+/var/lib/rancher
+```
+
+That meant the device-level pressure was real, but the alert payload was not specific enough to tell an operator which mounted path was implicated.
+
+The underlying runtime consuming `/dev/vdb1` was the Colima/Lima Linux VM disk. The dominant storage consumers were Docker-managed paths:
+
+```text
+57.1G  /host/mnt/lima-colima
+45.2G  /host/mnt/lima-colima/docker
+11.9G  /host/mnt/lima-colima/containerd
+45.1G  /host/var/lib/docker
+11.9G  /host/var/lib/containerd
+```
+
+The biggest single offender was a Docker JSON log file for `foodpulse-redis-master`:
+
+```text
+31.7G  /host/var/lib/docker/containers/6a48e3f17d09a8c7d961884daba1f54a2e82868679bf14b97a1cd8f0083c226b
+/foodpulse-redis-master
+/var/lib/docker/containers/6a48e3f17d09a8c7d961884daba1f54a2e82868679bf14b97a1cd8f0083c226b/6a48e3f17d09a8c7d961884daba1f54a2e82868679bf14b97a1cd8f0083c226b-json.log
+```
+
+### Fix Applied
+
+Updated the disk alerts so they preserve `mountpoint` in the alert labels:
+
+```text
+max by(instance, device, fstype, mountpoint) (...)
+```
+
+This intentionally trades device-level deduplication for better operational clarity. The current incident showed that the operator needs the mounted path back in the alert to understand whether the pressure is tied to Docker, containerd, CNI, or another runtime-owned filesystem view.
+
+Reloaded Prometheus after rule validation so the updated labels take effect without restarting the stack.
+
+### Verification
+
+Prometheus rules validated successfully:
+
+```text
+SUCCESS: 57 rules found
+```
+
+Prometheus reload completed successfully:
+
+```text
+HTTP 200 from /-/reload
+```
+
+The runtime causing the alert was identified, and the alerting rule now exposes `mountpoint` again so the next recurrence is immediately actionable from the alert payload itself.
+
+After reload, Prometheus began tracking one pending `HighDiskUsage` alert per affected mountpoint on `/dev/vdb1`:
+
+```text
+/mnt/lima-colima
+/var/lib/cni
+/var/lib/containerd
+/var/lib/docker
+/var/lib/ramalama
+/var/lib/rancher
+```
+
+That is expected with the new label set. The alert is now more actionable, but it is also noisier because one runtime disk can surface through several mounted paths.
+
+### Follow-Up Recommendations
+
+Add Docker log rotation to `FoodPulse`, especially for Redis and other continuously logging containers. Without log rotation, the same runtime disk pressure will recur.
+
+Add an operator cleanup step or maintenance task that explicitly checks `/var/lib/docker/containers/*-json.log` growth inside the Colima/Lima VM.
+
+Consider a second alert or dashboard panel specifically for container log growth so disk pressure can be traced to runaway JSON logs before the runtime disk crosses the filesystem threshold.
+
+If alert volume becomes too noisy, replace the raw mountpoint-level rule with a two-layer approach:
+
+```text
+1. keep a device-level alert for filesystem saturation
+2. add a separate diagnostic panel or recording rule that maps the hottest device back to the most relevant mountpoint
+```
+
 Core monitoring services remained healthy:
 
 ```text
