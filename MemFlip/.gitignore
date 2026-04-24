@@ -70,6 +70,7 @@ pgdata/
 # DOCKER
 # ========================================
 docker-compose.override.yml
+!docker-compose.override.yml
 .docker/
 docker-logs/
 

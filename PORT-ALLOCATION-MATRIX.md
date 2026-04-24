@@ -21,6 +21,26 @@ Use these rules going forward:
 5. Prefer loopback-only exposure (`127.0.0.1`) for app UIs and admin surfaces that do not need LAN access.
 6. Use environment-variable overrides for host ports so Mac Intel, Apple Silicon, and Linux operators can recover from local conflicts without editing Compose files.
 
+## Reserved Ranges For Future Apps
+
+New apps joining the workspace should allocate from these host-port bands first.
+
+| Range | Intended Use |
+|---|---|
+| `80-99` | explicit local ingress simulation only |
+| `3000-3199` | application APIs, gateways, and internal operator surfaces |
+| `4000-4199` | shared control-plane and workspace-level UIs |
+| `5400-5499` | PostgreSQL host listeners and SQL proxies |
+| `6300-6399` | Redis host listeners and Redis proxies |
+| `8080-8099` | browser-facing application frontends |
+| `9000-9199` | monitoring, logging, and exporter surfaces |
+
+When adding a new app:
+
+1. reserve host ports from the correct band
+2. parameterize them with env vars
+3. document them in this matrix as part of onboarding
+
 ## Current Standard
 
 These are the recommended workspace host ports when all major apps coexist locally.
@@ -154,9 +174,9 @@ Base stack:
 
 Override file:
 
-- `3000 -> 80` `reverse-proxy`
+- `${MEMFLIP_PROXY_HOST_PORT:-8083} -> 80` `reverse-proxy`
 
-This override collides with the central observability Grafana port if both are run together.
+The override is now env-driven and defaults to `8083`, which avoids the central observability Grafana port.
 
 ### `FoodPulse`
 
@@ -190,18 +210,22 @@ Recommendation:
 - Do not run `SwiftPay` monitoring or logging profiles on the same host when the central observability stack is active.
 - Treat the central observability stack as the only owner of shared monitoring/logging host ports.
 
-### 3. `MemFlip` reverse proxy override collides with Grafana
+### 3. Optional local reverse proxies remain a recurring risk
 
-`MemFlip/docker-compose.override.yml` publishes:
+Historically `MemFlip/docker-compose.override.yml` published:
 
 - `3000 -> 80`
 
-That collides with the central observability Grafana on `3000`.
+That collided with the central observability Grafana on `3000`.
+
+The workspace default is now:
+
+- `${MEMFLIP_PROXY_HOST_PORT:-8083} -> 80`
 
 Recommendation:
 
 - Reserve `3000` for Grafana.
-- If the MemFlip reverse proxy is needed, move it to a dedicated host port such as `8083` or make it env-driven.
+- Keep optional reverse proxies env-driven and outside the shared monitoring range.
 
 ### 4. `OpenSIS` edge mode uses host port `80`
 
@@ -224,13 +248,12 @@ Recommendation:
 
 These are the cleanups that would make the workspace safer:
 
-1. Move `MemFlip` reverse proxy off `3000` and make it env-driven.
-2. Add a short note to `SwiftPay` docs that its monitoring/logging profiles are standalone and should not be started beside the central observability stack.
-3. Keep database host exposure minimal:
+1. Keep database host exposure minimal:
    - `SwiftPay` on `5432`
    - `Obervability-Stack` on `5434`
    - `FoodPulse` on `5442/5443`
-4. Prefer loopback-only publication for app UIs and admin surfaces unless remote access is explicitly needed.
+2. Prefer loopback-only publication for app UIs and admin surfaces unless remote access is explicitly needed.
+3. Require every future app onboarding to reserve ports from the documented workspace ranges.
 
 ## Operator Guidance
 
