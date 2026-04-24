@@ -15462,3 +15462,20 @@ This added an operator-facing Docker storage check that reports:
 We also extended bounded Docker log rotation across the full FoodPulse stack, not just the Redis HA path. After recreating the services, all FoodPulse containers reported `json-file max-size=10m max-file=5`.
 
 On this Apple Silicon workstation, we also confirmed that the earlier platform warnings were not caused by repo-side `platform:` pins. The issue was local image selection. After refreshing `redis:7.2`, `postgres:14`, and `haproxy:2.9` with `linux/arm64/v8` variants and recreating the FoodPulse infra services, the running containers reported native `aarch64` instead of `x86_64`.
+
+We then carried the same Docker log hardening pattern into `SwiftPay`:
+
+```text
+SwiftPay/docker-compose.yml
+SwiftPay/scripts/docker-storage-check.sh
+SwiftPay/scripts/README.md
+SwiftPay/README.md
+```
+
+Changes applied:
+
+- added a shared Docker `json-file` logging policy with `max-size=10m` and `max-file=5`
+- applied that policy across SwiftPay infrastructure and app services
+- added an operator-facing `./scripts/docker-storage-check.sh` command
+
+After recreating the SwiftPay stack, every live SwiftPay container reported bounded Docker logging. The storage check also showed that no visible Docker log file in the shared runtime exceeded `200MB`, and SwiftPay dropped out of the top-noisiest container list entirely.
