@@ -15423,3 +15423,23 @@ Result:
 ```
 
 The disk alert did not fully clear because containerd and Docker rootfs usage are still substantial, but the runaway log-growth path is now contained.
+
+We then completed a safe Docker cleanup pass:
+
+```bash
+docker image prune -a -f
+docker container prune -f
+```
+
+We explicitly did not prune volumes because this workspace contains live PostgreSQL, MariaDB, Vault, Prometheus, Loki, and app data that should not be risked for convenience cleanup.
+
+Result:
+
+```text
+1.175GB reclaimed from unused images
+131.1kB reclaimed from exited containers
+/dev/vdb1 reduced to ~79-80%
+HighDiskUsage no longer active in Prometheus
+```
+
+That closed the incident cleanly. The alert resolved because the runtime disk actually recovered below threshold.

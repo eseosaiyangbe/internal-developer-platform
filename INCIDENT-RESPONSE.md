@@ -759,6 +759,57 @@ Runtime storage breakdown after remediation:
 
 This contained the runaway log-growth failure mode, but it did not fully clear the disk alert. `/dev/vdb1` remained at roughly `87%`, which means there is still broader Docker/containerd runtime pressure to reduce separately.
 
+### Final Remediation - Safe Docker Storage Cleanup
+
+After log rotation was in place, we performed a safe cleanup pass limited to unused Docker artifacts:
+
+```bash
+docker image prune -a -f
+docker container prune -f
+```
+
+This was intentionally chosen instead of pruning volumes. The workspace contains multiple stateful services, and named volumes may hold active database or observability data even when temporarily unattached.
+
+#### Cleanup Result
+
+Docker reported:
+
+```text
+Total reclaimed space from image prune: 1.175GB
+Total reclaimed space from container prune: 131.1kB
+```
+
+The most useful reclaimed items were legacy and superseded images that were no longer backing live containers, including old Yelb-era FoodPulse artifacts and retired observability image versions.
+
+#### Post-Cleanup Verification
+
+At `2026-04-24 06:20:57 EDT`, the monitored runtime disk had dropped below the warning threshold:
+
+```text
+/dev/vdb1 44.0G used 11.7G available 79% use
+Prometheus query value: 80.03379723593198%
+```
+
+Updated runtime breakdown:
+
+```text
+13.2G /host/mnt/lima-colima/docker
+7.7G  /host/mnt/lima-colima/containerd
+```
+
+Prometheus no longer returned any active `HighDiskUsage` alerts after the cleanup pass.
+
+### Final Outcome
+
+The incident had two separate contributing factors:
+
+```text
+1. unbounded Docker json-file logging on the FoodPulse Redis HA path
+2. accumulated unused Docker images in the shared development runtime
+```
+
+Both were addressed. The alert resolved because the underlying disk pressure was actually reduced, not because the alert was muted or suppressed.
+
 Core monitoring services remained healthy:
 
 ```text
