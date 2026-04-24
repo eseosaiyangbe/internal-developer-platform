@@ -15443,3 +15443,22 @@ HighDiskUsage no longer active in Prometheus
 ```
 
 That closed the incident cleanly. The alert resolved because the runtime disk actually recovered below threshold.
+
+We then added recurrence hardening in `FoodPulse`:
+
+```text
+FoodPulse/scripts/docker-storage-check.sh
+FoodPulse/docker-compose.yml
+FoodPulse/README.md
+FoodPulse/command.sh
+```
+
+This added an operator-facing Docker storage check that reports:
+
+- overall Docker storage usage
+- per-container logging policy for the FoodPulse stack
+- the largest Docker `json-file` logs visible from the local runtime
+
+We also extended bounded Docker log rotation across the full FoodPulse stack, not just the Redis HA path. After recreating the services, all FoodPulse containers reported `json-file max-size=10m max-file=5`.
+
+On this Apple Silicon workstation, we also confirmed that the earlier platform warnings were not caused by repo-side `platform:` pins. The issue was local image selection. After refreshing `redis:7.2`, `postgres:14`, and `haproxy:2.9` with `linux/arm64/v8` variants and recreating the FoodPulse infra services, the running containers reported native `aarch64` instead of `x86_64`.
