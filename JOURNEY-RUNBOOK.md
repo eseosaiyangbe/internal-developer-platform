@@ -15479,3 +15479,37 @@ Changes applied:
 - added an operator-facing `./scripts/docker-storage-check.sh` command
 
 After recreating the SwiftPay stack, every live SwiftPay container reported bounded Docker logging. The storage check also showed that no visible Docker log file in the shared runtime exceeded `200MB`, and SwiftPay dropped out of the top-noisiest container list entirely.
+
+On 2026-04-24 06:40:13 EDT we completed the same cleanup pattern for `OpenSIS` and `MemFlip`, and removed the obsolete top-level `version` key from `SwiftPay/docker-compose.yml`.
+
+Files changed:
+
+```text
+SwiftPay/docker-compose.yml
+OpenSIS/docker-compose.yaml
+OpenSIS/README.md
+OpenSIS/scripts/docker-storage-check.sh
+MemFlip/docker-compose.yml
+MemFlip/README.md
+MemFlip/scripts/docker-storage-check.sh
+```
+
+What changed:
+
+- removed the deprecated Compose `version` declaration from SwiftPay so local Compose runs stop emitting the known warning
+- added a shared Docker `json-file` logging policy with `max-size=10m` and `max-file=5` to OpenSIS
+- added the same bounded logging policy to the main MemFlip services
+- added `./scripts/docker-storage-check.sh` to both repos so operators can inspect Docker storage pressure, current logging policy, and the largest visible `json-file` logs before demos or during incidents
+
+Validation:
+
+- `docker compose -f SwiftPay/docker-compose.yml config` completed cleanly without the prior version warning
+- `docker compose -f OpenSIS/docker-compose.yaml config` completed successfully
+- `docker compose -f MemFlip/docker-compose.yml config` completed successfully
+- after recreating the OpenSIS runtime, the live containers reported bounded logging for `vault`, `vault-agent-db`, `vault-agent-app`, `opensis-db`, `opensis-ui`, `opensis-mysqld-exporter`, `opensis-apache-exporter`, and `opensis-vault-synthetic-exporter`
+- `OpenSIS/scripts/docker-storage-check.sh` reported no Docker log file above `200MB`
+- after recreating the MemFlip runtime, the live containers reported bounded logging for `humor-game-postgres`, `humor-game-redis`, `humor-game-backend`, and `humor-game-frontend`
+
+Operational note:
+
+The only real blocker during the OpenSIS rollout was stale one-shot init containers (`vault-volume-init`, `vault-agent-init`, `approle-volume-init`, `vault-bootstrap`, and `vault-seed`) whose fixed names conflicted with recreation. Removing those stale containers allowed the stack to rebuild and come back cleanly.

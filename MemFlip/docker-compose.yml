@@ -1,10 +1,15 @@
-# version: '3.8'
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: humor-game-postgres
+    logging: *default-logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-humor_memory_game}
@@ -30,6 +35,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: humor-game-redis
+    logging: *default-logging
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-gamepass123}
     volumes:
@@ -54,6 +60,7 @@ services:
       args:
         BUILDKIT_INLINE_CACHE: 0
     container_name: humor-game-backend
+    logging: *default-logging
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -104,6 +111,7 @@ services:
       args:
         BUILDKIT_INLINE_CACHE: 0
     container_name: humor-game-frontend
+    logging: *default-logging
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}

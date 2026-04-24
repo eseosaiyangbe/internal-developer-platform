@@ -151,6 +151,7 @@ make verify
 # Quick local setup with Docker Compose
 cp .env.example .env
 docker compose up -d
+./scripts/docker-storage-check.sh
 curl http://localhost:8080/api/health
 
 # Access the game
@@ -159,6 +160,8 @@ curl http://localhost:8080/api/health
 
 **Time**: 5 minutes | **Result**: Running application locally
 </details>
+
+`./scripts/docker-storage-check.sh` reports Docker storage usage, the active MemFlip container logging policy, and the largest visible Docker `json-file` logs. Use it before demos or when the shared Docker runtime starts showing disk pressure.
 
 ---
 
