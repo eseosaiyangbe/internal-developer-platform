@@ -244,9 +244,9 @@ Recommendation:
 - Keep `OpenSIS` edge profile optional.
 - Do not treat host `80` as part of the standard multi-repo local baseline.
 
-## Recommended Next Adjustments
+## Standing Workspace Rules
 
-These are the cleanups that would make the workspace safer:
+These are not open issues. They are the operating rules we should keep as more apps join the workspace:
 
 1. Keep database host exposure minimal:
    - `SwiftPay` on `5432`
