@@ -15544,3 +15544,49 @@ Validation:
 - `bash -n scripts/bootstrap-linux-userland.sh`
 - installed `promtool` locally into `~/.local/bin`
 - `promtool --version` returned `3.11.2` on `darwin/arm64`
+
+## 2026-04-25 - Phase 7 Opening Slice: Architecture Narrative And Kubernetes Framing
+
+Start Phase 7 cleanly by strengthening the root project story before touching screenshots, portfolio packaging details, or Kubernetes implementation work.
+
+Why this became the right next move:
+
+- the roadmap already marked Phase 7 as active
+- the root README still contained stale Phase 6 language
+- the workspace had strong technical substance, but the top-layer docs did not yet tell that story with enough production-style clarity
+- Kubernetes direction existed as intent, but not yet as a concrete root-level migration plan
+
+Files changed:
+
+```text
+README.md
+WORKSPACE-ARCHITECTURE.md
+KUBERNETES-MIGRATION-PLAN.md
+```
+
+What changed:
+
+- rewrote the root `README.md` so it now reads as a serious platform engineering project instead of a Phase 6 checkpoint
+- reframed the top-level story around one control plane managing four distinct workload narratives
+- corrected the roadmap position in the root README from stale Phase 6 wording to the active Phase 7 state
+- rebuilt `WORKSPACE-ARCHITECTURE.md` into a stronger architecture narrative with Mermaid visuals for:
+  - the control-plane system view
+  - workload-to-observability mapping
+- added `KUBERNETES-MIGRATION-PLAN.md` as a phased migration framing document covering:
+  - `dev` and `prod` environment direction
+  - namespace and ownership boundaries
+  - workload-to-resource mapping
+  - migration phases
+  - database, secrets, observability, and risk posture
+
+Why this matters:
+
+- Phase 7 is not supposed to start with random polish work
+- the architecture story has to stabilize first, otherwise screenshots and portfolio packaging will be built on shifting language
+- the Kubernetes move needs a root-level plan that connects back to the actual workloads and operator model, not just to infrastructure aspirations
+
+Validation:
+
+- searched root docs for stale Phase 6 and Phase 7 references after the rewrite
+- verified the new migration-plan document is linked from the root README
+- verified the new architecture doc links back to the migration plan

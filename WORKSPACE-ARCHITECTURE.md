@@ -2,229 +2,294 @@
 
 ## Purpose
 
-This document explains how the workspace fits together as one platform.
+This document explains how the workspace operates as one platform instead of five disconnected repos.
 
-The goal is not to run five unrelated repos side by side.
-The goal is to operate a mixed-architecture application lab from one shared control plane.
+The key architectural idea is simple:
 
-## Workspace Roles
+- keep each workload honest to its own runtime style
+- normalize the operator experience through one shared control plane
+- use local Docker Compose as the proving ground for an eventual Kubernetes model
 
-### `Obervability-Stack`
+## System Intent
 
-Role:
+The workspace is designed to answer one practical platform question:
 
-- control plane
-- shared observability hub
-- app inventory and operator UI
+How do we operate microservices, a legacy monolith, a failover lab, and a lightweight demo app from one consistent control plane without erasing the operational differences that make each workload interesting?
 
-Owns:
+The answer in this repo is:
 
-- Prometheus
-- Grafana
-- Loki
-- Alertmanager
-- blackbox probing
-- Next.js operator dashboard
+- shared observability
+- shared operator workflow
+- workload-specific metrics and runbooks
+- environment-driven startup contracts
+- documented incident response
 
-Why it matters:
+## Architecture Overview
 
-- this is the repo that turns the workspace into a platform instead of a pile of apps
+```mermaid
+flowchart LR
+    U["Operator / Presenter"] --> CP["Obervability-Stack Control Plane"]
+    CP --> P["Prometheus"]
+    CP --> G["Grafana"]
+    CP --> L["Loki"]
+    CP --> A["Alertmanager"]
+    CP --> B["Blackbox Exporter"]
 
-### `SwiftPay`
+    P --> SP["SwiftPay"]
+    P --> OS["OpenSIS"]
+    P --> FP["FoodPulse"]
+    P --> MF["MemFlip"]
 
-Role:
+    B --> SP
+    B --> OS
+    B --> FP
+    B --> MF
 
-- flagship microservices application
+    L --> SP
+    L --> OS
+    L --> FP
+    L --> MF
+```
 
-Architecture style:
+## Platform Layers
 
-- Node.js microservices
-- PostgreSQL
-- Redis
-- RabbitMQ
-- React frontend
+The workspace has three practical layers.
 
-Why it matters:
+### Layer 1: Managed Workloads
 
-- best workload for service-level health, logs, metrics, and business telemetry
-
-### `OpenSIS`
-
-Role:
-
-- legacy monolith with a serious platform wrapper
-
-Architecture style:
-
-- PHP/Apache app
-- MariaDB
-- Vault-based secret delivery
-- Kubernetes and GitOps model
-
-Why it matters:
-
-- best workload for showing how to operate and observe a legacy application inside a modern platform model
-
-### `FoodPulse`
-
-Role:
-
-- resilience and failover lab
-
-Architecture style:
-
-- workspace-owned React frontend
-- workspace-owned Node API
-- Redis master/replica/Sentinel
-- Postgres primary/replicas
-- HAProxy routing
-
-Why it matters:
-
-- best workload for failover drills and infrastructure behavior demonstrations
-
-### `MemFlip`
-
-Role:
-
-- lightweight onboarding and demo app
-
-Architecture style:
-
-- Node backend
-- static frontend
-- PostgreSQL
-- Redis
-
-Why it matters:
-
-- easiest app to onboard and use as a simple reference pattern
-
-## Shared Platform Model
-
-The platform model has three layers.
-
-### Layer 1: Workloads
-
-The application repos:
+These are the application repos being operated:
 
 - `SwiftPay`
 - `OpenSIS`
 - `FoodPulse`
 - `MemFlip`
 
+Each app keeps its own runtime shape, dependencies, and operational personality.
+
 ### Layer 2: Shared Runtime Integration
 
-The common runtime integration is the external Docker network:
+The common local integration layer is the Docker network:
 
 ```text
 observability-net
 ```
 
-This network lets the control plane probe and observe app containers by stable internal aliases.
+That network provides stable service discovery between the control plane and the managed workloads.
+
+This matters because the control plane should depend on stable service targets and health contracts, not on fragile human memory or ad hoc container browsing.
 
 ### Layer 3: Control Plane
 
-`Obervability-Stack` consumes the shared aliases and maps them into:
+`Obervability-Stack` is the platform-facing hub.
 
-- app metadata
-- health targets
-- log queries
-- uptime probes
-- latency probes
-- business metrics where available
+It owns:
 
-## Current App Alias Model
+- Prometheus scraping and rule evaluation
+- Blackbox probing
+- Alertmanager routing
+- Loki log aggregation
+- Grafana dashboards
+- the Next.js operator UI
+- app inventory and operator guidance
 
-These are the runtime aliases that matter most to the shared platform.
+This is the architectural move that turns the repo set into one platform.
 
-| App | Alias / Aliases | Purpose |
-|---|---|---|
-| `OpenSIS` | `opensis-ui` | primary UI probe target |
-| `SwiftPay` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | service-level observability |
-| `MemFlip` | `memflip-frontend`, `memflip-backend` | frontend and backend health |
-| `FoodPulse` | `foodpulse-ui` | primary UI probe target |
+## Why These Apps Were Chosen
+
+The workloads are intentionally different so the platform has to solve real integration problems.
+
+### `SwiftPay`
+
+Architecture:
+
+- React frontend
+- Node.js microservices
+- PostgreSQL
+- Redis
+- RabbitMQ
+
+Why it belongs here:
+
+- strongest example of service-to-service health
+- best place for business metrics and queue-backed workflows
+- best workload for showing component-level failure instead of single-app uptime only
+
+### `OpenSIS`
+
+Architecture:
+
+- PHP/Apache monolith
+- MariaDB
+- Vault-based secret delivery
+- exporter coverage for database, Vault synthetic checks, and Apache runtime
+
+Why it belongs here:
+
+- demonstrates how a legacy app can be wrapped with modern operational practices
+- introduces secrets, runtime exporters, and a stronger Kubernetes/GitOps direction
+- forces the control plane to support something more complex than a clean greenfield service stack
+
+### `FoodPulse`
+
+Architecture:
+
+- workspace-owned UI
+- workspace-owned API
+- Redis master/replica/Sentinel
+- Postgres primary/replica topology
+- HAProxy
+
+Why it belongs here:
+
+- the best workload for failover, routing, and resilience drills
+- the best place to surface infrastructure-driven incidents instead of only application bugs
+
+### `MemFlip`
+
+Architecture:
+
+- lightweight frontend
+- Node backend
+- PostgreSQL
+- Redis
+
+Why it belongs here:
+
+- simplest onboarding pattern in the workspace
+- easiest workload for proving control-plane conventions cleanly
+- useful as the “minimum viable managed app” reference
+
+## Workload-To-Control-Plane Mapping
+
+```mermaid
+flowchart TD
+    SP["SwiftPay"] --> SP1["Blackbox probes"]
+    SP --> SP2["Service metrics"]
+    SP --> SP3["Business signals"]
+    SP --> SP4["Operator guidance"]
+
+    OS["OpenSIS"] --> OS1["Blackbox probes"]
+    OS --> OS2["MariaDB exporter"]
+    OS --> OS3["Vault synthetic checks"]
+    OS --> OS4["Apache runtime metrics"]
+
+    FP["FoodPulse"] --> FP1["UI/API health"]
+    FP --> FP2["Failover drills"]
+    FP --> FP3["Storage and logging discipline"]
+
+    MF["MemFlip"] --> MF1["Frontend/backend health"]
+    MF --> MF2["Simple onboarding pattern"]
+    MF --> MF3["Reference runbook path"]
+```
 
 ## Control Plane Contract
 
-For an app to participate cleanly in this workspace platform, it should have:
+For a workload to participate cleanly in this platform, it should provide:
 
-1. a stable `observability-net` alias
-2. a documented local startup command
-3. at least one health endpoint or HTTP probe target
-4. a documented local browser URL if user-facing
-5. a log and metrics story, even if minimal
+1. a stable runtime alias on `observability-net`
+2. a documented startup command
+3. a health endpoint or probe target
+4. a local browser URL if it is user-facing
+5. a metrics story, even if small
+6. an operator handoff or runbook path
 
-## Kubernetes-Ready Direction
+This contract matters more than the implementation language.
 
-We are still normalizing the workspace in Docker Compose first, but the target direction is Kubernetes.
+It is what lets the control plane operate mixed systems without pretending they are all the same application.
 
-That changes how we make local decisions now:
+## Current Alias Model
 
-- prefer explicit env contracts that can become ConfigMaps and Secrets later
-- prefer stable service names and aliases that can map cleanly to Kubernetes Services
-- prefer health endpoints that can become liveness and readiness probes
-- prefer stateless app containers where possible
-- treat local helper scripts as operator runbooks, not permanent control mechanisms
-- avoid coupling the control plane to container names when a service-level target would work
-
-Compose is the proving ground.
-Kubernetes is the destination.
-
-The point of Phase 2 is to reduce the amount of hidden Docker-only behavior we would need to unlearn later.
-
-## Architecture Pattern By Repo
-
-This workspace is valuable because it compares different architecture styles under one operator model.
-
-| Repo | Style | Main Platform Lesson |
+| App | Alias / Aliases | Purpose |
 |---|---|---|
-| `SwiftPay` | microservices | service decomposition, queue-backed workflows, business telemetry |
-| `OpenSIS` | legacy monolith | secret delivery, GitOps, platform wrapping, operability |
-| `FoodPulse` | HA infrastructure lab | failover behavior, data-plane routing, resilience drills |
-| `MemFlip` | simple web app | easy onboarding, lightweight app monitoring |
+| `OpenSIS` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker`, `opensis-apache-exporter` | UI probes and deeper runtime health |
+| `SwiftPay` | `swiftpay-frontend`, `swiftpay-api-gateway`, `swiftpay-auth-service`, `swiftpay-wallet-service`, `swiftpay-transaction-service`, `swiftpay-notification-service` | service-level availability and metrics |
+| `MemFlip` | `memflip-frontend`, `memflip-backend` | frontend/backend health model |
+| `FoodPulse` | `foodpulse-ui`, `foodpulse-api` | UI availability and API health/metrics |
 
-## Recommended Operator Mental Model
+## Operator Mental Model
 
-Think of the workspace like this:
-
-```text
-Operator -> Obervability-Stack -> App inventory -> Workload health / logs / metrics / drills
-```
-
-And think of the workloads like this:
+Operators should think about the workspace like this:
 
 ```text
-SwiftPay  = flagship app
-OpenSIS   = legacy platform case
-FoodPulse = resilience lab
-MemFlip   = onboarding reference
+Operator -> Control Plane -> App inventory -> Health -> Logs -> Metrics -> Runbook -> Incident response
 ```
 
-## Near-Term Architecture Priorities
+That sequence is deliberate.
 
-### 1. Normalize startup contracts
+The UI is not supposed to replace underlying observability systems.
+It is supposed to shorten the path from “something looks wrong” to “I know where to go next.”
 
-Every app should have:
+## Environment Model
 
-- a clear startup command
-- an env contract
-- a health contract
+The local workspace is still Compose-first, but the intended long-term environment model is:
 
-### 2. Harden the control plane
+- `dev`: iterative validation, demos, drills, and integration testing
+- `prod`: tighter secrets, backups, routing, retention, and operational controls
 
-The app inventory and docs in `Obervability-Stack` need to be fully trustworthy.
+That changes how we make decisions now:
 
-### 3. Keep app roles distinct
+- prefer explicit environment variables over hidden defaults
+- prefer databases and services that translate cleanly into separate environment backends
+- prefer stable names, probes, and startup contracts that can become Kubernetes resources later
 
-Do not force every app into the same story.
-Use each workload for the thing it best demonstrates.
+## Kubernetes Direction
 
-### 4. Normalize for future Kubernetes migration
+Compose is not the destination.
+Compose is the proving ground.
 
-Priority areas:
+The Kubernetes direction for this workspace is:
 
-- repo-level `.env.example` coverage
-- explicit health and startup contracts
-- cleaner separation between generated artifacts and source-of-truth files
-- fewer ad hoc scripts masquerading as product workflows
+- shared control-plane services become namespace-scoped platform components
+- app services become environment-specific workloads
+- local aliases become Kubernetes Services
+- env files become ConfigMaps and Secrets
+- one-off bootstraps become Jobs or init flows
+- stateful services become PVC-backed StatefulSets or managed external services
+
+The migration plan is documented separately in [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md).
+
+## Architectural Risks We Are Managing
+
+### 1. Control Plane Drift
+
+If the control plane says one thing and the live workloads say another, trust collapses quickly.
+
+Mitigation:
+
+- inventory validation
+- live smoke checks
+- runbook-backed operator flows
+- documented incidents when the control plane is wrong
+
+### 2. Docker-Only Assumptions
+
+If we overfit everything to local Compose behavior, the Kubernetes migration becomes expensive and error-prone.
+
+Mitigation:
+
+- stable service contracts
+- explicit probes
+- cleaner environment boundaries
+- migration planning before implementation
+
+### 3. Narrative Drift
+
+If the repo no longer tells a coherent story, the technical quality becomes harder for others to recognize.
+
+Mitigation:
+
+- strong root docs
+- architecture visuals
+- clear workload roles
+- incident evidence tied back to the platform model
+
+## What This Architecture Proves
+
+This workspace proves that a shared control plane can:
+
+- normalize operations across different application styles
+- surface real health and failure signals without hiding workload differences
+- connect health, metrics, logs, alerts, and runbooks into one operator journey
+- provide a credible bridge from local development to Kubernetes-minded platform design
+
+That is the core engineering story for Phase 7.
