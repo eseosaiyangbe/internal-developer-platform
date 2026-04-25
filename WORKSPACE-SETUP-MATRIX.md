@@ -12,6 +12,15 @@ It answers, for each repo:
 - what health endpoint to check
 - what `observability-net` alias the control plane expects
 
+## Workspace Wrappers
+
+For full-workspace startup and shutdown, prefer the root wrappers:
+
+- `./scripts/workspace-start.sh`
+- `./scripts/workspace-stop.sh`
+
+These scripts start and stop the repos in the documented order, seed missing `.env` files for `FoodPulse` and `MemFlip`, and handle the Apple Silicon `OpenSIS` local-build path automatically.
+
 ## Setup Matrix
 
 | Repo | Primary Start Command | Optional Helper | Env Contract | Main Local URL | Health Check | `observability-net` Alias / Aliases | Kubernetes Readiness Note | Notes |

@@ -15958,3 +15958,50 @@ Why this matters:
 - the repo now reads more like a production-grade portfolio surface and less like a raw project dump
 - reviewers can move through the strongest evidence in a deliberate sequence instead of guessing at document priority
 - this is the right final README refinement before we shift from packaging into the first concrete Kubernetes implementation slice
+
+## 2026-04-25 - Phase 7 Slice 11: Add Workspace Start And Stop Wrappers
+
+Replace the repo-hopping startup instructions with a real workspace operator entry point.
+
+Why this mattered:
+
+- the root README had the correct startup order, but it still asked a new operator to manually jump across repositories and remember environment setup details
+- Phase 7 should leave the repo easier to run, not only easier to read
+
+Files changed:
+
+```text
+scripts/workspace-start.sh
+scripts/workspace-stop.sh
+README.md
+WORKSPACE-SETUP-MATRIX.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- added `./scripts/workspace-start.sh` to start the repos in the documented order:
+  - `Obervability-Stack`
+  - `SwiftPay`
+  - `OpenSIS`
+  - `FoodPulse`
+  - `MemFlip`
+  - final `./Obervability-Stack/scripts/devops-monitor.sh operator`
+- added `./scripts/workspace-stop.sh` to stop the same repos in reverse order
+- made the start wrapper seed missing `.env` files for `FoodPulse` and `MemFlip` from `.env.example` without overwriting an existing `.env`
+- made the start wrapper automatically use the Apple Silicon `OpenSIS` local-build path
+- added wrapper-specific flags for the OpenSIS edge and pull-image variants, plus optional verification skip and volume removal behavior
+- updated the root README so the recommended startup path is now the wrapper, with the lower-level repo-by-repo commands kept as a secondary reference
+- updated `WORKSPACE-SETUP-MATRIX.md` so the root wrapper contract is explicit
+
+Validation:
+
+- `bash -n scripts/workspace-start.sh scripts/workspace-stop.sh`
+- `./scripts/workspace-start.sh --help`
+- `./scripts/workspace-stop.sh --help`
+
+Why this matters:
+
+- the workspace now has a real operator-friendly start and stop path
+- the root README is more actionable for new reviewers and new contributors
+- this is a cleaner bridge from Phase 7 packaging into future cluster-oriented orchestration work

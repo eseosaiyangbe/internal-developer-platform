@@ -131,7 +131,14 @@ Linux:
 
 Both bootstrap paths install Docker tooling, Kubernetes tooling, Terraform, cloud CLIs, and `promtool`, so rule validation and operator checks work consistently on macOS and Linux.
 
-Then follow the workspace startup order:
+Recommended workspace commands:
+
+```bash
+./scripts/workspace-start.sh
+./scripts/workspace-stop.sh
+```
+
+What `./scripts/workspace-start.sh` does:
 
 1. Start `Obervability-Stack`
 2. Start `SwiftPay`
@@ -140,7 +147,13 @@ Then follow the workspace startup order:
 5. Start `MemFlip`
 6. Run the shared operator check
 
-Recommended commands:
+Start the full workspace:
+
+```bash
+./scripts/workspace-start.sh
+```
+
+If you want the underlying repo-by-repo commands instead of the wrapper:
 
 ```bash
 cd Obervability-Stack && docker compose up -d
@@ -151,11 +164,7 @@ cd ../MemFlip && cp .env.example .env && docker compose up -d
 cd .. && ./Obervability-Stack/scripts/devops-monitor.sh operator
 ```
 
-Apple Silicon note for `OpenSIS`:
-
-```bash
-cd OpenSIS && ./scripts/compose-start.sh --build-local
-```
+Apple Silicon note for `OpenSIS`: the wrapper automatically uses `./scripts/compose-start.sh --build-local`.
 
 Target healthy result:
 
