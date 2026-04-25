@@ -155,7 +155,7 @@ Executed drill categories include:
 | [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
 | [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
 | [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
-| [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | first real screenshot capture batch and artifact inventory |
+| [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |
 | [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | root architecture narrative and platform model |
 | [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
 | [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |

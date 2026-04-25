@@ -210,6 +210,21 @@ Recommended order when building the visual pack:
 9. capture incident evidence
 10. export or screenshot architecture diagrams
 
+## Current Capture Status
+
+The first live Phase 7 evidence batches are now recorded in:
+
+- [PHASE7-VISUAL-CAPTURE-LOG.md](/Users/raymond/Documents/DevOps-Easy-Learning/PHASE7-VISUAL-CAPTURE-LOG.md)
+
+Those batches now include:
+
+- the full control-plane core screenshot set
+- two live managed app UIs
+- a rendered incident-drill document capture
+- a repo-native exported architecture diagram image
+
+The remaining work is now curation and optional expansion, not foundational capture.
+
 ## Capture Preconditions
 
 Before taking screenshots:

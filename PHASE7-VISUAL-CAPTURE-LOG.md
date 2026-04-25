@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records the first real screenshot capture pass for the Phase 7 portfolio pack.
+This document records the live screenshot and diagram capture passes for the Phase 7 portfolio pack.
 
 It exists so the visual artifacts are:
 
@@ -10,7 +10,7 @@ It exists so the visual artifacts are:
 - reviewable
 - tied back to a known healthy platform state
 
-## Capture Baseline
+## Shared Capture Baseline
 
 Capture date:
 
@@ -30,13 +30,15 @@ Validated result before capture:
 - inventory validation passed
 - `OpenSIS`, `SwiftPay`, `MemFlip`, and `FoodPulse` all reported healthy
 
-## Captured Artifacts
+## Artifact Location
 
 Stored under:
 
 ```text
 output/playwright/phase7/
 ```
+
+## Capture Pass 1: Core Control-Plane Story
 
 Artifacts captured:
 
@@ -50,9 +52,7 @@ Artifacts captured:
 8. `phase7-08-demo-center.png`
 9. `phase7-09-swiftpay-ui.png`
 
-## What This Capture Pass Covers
-
-This first pass already covers the strongest control-plane story:
+What this pass covers:
 
 - presenter front door
 - simplified operator dashboard
@@ -64,23 +64,37 @@ This first pass already covers the strongest control-plane story:
 - demo workflow
 - one live managed workload
 
-## What Is Still Worth Capturing
+## Capture Pass 2: Incident And Architecture Evidence
 
-The next visual pass should add:
+Artifacts captured:
 
-1. one incident-drill evidence screenshot
-2. one exported architecture diagram image
-3. one additional live app UI if we want broader workload coverage
+10. `phase7-10-foodpulse-ui.png`
+11. `phase7-11-incident-drills-doc.png`
+12. `phase7-12-architecture-diagram.png`
+
+What this pass adds:
+
+- a second live workload UI with a different operating story
+- rendered incident-drill evidence from the public repo view
+- a repo-native exported architecture diagram generated directly from the Mermaid source in [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md)
 
 ## Why The Baseline Fix Matters
 
-During this capture pass, the operator baseline initially failed because the control-plane health script treated `devops-monitor-db-init` as a long-running service even though it is a one-shot init path.
+During the first capture pass, the operator baseline initially failed because the control-plane health script treated `devops-monitor-db-init` as a long-running service even though it is a one-shot init path.
 
 That was corrected in:
 
 - [health-check.sh](/Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/scripts/health-check.sh)
 
 The script now treats successful one-shot init services correctly, which makes the visual-capture baseline truthful instead of noisy.
+
+## Remaining Recommended Work
+
+The visual pack now covers the required Phase 7 categories. The remaining work is curation, not missing evidence:
+
+1. choose the strongest 4 to 6 artifacts for the root README and portfolio narrative
+2. decide whether to export the second Mermaid diagram from [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md) as a companion image
+3. decide whether to add one annotated incident screenshot from the live control plane for deck-ready storytelling
 
 ## Recommended Next Use
 

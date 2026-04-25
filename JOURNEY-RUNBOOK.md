@@ -15818,3 +15818,39 @@ Why this matters:
 - the repo now contains real visual evidence for the Phase 7 story
 - the capture batch is tied to a known healthy operator baseline
 - the first portfolio-ready image set now exists instead of only being planned
+
+## 2026-04-25 - Phase 7 Slice 7: Incident And Architecture Evidence Pass
+
+Extend the Phase 7 visual pack with incident-proof and architecture-proof artifacts so the portfolio story is not limited to control-plane UI screenshots.
+
+Why this mattered:
+
+- the first screenshot batch already proved the control plane, but the portfolio still needed explicit visual evidence for drill readiness and architecture design
+- the architecture artifact should come from repo-owned source, not from a brittle browser layout or presentation-only mockup
+
+Files changed:
+
+```text
+PHASE7-VISUAL-CAPTURE-LOG.md
+VISUAL-EVIDENCE-PACK.md
+README.md
+JOURNEY-RUNBOOK.md
+output/playwright/phase7/phase7-10-foodpulse-ui.png
+output/playwright/phase7/phase7-11-incident-drills-doc.png
+output/playwright/phase7/phase7-12-architecture-diagram.png
+```
+
+What changed:
+
+- reran the operator baseline and confirmed the control plane remained healthy at `30/30` before new captures
+- captured a second live workload UI with `FoodPulse` at `http://localhost:8090`
+- captured a rendered incident-drill document view from the public repository page for `Obervability-Stack/docs/INCIDENT_DRILLS.md`
+- generated a repo-native architecture diagram image directly from the first Mermaid block in `WORKSPACE-ARCHITECTURE.md` using `@mermaid-js/mermaid-cli`
+- updated the Phase 7 capture log so it now reflects two distinct visual-capture passes instead of a single initial batch
+- updated the visual-pack doc and root README so the evidence pack now reads as an active artifact inventory rather than a future plan
+
+Why this matters:
+
+- the visual pack now covers the control plane, live workloads, incident readiness, and architecture direction in one evidence chain
+- the architecture image is deterministic because it is generated from the repo source instead of depending on a remote page renderer
+- Phase 7 is now moving from “collecting screenshots” into curation and presentation, which is the right maturity shift
