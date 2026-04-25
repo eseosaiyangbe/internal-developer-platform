@@ -11,19 +11,19 @@ This is not a collection of unrelated demo repos. It is a deliberately mixed env
 
 The center of that experience is `Obervability-Stack`, which acts as the operator control plane for health, probes, alerts, logs, runbooks, and incident evidence.
 
-## Why This Project Exists
+## What This Repo Demonstrates
 
 Most portfolio projects show one application running well on a good day.
 
-This project aims higher:
+This workspace demonstrates something harder:
 
-- onboard mixed workloads into one operating model
-- expose real health, latency, metrics, logs, and operator guidance
-- execute incident drills instead of only writing theoretical runbooks
-- document commands, failures, and fixes as reusable operator evidence
-- prepare the workspace for a future Kubernetes migration with separate `dev` and `prod` thinking
+- onboarding mixed workloads into one operating model
+- exposing real health, latency, metrics, logs, alerts, and operator guidance
+- executing incident drills instead of only writing theoretical runbooks
+- documenting commands, failures, and fixes as reusable operator evidence
+- preparing local platform decisions for a future Kubernetes path with separate `dev` and `prod` thinking
 
-The result is intended to be useful to:
+This makes the repo useful to:
 
 - hiring managers evaluating platform and DevOps depth
 - engineers who want a realistic local operations lab
@@ -61,6 +61,23 @@ The platform is built around one operator loop:
 3. surface health, alerts, logs, versions, and runbooks in one control plane
 4. execute drills and recovery steps against real failure modes
 5. carry the validated operating model forward into Kubernetes planning
+
+## How To Review This Repo
+
+If you are evaluating the project quickly, use this order:
+
+1. start with the visual highlights below to understand the platform shape
+2. read [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) for the short-form project narrative
+3. read [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) for the system model and workload roles
+4. read [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) to see how the local lab maps to the target platform direction
+5. read [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) and [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) for proof that incidents, fixes, and operator workflows were executed for real
+
+If you want to run it instead of just review it:
+
+1. bootstrap the workstation with the platform script for your OS
+2. start the repos in the workspace order shown below
+3. run `./Obervability-Stack/scripts/devops-monitor.sh operator`
+4. use [DEMO-WALKTHROUGH.md](DEMO-WALKTHROUGH.md) as the guided live path
 
 ## Visual Highlights
 
@@ -135,6 +152,26 @@ Inventory validation passed
 All monitored apps are currently healthy
 ```
 
+## Key Documents
+
+| Doc | Purpose |
+|---|---|
+| [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
+| [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
+| [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
+| [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |
+| [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | root architecture narrative and platform model |
+| [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
+| [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
+| [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md) | deeper Kubernetes plan for the shared observability control plane |
+| [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
+| [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | startup commands, ports, health checks, and aliases |
+| [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
+| [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | production-grade metrics standards for platform and apps |
+| [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) | incident investigations, root causes, and follow-ups |
+| [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) | command-by-command build and operations record |
+| [Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md](Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md) | standard first-response workflow |
+
 ## Demo And Operator Entry Points
 
 Demo walkthrough:
@@ -168,26 +205,6 @@ Executed drill categories include:
 - OpenSIS Vault failure
 - FoodPulse Redis failover
 - control-plane probe drift and alert-path issues
-
-## Key Documents
-
-| Doc | Purpose |
-|---|---|
-| [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
-| [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
-| [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
-| [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |
-| [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | root architecture narrative and platform model |
-| [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
-| [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
-| [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md) | deeper Kubernetes plan for the shared observability control plane |
-| [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
-| [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | startup commands, ports, health checks, and aliases |
-| [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
-| [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | production-grade metrics standards for platform and apps |
-| [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) | incident investigations, root causes, and follow-ups |
-| [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) | command-by-command build and operations record |
-| [Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md](Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md) | standard first-response workflow |
 
 ## Current Roadmap Position
 

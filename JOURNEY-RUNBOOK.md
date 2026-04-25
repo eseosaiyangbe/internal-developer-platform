@@ -15928,3 +15928,33 @@ Why this matters:
 - the root portfolio surface is now more disciplined and easier to scan
 - the highest-signal visuals remain in place while the broader evidence set is still preserved for deeper review
 - this creates a cleaner separation between the repo front door and the full Phase 7 visual archive
+
+## 2026-04-25 - Phase 7 Slice 10: Add A Reviewer Path To The README
+
+Refine the non-visual front door so a new reviewer can understand the repo faster without scanning the entire document tree.
+
+Why this mattered:
+
+- the README had strong content, but the reviewer journey still relied too much on intuition
+- Phase 7 is not only about collecting evidence; it is also about presenting that evidence in the right order
+
+Files changed:
+
+```text
+README.md
+PORTFOLIO-SNAPSHOT.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- renamed the opening motivation section in `README.md` from a generic “why this project exists” framing to a more direct “what this repo demonstrates” framing
+- added a compact `How To Review This Repo` section that gives reviewers a deliberate path from visuals to architecture to migration plan to incident evidence
+- reordered the README so `Key Documents` now appears before the detailed operator commands and evidence recap
+- updated `PORTFOLIO-SNAPSHOT.md` so the new README reviewer path is explicitly part of the portfolio story
+
+Why this matters:
+
+- the repo now reads more like a production-grade portfolio surface and less like a raw project dump
+- reviewers can move through the strongest evidence in a deliberate sequence instead of guessing at document priority
+- this is the right final README refinement before we shift from packaging into the first concrete Kubernetes implementation slice

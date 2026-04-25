@@ -126,6 +126,8 @@ Reviewers who want proof rather than claims should start with:
 - [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md)
 - [Obervability-Stack/docs/INCIDENT_DRILLS.md](Obervability-Stack/docs/INCIDENT_DRILLS.md)
 
+The root README now includes a compact `How To Review This Repo` path so a new reviewer can move from visuals to architecture to incident evidence without guessing where to start.
+
 ## Suggested Screenshot Set
 
 The strongest Phase 7 screenshot pack should include:
