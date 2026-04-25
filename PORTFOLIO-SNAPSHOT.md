@@ -143,14 +143,14 @@ The strongest Phase 7 screenshot pack should include:
 
 The structured capture plan now lives in [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md).
 
-The curated root-README gallery now prioritizes six visuals:
+The curated root-README gallery is now intentionally compressed to four visuals for a stronger first impression:
 
 1. architecture direction
 2. control-plane dashboard
-3. workload comparison view
-4. app operator handoff page
-5. one live managed workload
-6. incident-drill evidence
+3. app operator handoff page
+4. incident-drill evidence
+
+The wider six-asset Phase 7 pack still exists in the capture log for portfolio sharing, decks, and deeper walkthroughs.
 
 ## Suggested Talking Points For Reviewers
 

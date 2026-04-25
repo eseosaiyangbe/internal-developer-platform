@@ -15893,3 +15893,38 @@ Why this matters:
 - the root repo surface now behaves like a portfolio entry, not only a document index
 - the chosen visuals reinforce the platform story in the right order: architecture, control plane, workload differences, operator handoff, live application, incident readiness
 - this is the clean handoff point for the next Phase 7 decision: keep the gallery at six visuals or compress it further for a more minimal README
+
+## 2026-04-25 - Phase 7 Slice 9: Compress The Root Gallery To Four Visuals
+
+Tighten the root portfolio surface so the README keeps a stronger first impression without looking overloaded.
+
+Why this mattered:
+
+- the six-visual gallery was good evidence, but it asked too much of the first screen
+- the root README should optimize for fast comprehension, while the wider evidence pack can carry the deeper asset inventory
+
+Files changed:
+
+```text
+README.md
+PORTFOLIO-SNAPSHOT.md
+PHASE7-VISUAL-CAPTURE-LOG.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- reduced the root README gallery from six visuals to four:
+  - architecture direction
+  - control-plane dashboard
+  - app operator handoff
+  - incident-drill evidence
+- removed the workload-comparison and live-workload visuals from the README front page while keeping them in the Phase 7 capture inventory
+- updated `PORTFOLIO-SNAPSHOT.md` so the compressed root-gallery choice is explicit
+- updated `PHASE7-VISUAL-CAPTURE-LOG.md` so the remaining open decision now reflects a stable four-visual README with the wider six-asset pack retained elsewhere
+
+Why this matters:
+
+- the root portfolio surface is now more disciplined and easier to scan
+- the highest-signal visuals remain in place while the broader evidence set is still preserved for deeper review
+- this creates a cleaner separation between the repo front door and the full Phase 7 visual archive

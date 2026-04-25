@@ -96,7 +96,7 @@ The visual pack now covers the required Phase 7 categories. The remaining work i
 
 1. decide whether to export the second Mermaid diagram from [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md) as a companion image
 2. decide whether to add one annotated incident screenshot from the live control plane for deck-ready storytelling
-3. decide whether the README gallery should stay at six visuals or be reduced to four for a more minimal front page
+3. decide whether the four-visual README gallery should remain stable or whether a second surface such as the portfolio snapshot should keep the wider six-visual grid
 
 ## Recommended Next Use
 
