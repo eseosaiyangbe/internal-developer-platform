@@ -19,6 +19,7 @@ The bootstrap scripts are designed to prepare a workstation for the main workflo
 - Docker and Docker Compose
 - Docker Buildx
 - Kubernetes CLI tooling
+- Prometheus rule tooling (`promtool`)
 - local Kubernetes tooling
 - Terraform
 - Node.js and npm
@@ -86,6 +87,7 @@ docker compose version
 docker buildx version
 kubectl version --client
 helm version
+promtool --version
 terraform version
 node --version
 npm --version

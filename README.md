@@ -38,6 +38,8 @@ Linux users can use:
 ./scripts/bootstrap-linux-userland.sh
 ```
 
+Both bootstrap paths now install `promtool` alongside Docker, Kubernetes, and infrastructure tooling so alert/rule validation works the same way on macOS and Linux.
+
 Then follow the workspace startup order:
 
 1. Start `Obervability-Stack`.

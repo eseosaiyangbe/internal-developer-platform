@@ -183,6 +183,20 @@ install_helm() {
   rm -rf "${tmp_dir}"
 }
 
+install_promtool() {
+  local tag version tmp_dir archive_root
+  tag="$(github_latest_tag prometheus/prometheus)"
+  version="${tag#v}"
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "${tmp_dir}"' RETURN
+  download "https://github.com/prometheus/prometheus/releases/download/${tag}/prometheus-${version}.linux-${ARCH}.tar.gz" "${tmp_dir}/prometheus.tgz"
+  tar -xzf "${tmp_dir}/prometheus.tgz" -C "${tmp_dir}"
+  archive_root="${tmp_dir}/prometheus-${version}.linux-${ARCH}"
+  install_executable "${archive_root}/promtool" promtool
+  trap - RETURN
+  rm -rf "${tmp_dir}"
+}
+
 install_kustomize() {
   local url
   url="$(github_asset_url kubernetes-sigs/kustomize "kustomize_v.*_linux_${ARCH}\\.tar\\.gz$")"
@@ -288,6 +302,7 @@ main() {
   echo "Installing Kubernetes and platform tooling..."
   install_kubectl
   install_helm
+  install_promtool
   install_kustomize
   install_kind
   install_k3d
@@ -320,6 +335,7 @@ Verification:
   docker compose version
   kubectl version --client
   helm version
+  promtool --version
   terraform version
   node --version
   npm --version

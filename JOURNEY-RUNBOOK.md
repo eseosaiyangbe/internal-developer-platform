@@ -15513,3 +15513,34 @@ Validation:
 Operational note:
 
 The only real blocker during the OpenSIS rollout was stale one-shot init containers (`vault-volume-init`, `vault-agent-init`, `approle-volume-init`, `vault-bootstrap`, and `vault-seed`) whose fixed names conflicted with recreation. Removing those stale containers allowed the stack to rebuild and come back cleanly.
+
+On 2026-04-25 00:32:15 EDT we added `promtool` to the shared workstation bootstrap contract and installed it locally on the Apple Silicon macOS workstation.
+
+Files changed:
+
+```text
+scripts/bootstrap-macos-userland.sh
+scripts/bootstrap-linux-userland.sh
+README.md
+WORKSTATION-BOOTSTRAP.md
+```
+
+What changed:
+
+- added an `install_promtool` step to the macOS bootstrap script using the official `prometheus/prometheus` release tarball for `darwin-arm64`
+- added the same `install_promtool` step to the Linux bootstrap script using the official `linux-amd64` and `linux-arm64` release tarballs based on detected architecture
+- extended the bootstrap verification blocks so operators explicitly check `promtool --version`
+- updated the root README and workstation bootstrap guide so `promtool` is now part of the documented baseline toolchain
+
+Why this changed:
+
+- the workstation did not have `promtool`, which prevented local Prometheus rule validation
+- rule reloads were still possible, but an enterprise-grade operator path should validate rules before relying on runtime reloads
+- adding `promtool` to both bootstrap scripts keeps macOS and Linux contributors aligned and prevents this drift from recurring
+
+Validation:
+
+- `bash -n scripts/bootstrap-macos-userland.sh`
+- `bash -n scripts/bootstrap-linux-userland.sh`
+- installed `promtool` locally into `~/.local/bin`
+- `promtool --version` returned `3.11.2` on `darwin/arm64`
