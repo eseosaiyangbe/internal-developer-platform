@@ -15590,3 +15590,54 @@ Validation:
 - searched root docs for stale Phase 6 and Phase 7 references after the rewrite
 - verified the new migration-plan document is linked from the root README
 - verified the new architecture doc links back to the migration plan
+
+## 2026-04-25 - Phase 7 Slice 2: Portfolio Pack, Environment Model, And First Migration Candidate
+
+Continue Phase 7 by turning the new architecture narrative into a stronger documentation pack that explains:
+
+- why the project is a serious portfolio piece
+- how `dev` and `prod` should differ going forward
+- how the control plane should be modeled in Kubernetes
+- which workload should migrate first and why
+
+Why this was the right next step:
+
+- Phase 7 needed more than one root architecture doc
+- the repo still lacked a short portfolio summary that a reviewer could consume quickly
+- `dev` and `prod` were now part of the strategic direction, but not yet formalized at the root
+- the migration plan named `MemFlip` as the likely first candidate, but the rationale needed to be explicit
+
+Files changed:
+
+```text
+PORTFOLIO-SNAPSHOT.md
+ENVIRONMENT-MODEL.md
+CONTROL-PLANE-K8S-PLAN.md
+MEMFLIP-K8S-CANDIDATE.md
+README.md
+WORKSPACE-ARCHITECTURE.md
+KUBERNETES-MIGRATION-PLAN.md
+```
+
+What changed:
+
+- added `PORTFOLIO-SNAPSHOT.md` as the short-form reviewer-facing summary of the platform story, workload roles, and strongest evidence
+- added `ENVIRONMENT-MODEL.md` to make `dev` and `prod` explicit root-level concepts before Kubernetes implementation begins
+- added `CONTROL-PLANE-K8S-PLAN.md` to deepen the resource, storage, ingress, config, and migration sequence for `Obervability-Stack`
+- added `MEMFLIP-K8S-CANDIDATE.md` to explain why `MemFlip` is the best first migrated workload even though it is not the most complex app
+- wired the new docs back into `README.md`, `WORKSPACE-ARCHITECTURE.md`, and `KUBERNETES-MIGRATION-PLAN.md` so the Phase 7 doc set forms one visible chain instead of isolated files
+
+Why this matters:
+
+- this is the point where Phase 7 starts to feel like a real portfolio packaging effort instead of a single documentation rewrite
+- the repo now has a clearer separation between:
+  - public-facing summary
+  - architecture narrative
+  - environment policy
+  - platform migration plan
+  - first workload migration logic
+
+Validation:
+
+- `git diff --check`
+- searched root docs to verify the new Phase 7 files are discoverable from the README and planning chain

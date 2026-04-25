@@ -323,6 +323,12 @@ The clean next implementation order is:
 4. migrate `MemFlip` as the first low-risk app
 5. validate observability continuity before moving to the next workload
 
+Supporting planning documents:
+
+- [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
+- [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
+- [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
+
 ## Success Criteria
 
 This migration plan is successful when:

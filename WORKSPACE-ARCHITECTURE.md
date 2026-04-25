@@ -248,6 +248,12 @@ The Kubernetes direction for this workspace is:
 
 The migration plan is documented separately in [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md).
 
+Supporting Phase 7 documents:
+
+- [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
+- [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
+- [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
+
 ## Architectural Risks We Are Managing
 
 ### 1. Control Plane Drift

@@ -152,8 +152,12 @@ Executed drill categories include:
 | Doc | Purpose |
 |---|---|
 | [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
+| [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
 | [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | root architecture narrative and platform model |
+| [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
 | [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
+| [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md) | deeper Kubernetes plan for the shared observability control plane |
+| [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
 | [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | startup commands, ports, health checks, and aliases |
 | [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
 | [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | production-grade metrics standards for platform and apps |
@@ -173,3 +177,12 @@ Phase 7 focuses on:
 - portfolio-ready documentation and visuals
 - production-style environment and deployment framing
 - a concrete Kubernetes migration path
+
+The current Phase 7 documentation spine is:
+
+- [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md)
+- [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md)
+- [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
+- [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md)
+- [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
+- [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
