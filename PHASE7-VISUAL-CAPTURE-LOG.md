@@ -71,12 +71,14 @@ Artifacts captured:
 10. `phase7-10-foodpulse-ui.png`
 11. `phase7-11-incident-drills-doc.png`
 12. `phase7-12-architecture-diagram.png`
+13. `phase7-11-incident-drills-doc-cropped.png`
 
 What this pass adds:
 
 - a second live workload UI with a different operating story
 - rendered incident-drill evidence from the public repo view
 - a repo-native exported architecture diagram generated directly from the Mermaid source in [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md)
+- a README-safe cropped incident-drill image for portfolio embedding without the full-page document height
 
 ## Why The Baseline Fix Matters
 
@@ -92,9 +94,9 @@ The script now treats successful one-shot init services correctly, which makes t
 
 The visual pack now covers the required Phase 7 categories. The remaining work is curation, not missing evidence:
 
-1. choose the strongest 4 to 6 artifacts for the root README and portfolio narrative
-2. decide whether to export the second Mermaid diagram from [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md) as a companion image
-3. decide whether to add one annotated incident screenshot from the live control plane for deck-ready storytelling
+1. decide whether to export the second Mermaid diagram from [WORKSPACE-ARCHITECTURE.md](/Users/raymond/Documents/DevOps-Easy-Learning/WORKSPACE-ARCHITECTURE.md) as a companion image
+2. decide whether to add one annotated incident screenshot from the live control plane for deck-ready storytelling
+3. decide whether the README gallery should stay at six visuals or be reduced to four for a more minimal front page
 
 ## Recommended Next Use
 

@@ -15854,3 +15854,42 @@ Why this matters:
 - the visual pack now covers the control plane, live workloads, incident readiness, and architecture direction in one evidence chain
 - the architecture image is deterministic because it is generated from the repo source instead of depending on a remote page renderer
 - Phase 7 is now moving from “collecting screenshots” into curation and presentation, which is the right maturity shift
+
+## 2026-04-25 - Phase 7 Slice 8: Curate The Root Portfolio Gallery
+
+Select the strongest Phase 7 visuals and embed them into the root README so the repo tells its story visually without requiring a guided walkthrough.
+
+Why this mattered:
+
+- raw screenshot inventory is useful for operators, but reviewers need a smaller curated set at the repo front door
+- the incident-drill full-page capture was too tall for README use, so the portfolio surface needed a presentation-safe derivative rather than a direct dump of every artifact
+
+Files changed:
+
+```text
+README.md
+PORTFOLIO-SNAPSHOT.md
+PHASE7-VISUAL-CAPTURE-LOG.md
+JOURNEY-RUNBOOK.md
+output/playwright/phase7/phase7-11-incident-drills-doc-cropped.png
+```
+
+What changed:
+
+- chose six root-gallery visuals with the highest reviewer value:
+  - architecture direction
+  - control-plane dashboard
+  - workload comparison view
+  - app operator handoff
+  - one live managed workload
+  - incident-drill evidence
+- embedded those visuals into `README.md` as a curated gallery with short role-specific captions
+- created `phase7-11-incident-drills-doc-cropped.png` so the incident-drill evidence can be embedded cleanly without the full `16684px` document height
+- updated `PORTFOLIO-SNAPSHOT.md` so the recommended root-gallery selection is explicit
+- updated `PHASE7-VISUAL-CAPTURE-LOG.md` so the cropped derivative is tracked as part of the visual asset set
+
+Why this matters:
+
+- the root repo surface now behaves like a portfolio entry, not only a document index
+- the chosen visuals reinforce the platform story in the right order: architecture, control plane, workload differences, operator handoff, live application, incident readiness
+- this is the clean handoff point for the next Phase 7 decision: keep the gallery at six visuals or compress it further for a more minimal README

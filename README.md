@@ -62,6 +62,32 @@ The platform is built around one operator loop:
 4. execute drills and recovery steps against real failure modes
 5. carry the validated operating model forward into Kubernetes planning
 
+## Visual Highlights
+
+These are the six visuals I recommend as the root portfolio surface because together they explain the platform fastest:
+
+- architecture direction
+- control-plane operator view
+- workload comparison story
+- app-specific operator handoff
+- one live managed workload
+- incident-drill evidence
+
+| Architecture Direction | Control-Plane Dashboard |
+|---|---|
+| <img src="output/playwright/phase7/phase7-12-architecture-diagram.png" alt="Workspace architecture diagram" width="100%"> | <img src="output/playwright/phase7/phase7-02-dashboard.png" alt="Control-plane dashboard" width="100%"> |
+| Repo-native architecture map generated from the Phase 7 Mermaid source. | The live operator dashboard that anchors the platform story. |
+
+| Workload Comparison | App Operator Handoff |
+|---|---|
+| <img src="output/playwright/phase7/phase7-04-compare.png" alt="Workload comparison view" width="100%"> | <img src="output/playwright/phase7/phase7-05-opensis-app-page.png" alt="OpenSIS app detail page" width="100%"> |
+| The control plane explains why four different workload types belong in one platform. | The app detail page proves the handoff from inventory to real operator context. |
+
+| Live Managed Workload | Incident Drill Evidence |
+|---|---|
+| <img src="output/playwright/phase7/phase7-10-foodpulse-ui.png" alt="FoodPulse live UI" width="100%"> | <img src="output/playwright/phase7/phase7-11-incident-drills-doc-cropped.png" alt="Incident drill catalog" width="100%"> |
+| A live workload UI shows that the platform is operating a real application, not only telemetry screens. | The drill catalog makes incident practice part of the product story instead of an afterthought. |
+
 ## Production-Minded Decisions Already In Place
 
 This is still a local Compose-first proving ground, but several decisions already reflect production-style thinking:
