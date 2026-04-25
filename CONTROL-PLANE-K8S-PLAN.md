@@ -34,6 +34,8 @@ The Kubernetes control-plane scope includes:
 - node and container observability equivalents
 - the Next.js UI
 - rule/config provisioning
+- ArgoCD as the desired-state reconciler for platform manifests
+- Vault integration for secret delivery to control-plane workloads
 
 ## Recommended Namespace
 
@@ -178,6 +180,12 @@ Configuration should be split cleanly:
 
 Do not combine secret and non-secret configuration into one convenience object just because local Compose env files did.
 
+Strategic platform split:
+
+- ArgoCD reconciles the platform manifests from Git
+- Vault is the preferred source of truth for secret material
+- Kubernetes Secrets should be treated as delivery objects where the runtime path requires them, not as the human-managed system of record
+
 ## Ingress Direction
 
 Recommended pattern:
@@ -208,6 +216,11 @@ Recommended approach:
 - Grafana dashboards stored in version-controlled provisioning bundles
 - app inventory and operator guidance kept as code-backed configuration, not as manual dashboard edits
 
+GitOps direction:
+
+- ArgoCD should reconcile these version-controlled platform definitions
+- sync ordering should be explicit where secrets or storage preconditions matter
+
 This preserves reviewability and makes `dev` to `prod` promotion cleaner.
 
 ## Security Direction
@@ -221,6 +234,7 @@ Controls should include:
 - explicit ingress/auth policy
 - no accidental public exposure of internal metrics surfaces
 - reduced reliance on default credentials and placeholder secrets
+- Vault-backed secret delivery where control-plane components need sensitive runtime material
 
 ## Migration Sequence
 

@@ -142,12 +142,32 @@ At the root level, the workspace should converge toward:
 
 Environment separation is meaningless if secrets are shared.
 
+Strategic direction:
+
+- Vault is the long-term secret source of truth for Kubernetes environments
+- Kubernetes Secrets should hold only the delivery objects needed by workloads, not become the human-managed system of record
+- Git must not store live secret values
+
 Required rules:
 
 - `dev` and `prod` never share the same secret values
 - no committed secret-bearing env files
 - no fallback to placeholder secrets in production-like contexts
 - no app should require manual inline editing of committed files to switch environments
+
+## GitOps Rules
+
+Strategic direction:
+
+- ArgoCD is the preferred GitOps reconciler for Kubernetes environments in this workspace
+- Git stores desired state, manifest structure, and non-secret configuration references
+- Git does not store secret values
+
+Required rules:
+
+- `dev` and `prod` should reconcile from explicit environment-aware manifest paths or overlays
+- manual kubectl drift should be treated as temporary debugging, not as the normal operating model
+- sync ordering for secrets-dependent workloads must be explicit where needed
 
 ## Database Rules
 

@@ -15641,3 +15641,46 @@ Validation:
 
 - `git diff --check`
 - searched root docs to verify the new Phase 7 files are discoverable from the README and planning chain
+
+## 2026-04-25 - Phase 7 Slice 3: Formalize Vault And ArgoCD As Platform Standards
+
+Before going deeper into Phase 7 packaging, we captured one strategic platform decision explicitly at the root level:
+
+- Vault is the preferred secret source of truth
+- ArgoCD is the preferred GitOps reconciler
+
+Why this mattered now:
+
+- the workspace already hinted at both choices, especially through `OpenSIS`
+- leaving them implicit would weaken the production story and make the Kubernetes direction sound undecided
+- the user explicitly wants Vault for secrets and ArgoCD for GitOps, and that aligns with the strongest platform patterns already present in the repo
+
+Files changed:
+
+```text
+WORKSPACE-ARCHITECTURE.md
+ENVIRONMENT-MODEL.md
+KUBERNETES-MIGRATION-PLAN.md
+CONTROL-PLANE-K8S-PLAN.md
+PORTFOLIO-SNAPSHOT.md
+```
+
+What changed:
+
+- updated the root architecture narrative to describe GitOps-driven desired state and Vault-backed secret management as part of the platform model
+- added explicit GitOps and secret-management rules to `ENVIRONMENT-MODEL.md`
+- updated `KUBERNETES-MIGRATION-PLAN.md` so the target end state now includes:
+  - ArgoCD for desired-state reconciliation
+  - Vault for secret truth and runtime delivery
+- added a root-level `Platform Control Decisions` section to the migration plan
+- updated the control-plane Kubernetes plan so `Obervability-Stack` is now framed alongside ArgoCD and Vault instead of only platform telemetry components
+- strengthened the portfolio snapshot so reviewers can see that the future platform direction is not generic Kubernetes drift, but a more deliberate GitOps-plus-secrets model
+
+Architectural clarification:
+
+- Git stores desired state
+- ArgoCD reconciles desired state
+- Vault stores secret truth
+- the control plane verifies health, telemetry, and operational outcomes
+
+That separation is now part of the root Phase 7 story.

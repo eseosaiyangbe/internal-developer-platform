@@ -20,6 +20,8 @@ The answer in this repo is:
 
 - shared observability
 - shared operator workflow
+- GitOps-driven desired state
+- Vault-backed secret management
 - workload-specific metrics and runbooks
 - environment-driven startup contracts
 - documented incident response
@@ -91,6 +93,11 @@ It owns:
 - Grafana dashboards
 - the Next.js operator UI
 - app inventory and operator guidance
+
+In the Kubernetes direction, it also sits beside two strategic platform controls:
+
+- `ArgoCD` as the GitOps reconciler for desired state
+- `Vault` as the secret source of truth
 
 This is the architectural move that turns the repo set into one platform.
 
@@ -239,6 +246,8 @@ Compose is the proving ground.
 
 The Kubernetes direction for this workspace is:
 
+- ArgoCD reconciles platform and workload manifests from Git
+- Vault delivers runtime secrets without storing secret values in Git
 - shared control-plane services become namespace-scoped platform components
 - app services become environment-specific workloads
 - local aliases become Kubernetes Services
@@ -247,6 +256,13 @@ The Kubernetes direction for this workspace is:
 - stateful services become PVC-backed StatefulSets or managed external services
 
 The migration plan is documented separately in [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md).
+
+Strategic platform decisions:
+
+- Git is the source of truth for desired state
+- ArgoCD is the reconciler for desired state
+- Vault is the source of truth for secrets
+- the control plane is the operator-facing surface that verifies health, telemetry, and recovery
 
 Supporting Phase 7 documents:
 

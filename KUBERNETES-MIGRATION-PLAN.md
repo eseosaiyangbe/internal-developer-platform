@@ -31,6 +31,12 @@ Today the workspace already has several useful preconditions:
 This means the migration should not start from manifests.
 It should start from the operating contracts we have already validated.
 
+It also means the repo already has a natural strategic direction:
+
+- `OpenSIS` proves Vault is already operationally meaningful in this workspace
+- `OpenSIS` also proves ArgoCD and GitOps are already part of the Kubernetes story
+- Phase 7 should now elevate those patterns into root platform standards
+
 ## Target End State
 
 The intended Kubernetes end state is:
@@ -39,6 +45,8 @@ The intended Kubernetes end state is:
 - a shared observability platform with clear ownership boundaries
 - workload deployments expressed through Kubernetes-native resources
 - database, secrets, probes, and ingress modeled explicitly
+- ArgoCD managing desired-state reconciliation
+- Vault managing secret truth and runtime delivery
 - migration decisions driven by operational truth, not by YAML volume
 
 ## Environment Model
@@ -90,6 +98,34 @@ Recommended namespace shape:
 - `memflip-prod`
 
 This keeps platform services separate from application namespaces and makes the `dev`/`prod` split explicit from the beginning.
+
+## Platform Control Decisions
+
+Two platform decisions should now be treated as root direction, not as optional side paths.
+
+### ArgoCD For GitOps
+
+ArgoCD should be the preferred Kubernetes reconciler for:
+
+- platform manifests
+- environment overlays
+- workload promotion paths
+
+Why:
+
+- it matches the strongest GitOps posture already present in the workspace
+- it keeps desired state reviewable and versioned
+- it fits the future `dev` and `prod` environment split cleanly
+
+### Vault For Secret Management
+
+Vault should be the preferred secret source of truth for Kubernetes environments.
+
+Why:
+
+- OpenSIS already proves Vault is operationally meaningful in this workspace
+- it avoids treating Git or manually curated Kubernetes Secrets as the human secret store
+- it strengthens the production story for secret rotation, secret scoping, and runtime delivery
 
 ## Workload Mapping
 
@@ -261,9 +297,19 @@ Current direction:
 
 Target Kubernetes direction:
 
-- Kubernetes Secrets for standard app credentials
-- Vault or external secret integration where the operational story requires stronger secret management
+- Vault as the secret source of truth
+- Kubernetes Secrets only as delivery artifacts where required by the runtime path
+- workloads authenticating to Vault through Kubernetes-native auth patterns where applicable
 - no secret material in images, committed env files, or ad hoc bootstrap notes
+
+Important separation:
+
+- Git stores desired state
+- ArgoCD reconciles desired state
+- Vault stores secret truth
+- the cluster delivers secrets to workloads through approved runtime mechanisms
+
+Do not blur those responsibilities.
 
 ## Observability Strategy In Kubernetes
 
@@ -319,9 +365,10 @@ The clean next implementation order is:
 
 1. tighten the root architecture and portfolio docs
 2. formalize `dev` and `prod` config expectations at the root level
-3. define the control-plane Kubernetes resource plan
-4. migrate `MemFlip` as the first low-risk app
-5. validate observability continuity before moving to the next workload
+3. formalize ArgoCD and Vault as root platform standards
+4. define the control-plane Kubernetes resource plan
+5. migrate `MemFlip` as the first low-risk app
+6. validate observability continuity before moving to the next workload
 
 Supporting planning documents:
 

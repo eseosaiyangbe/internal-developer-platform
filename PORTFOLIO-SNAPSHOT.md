@@ -21,6 +21,7 @@ It also includes:
 - validating health, metrics, logs, alerts, and runbooks together
 - executing and documenting incident drills
 - making local development choices that support a future Kubernetes migration
+- shaping the future platform around ArgoCD for GitOps and Vault for secrets
 
 ## Platform At A Glance
 
@@ -107,6 +108,8 @@ Even before Kubernetes, the workspace already reflects several production-style 
 - central observability instead of app-specific monitoring islands
 - bounded Docker log rotation to avoid silent disk growth
 - Postgres chosen as the strategic control-plane database direction
+- Vault already proven in the OpenSIS platform path
+- ArgoCD already present in the strongest GitOps-oriented workload path
 - app-specific alerts and metrics instead of generic host-only dashboards
 - documented incident response and runbook handoff
 - explicit workstation bootstrap for macOS and Linux
