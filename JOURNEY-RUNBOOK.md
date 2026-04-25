@@ -15762,3 +15762,59 @@ Why this matters:
 - Phase 7 now has a concrete path from documentation narrative to reviewer-ready visual evidence
 - this reduces the risk of taking screenshots that look good but do not strengthen the platform story
 - it also gives us a cleaner checklist for the next phase of packaging work
+
+## 2026-04-25 - Phase 7 Slice 6: First Real Screenshot Capture Pass
+
+Convert the visual evidence plan into real captured artifacts, and fix any platform truth issue that blocks a clean baseline before capture.
+
+Why this mattered:
+
+- a screenshot plan without actual artifacts is still only half-done packaging
+- the capture pass should start from a trustworthy operator baseline, not from a failing check with a false signal
+
+Files changed:
+
+```text
+Obervability-Stack/scripts/health-check.sh
+VISUAL-EVIDENCE-PACK.md
+PHASE7-VISUAL-CAPTURE-LOG.md
+README.md
+output/playwright/phase7/phase7-01-landing-page.png
+output/playwright/phase7/phase7-02-dashboard.png
+output/playwright/phase7/phase7-03-services.png
+output/playwright/phase7/phase7-04-compare.png
+output/playwright/phase7/phase7-05-opensis-app-page.png
+output/playwright/phase7/phase7-06-alerts.png
+output/playwright/phase7/phase7-07-notifications.png
+output/playwright/phase7/phase7-08-demo-center.png
+output/playwright/phase7/phase7-09-swiftpay-ui.png
+```
+
+What changed:
+
+- patched `Obervability-Stack/scripts/health-check.sh` so one-shot init services are no longer treated as failed long-running services
+- verified the control-plane operator baseline now passes cleanly at `30/30`
+- captured the first real Phase 7 screenshot batch under `output/playwright/phase7/`
+- added `PHASE7-VISUAL-CAPTURE-LOG.md` to record:
+  - baseline state
+  - captured files
+  - remaining capture gaps
+- linked the new capture log back into the root documentation chain
+
+Playwright capture scope completed:
+
+- landing page
+- dashboard
+- services page
+- comparison view
+- OpenSIS app detail page
+- alerts page
+- notifications page
+- demo center
+- SwiftPay live UI
+
+Why this matters:
+
+- the repo now contains real visual evidence for the Phase 7 story
+- the capture batch is tied to a known healthy operator baseline
+- the first portfolio-ready image set now exists instead of only being planned

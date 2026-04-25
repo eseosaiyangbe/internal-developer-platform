@@ -269,3 +269,5 @@ This pack is successful when:
 - a reviewer can understand the platform story quickly
 - screenshots reinforce the architecture narrative instead of duplicating it
 - the repo looks like a serious engineering project without relying on live narration
+
+The first live capture batch is recorded in [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md).
