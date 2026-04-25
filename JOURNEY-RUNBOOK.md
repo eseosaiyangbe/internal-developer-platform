@@ -15730,3 +15730,35 @@ Validation:
 
 - `git diff --check`
 - searched the affected root and repo docs to confirm the Traefik standard and transitional NGINX notes are visible
+
+## 2026-04-25 - Phase 7 Slice 5: Visual Evidence Pack
+
+Continue Phase 7 by turning the documentation spine into a concrete screenshot and diagram capture plan.
+
+Why this was the right next move:
+
+- the roadmap explicitly calls for screenshots and diagrams
+- the architecture and migration story had already stabilized enough to capture visually
+- the repo needed a repeatable visual pack plan instead of relying on ad hoc screenshot ideas
+
+Files changed:
+
+```text
+VISUAL-EVIDENCE-PACK.md
+README.md
+PORTFOLIO-SNAPSHOT.md
+```
+
+What changed:
+
+- added `VISUAL-EVIDENCE-PACK.md` as the root screenshot and diagram capture plan for the Phase 7 portfolio pack
+- defined the core screenshot set, what each screenshot should prove, and the recommended capture order
+- defined the core diagram set and linked it back to the architecture and migration docs
+- added capture preconditions, file naming guidance, and reuse guidance for README, presentations, and portfolio sharing
+- linked the new visual-pack doc from the root README and the portfolio snapshot
+
+Why this matters:
+
+- Phase 7 now has a concrete path from documentation narrative to reviewer-ready visual evidence
+- this reduces the risk of taking screenshots that look good but do not strengthen the platform story
+- it also gives us a cleaner checklist for the next phase of packaging work

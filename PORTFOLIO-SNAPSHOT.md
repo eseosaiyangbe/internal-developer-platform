@@ -141,6 +141,8 @@ The strongest Phase 7 screenshot pack should include:
 9. One incident drill doc
 10. One architecture diagram
 
+The structured capture plan now lives in [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md).
+
 ## Suggested Talking Points For Reviewers
 
 - one control plane, four different workload stories
