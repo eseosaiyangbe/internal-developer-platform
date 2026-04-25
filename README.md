@@ -140,8 +140,21 @@ Then follow the workspace startup order:
 5. Start `MemFlip`
 6. Run the shared operator check
 
+Recommended commands:
+
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh operator
+cd Obervability-Stack && docker compose up -d
+cd ../SwiftPay && docker compose up -d
+cd ../OpenSIS && ./scripts/compose-start.sh
+cd ../FoodPulse && cp .env.example .env && ./scripts/start.sh
+cd ../MemFlip && cp .env.example .env && docker compose up -d
+cd .. && ./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Apple Silicon note for `OpenSIS`:
+
+```bash
+cd OpenSIS && ./scripts/compose-start.sh --build-local
 ```
 
 Target healthy result:
