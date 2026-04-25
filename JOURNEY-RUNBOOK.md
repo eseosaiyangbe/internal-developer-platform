@@ -15684,3 +15684,49 @@ Architectural clarification:
 - the control plane verifies health, telemetry, and operational outcomes
 
 That separation is now part of the root Phase 7 story.
+
+## 2026-04-25 - Phase 7 Slice 4: Standardize On Traefik For Ingress Direction
+
+Before going deeper into Kubernetes planning, we resolved another root-level platform choice:
+
+- Traefik is the preferred ingress direction for the workspace Kubernetes path
+
+Why this was needed:
+
+- `OpenSIS` already leaned strongly toward Traefik
+- parts of `SwiftPay` and `MemFlip` still described NGINX ingress flows
+- leaving both stories active at the root level would weaken the Phase 7 architecture narrative
+
+Files changed:
+
+```text
+README.md
+PORTFOLIO-SNAPSHOT.md
+WORKSPACE-ARCHITECTURE.md
+KUBERNETES-MIGRATION-PLAN.md
+CONTROL-PLANE-K8S-PLAN.md
+OpenSIS/k8s/bootstrap/traefik/README.md
+SwiftPay/k8s/ingress/README.md
+MemFlip/README.md
+MemFlip/docs/local/04-ingress.md
+```
+
+What changed:
+
+- updated the root Phase 7 docs so Traefik is now the explicitly stated ingress standard
+- added a dedicated Traefik section to the root Kubernetes migration plan
+- updated the control-plane Kubernetes plan so Traefik is part of the platform model, not an afterthought
+- strengthened the OpenSIS Traefik bootstrap doc to clarify that remaining NGINX references elsewhere are transitional
+- added Phase 7 notes to the SwiftPay and MemFlip ingress docs so readers understand those NGINX-based materials are workload-local learning content, not the current platform standard
+- updated the MemFlip top-level README to align its orchestration row with the Traefik direction
+
+Why this matters:
+
+- the workspace now tells one ingress story at the top level
+- Traefik fits better with the Vault-plus-ArgoCD platform direction we already chose
+- this reduces platform narrative drift before we begin turning Phase 7 plans into implementation work
+
+Validation:
+
+- `git diff --check`
+- searched the affected root and repo docs to confirm the Traefik standard and transitional NGINX notes are visible

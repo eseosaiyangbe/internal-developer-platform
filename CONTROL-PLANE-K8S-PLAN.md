@@ -35,6 +35,7 @@ The Kubernetes control-plane scope includes:
 - the Next.js UI
 - rule/config provisioning
 - ArgoCD as the desired-state reconciler for platform manifests
+- Traefik as the standard ingress controller layer
 - Vault integration for secret delivery to control-plane workloads
 
 ## Recommended Namespace
@@ -190,6 +191,7 @@ Strategic platform split:
 
 Recommended pattern:
 
+- Traefik as the standard ingress controller
 - one ingress for the control-plane UI
 - internal Services for Prometheus, Alertmanager, Loki, and Grafana
 - exposure of internal components only when operationally justified

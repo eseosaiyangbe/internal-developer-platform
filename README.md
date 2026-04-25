@@ -69,6 +69,7 @@ This is still a local Compose-first proving ground, but several decisions alread
 - shared observability instead of per-app siloed dashboards
 - bounded Docker log rotation to prevent silent disk exhaustion
 - PostgreSQL selected as the long-term control-plane database direction
+- Traefik selected as the strategic Kubernetes ingress direction
 - environment-driven configuration instead of hard-coded local assumptions
 - explicit operator runbooks and incident documentation
 - app-specific metrics and alerts rather than generic “up/down only” monitoring

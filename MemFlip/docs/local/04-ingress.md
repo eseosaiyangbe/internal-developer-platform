@@ -2,6 +2,8 @@
 
 *Learn to route internet traffic to your Kubernetes application using production-grade networking*
 
+> **Phase 7 Note**: The workspace-wide Kubernetes direction now standardizes on Traefik as the preferred ingress controller. This document remains useful for ingress concepts and local learning, but its NGINX-based steps should be treated as transitional training material rather than the root platform standard.
+
 ## 🎯 **What You'll Learn**
 
 By the end of this tutorial, you'll know how to:

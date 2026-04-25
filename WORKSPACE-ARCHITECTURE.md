@@ -247,6 +247,7 @@ Compose is the proving ground.
 The Kubernetes direction for this workspace is:
 
 - ArgoCD reconciles platform and workload manifests from Git
+- Traefik provides the standard in-cluster ingress layer
 - Vault delivers runtime secrets without storing secret values in Git
 - shared control-plane services become namespace-scoped platform components
 - app services become environment-specific workloads

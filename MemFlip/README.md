@@ -185,7 +185,7 @@ curl http://localhost:8080/api/health
 | **Application** | Node.js + Express, Vanilla JS | Game logic and UI |
 | **Database** | PostgreSQL 15, Redis 7 | Persistent data and caching |
 | **Container** | Docker, Multi-stage builds | Application packaging |
-| **Orchestration** | Kubernetes (k3d), NGINX Ingress | Container management |
+| **Orchestration** | Kubernetes (k3d), Traefik ingress direction | Container management |
 | **Monitoring** | Prometheus, Grafana | Metrics and visualization |
 | **GitOps** | ArgoCD, Git-based workflows | Automated deployments |
 | **Security** | Network Policies, Security Contexts | Defense-in-depth |

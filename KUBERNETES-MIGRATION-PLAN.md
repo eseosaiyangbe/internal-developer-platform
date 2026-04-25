@@ -46,6 +46,7 @@ The intended Kubernetes end state is:
 - workload deployments expressed through Kubernetes-native resources
 - database, secrets, probes, and ingress modeled explicitly
 - ArgoCD managing desired-state reconciliation
+- Traefik handling the standard in-cluster ingress layer
 - Vault managing secret truth and runtime delivery
 - migration decisions driven by operational truth, not by YAML volume
 
@@ -126,6 +127,16 @@ Why:
 - OpenSIS already proves Vault is operationally meaningful in this workspace
 - it avoids treating Git or manually curated Kubernetes Secrets as the human secret store
 - it strengthens the production story for secret rotation, secret scoping, and runtime delivery
+
+### Traefik For Ingress
+
+Traefik should be the preferred ingress controller direction for this workspace.
+
+Why:
+
+- it already aligns with the strongest explicit ingress direction in the repo
+- it fits well behind Cloudflare Tunnel and other edge layers
+- it keeps the platform story cleaner than maintaining mixed ingress-controller guidance across workloads
 
 ## Workload Mapping
 

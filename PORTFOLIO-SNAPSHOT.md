@@ -110,6 +110,7 @@ Even before Kubernetes, the workspace already reflects several production-style 
 - Postgres chosen as the strategic control-plane database direction
 - Vault already proven in the OpenSIS platform path
 - ArgoCD already present in the strongest GitOps-oriented workload path
+- Traefik selected as the strategic ingress direction for the Kubernetes path
 - app-specific alerts and metrics instead of generic host-only dashboards
 - documented incident response and runbook handoff
 - explicit workstation bootstrap for macOS and Linux
