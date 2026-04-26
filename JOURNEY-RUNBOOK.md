@@ -16005,3 +16005,55 @@ Why this matters:
 - the workspace now has a real operator-friendly start and stop path
 - the root README is more actionable for new reviewers and new contributors
 - this is a cleaner bridge from Phase 7 packaging into future cluster-oriented orchestration work
+
+## 2026-04-26 - Workspace Wrapper Bash 3.2 Compatibility Fix
+
+Correct a macOS shell-compatibility bug in the new workspace wrappers.
+
+Why this mattered:
+
+- the first `./scripts/workspace-stop.sh` test on this Mac failed while stopping `OpenSIS`
+- the failure happened before `compose-stop.sh` even ran, which meant the wrapper was not robust enough for the default macOS Bash runtime
+
+Observed error:
+
+```text
+[workspace-stop] Stopping OpenSIS
+./scripts/workspace-stop.sh: line 82: opensis_mode[@]: unbound variable
+```
+
+Root cause:
+
+- this workstation is using `GNU bash, version 3.2.57`
+- under `set -u`, expanding an empty array with `"${array[@]}"` raises an unbound-variable error on that Bash version
+- both workspace wrappers built an optional `OpenSIS` argument array that could be empty when no flags were selected
+
+Files changed:
+
+```text
+scripts/workspace-start.sh
+scripts/workspace-stop.sh
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- replaced the optional empty `opensis_mode` arrays with command arrays initialized to the script path itself
+- appended optional OpenSIS flags onto those command arrays only when needed
+- kept the wrapper behavior unchanged from an operator perspective while removing the Bash 3.2 empty-array failure mode
+
+Validation:
+
+- `bash -n scripts/workspace-start.sh scripts/workspace-stop.sh`
+- `./scripts/workspace-start.sh --help`
+- `./scripts/workspace-stop.sh --help`
+- reproduced the underlying shell behavior directly with:
+
+```bash
+bash -lc 'set -euo pipefail; arr=(); printf "empty-array:%s\n" "${arr[@]}"'
+```
+
+Why this matters:
+
+- the workspace wrappers now behave correctly on the default macOS Bash runtime instead of only on newer Bash versions
+- this protects the operator entry point we just introduced and reduces the risk of a confusing false failure during normal start/stop use

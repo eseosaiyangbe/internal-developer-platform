@@ -69,27 +69,27 @@ start_swiftpay() {
 }
 
 start_opensis() {
-  local opensis_mode=()
+  local -a opensis_cmd=(./scripts/compose-start.sh)
   local arch
 
   arch="$(uname -m)"
 
   if [[ "${arch}" == "arm64" || "${arch}" == "aarch64" ]]; then
-    opensis_mode+=(--build-local)
+    opensis_cmd+=(--build-local)
   fi
 
   if [[ "${OPENSIS_PULL_IMAGE}" == "1" ]]; then
-    opensis_mode+=(--pull-image)
+    opensis_cmd+=(--pull-image)
   fi
 
   if [[ "${OPENSIS_EDGE}" == "1" ]]; then
-    opensis_mode+=(--edge)
+    opensis_cmd+=(--edge)
   fi
 
   log "Starting OpenSIS"
   (
     cd "${WORKSPACE_ROOT}/OpenSIS"
-    ./scripts/compose-start.sh "${opensis_mode[@]}"
+    "${opensis_cmd[@]}"
   )
 }
 

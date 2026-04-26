@@ -62,24 +62,24 @@ stop_foodpulse() {
 }
 
 stop_opensis() {
-  local opensis_mode=()
+  local -a opensis_cmd=(./scripts/compose-stop.sh)
 
   if [[ "${OPENSIS_PULL_IMAGE}" == "1" ]]; then
-    opensis_mode+=(--pull-image)
+    opensis_cmd+=(--pull-image)
   fi
 
   if [[ "${OPENSIS_EDGE}" == "1" ]]; then
-    opensis_mode+=(--edge)
+    opensis_cmd+=(--edge)
   fi
 
   if [[ "${REMOVE_VOLUMES}" == "1" ]]; then
-    opensis_mode+=(--volumes)
+    opensis_cmd+=(--volumes)
   fi
 
   log "Stopping OpenSIS"
   (
     cd "${WORKSPACE_ROOT}/OpenSIS"
-    ./scripts/compose-stop.sh "${opensis_mode[@]}"
+    "${opensis_cmd[@]}"
   )
 }
 
