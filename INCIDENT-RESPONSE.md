@@ -2159,3 +2159,69 @@ activeCount=0
 ### Follow-Up
 
 For a production-grade control plane, replace JSON-file notification storage with SQLite/PostgreSQL and a retention policy. The current atomic file write is acceptable for this local Docker Compose learning stack, but database-backed event storage is the correct Kubernetes-ready path.
+
+## 2026-04-26 - OpenSIS failed to recover cleanly after Colima runtime restart
+
+### Summary
+
+After restarting the local Colima `docker+k3s` runtime, OpenSIS remained down even though the rest of the workspace largely returned. The root cause was a restart-model mismatch in the OpenSIS Vault path: Vault came back sealed, while the component responsible for unsealing and re-establishing AppRole readiness was implemented as a one-shot container. That left the Vault agents backing off for minutes and prevented both the database and UI secrets from being re-rendered in time.
+
+### Impact
+
+- `OpenSIS` showed as `down` in the control plane
+- `opensis-db` healthcheck failed because `/run/secrets/db.env` did not exist
+- `opensis-ui` repeatedly failed its entrypoint wait loop for `/run/secrets/app.env`
+- the supporting MySQL exporter also restarted after the runtime bounce because it lacked a writable `/tmp` for its generated config
+
+### Evidence
+
+- `opensis-db` health failures reported:
+
+```text
+/bin/sh: 1: .: cannot open /run/secrets/db.env: No such file
+```
+
+- `vault-agent-db` and `vault-agent-app` both logged sealed-state authentication failures:
+
+```text
+Code: 503. Errors:
+* Vault is sealed
+```
+
+- `opensis-ui` logged repeated secret wait failures:
+
+```text
+[entrypoint] ERROR: Vault secrets not available after 60 seconds.
+```
+
+- after the hardening change and another `colima restart`, the runtime came back with:
+
+```text
+opensis-ui Up (healthy)
+opensis-db Up (healthy)
+vault-agent-app Up
+vault-agent-db Up
+vault-bootstrap Up (healthy)
+opensis-mysqld-exporter Up
+```
+
+### Remediation
+
+- converted `vault-bootstrap` into a long-running reconcile helper with `OpenSIS/scripts/vault-bootstrap-watch.sh`
+- made AppRole credential reconciliation idempotent without rotating `secret_id` files on every loop
+- added `OpenSIS/scripts/vault-agent-supervisor.sh` so the Vault agents restart themselves if they cannot complete the initial secret render
+- changed dependent services to wait on a healthy `vault-bootstrap` rather than a completed one-shot container
+- increased the OpenSIS UI secret wait timeout to `180s`
+- added recovery `start_period` values to the DB and UI healthchecks
+- added `/tmp` `tmpfs` support to `opensis-mysqld-exporter`
+
+### Validation
+
+- OpenSIS returned to `healthy` in the control plane after the Colima restart
+- `http://localhost:8088` returned the expected installer redirect
+- the OpenSIS DB, UI, both Vault agents, bootstrap helper, and MySQL exporter all came back without manual OpenSIS restarts
+
+### Follow-Up
+
+- keep the long-running bootstrap reconcile helper for the Docker Compose learning path
+- if this pattern is ever promoted beyond local Compose, replace the local unseal approach with a proper production-grade auto-unseal mechanism

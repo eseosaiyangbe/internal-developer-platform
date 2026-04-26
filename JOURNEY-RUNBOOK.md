@@ -16291,3 +16291,39 @@ Why this matters:
 - the repo now has one authoritative MemFlip Kubernetes directory instead of two competing candidates
 - the workstation no longer blocks Kubernetes validation on a dead context
 - the project is now genuinely using `k3s` as the live local distribution, not only mentioning it in planning docs
+
+## 2026-04-26 06:14 EDT - OpenSIS runtime restart hardening after Colima recovery gap
+
+What happened:
+
+- after the local `docker+k3s` runtime restart, `vault` came back sealed
+- the original `vault-bootstrap` container was a one-shot helper, so it did not remain around to reconcile the sealed state
+- `vault-agent-db` and `vault-agent-app` retried against a sealed Vault and backed off for minutes
+- `opensis-db` stayed unhealthy because `/run/secrets/db.env` had not been re-rendered
+- `opensis-ui` stayed down because its entrypoint only waited `60s` for `/run/secrets/app.env`
+
+What we changed:
+
+- converted `vault-bootstrap` from a one-shot helper into a long-running reconcile loop using `OpenSIS/scripts/vault-bootstrap-watch.sh`
+- kept the bootstrap logic idempotent but stopped rotating AppRole `secret_id` values on every reconcile pass unless rotation is explicitly requested
+- introduced `OpenSIS/scripts/vault-agent-supervisor.sh` so both Vault agents fail fast and restart if the initial secret render does not complete inside the configured timeout
+- changed `vault-bootstrap` dependencies from `service_completed_successfully` to `service_healthy` for `vault-seed`, `vault-agent-db`, `vault-agent-app`, and the synthetic exporter
+- increased the OpenSIS UI secret wait window from `60s` to `180s`
+- added `start_period` recovery windows to the OpenSIS DB and UI healthchecks so Compose does not declare failure too early during Vault reconciliation
+- added an explicit `tmpfs` mount for `/tmp` on `opensis-mysqld-exporter` because the exporter writes a generated credentials file there and was restarting under the `nobody` user after the runtime bounce
+
+Why we did it this way:
+
+- the real fault was not only the app containers; it was the mismatch between a restartable runtime and a one-shot Vault reconciliation model
+- keeping a lightweight reconcile loop around Vault is the cleanest local-Compose answer because it preserves the same secret-management architecture without forcing manual unseal and agent restarts after every daemon bounce
+- failing the agents fast on missing initial render is safer than leaving them in a long sealed-state backoff while downstream services remain broken
+
+Validation sequence:
+
+- applied the OpenSIS Compose and script changes
+- brought the OpenSIS stack back to a healthy baseline
+- restarted Colima with `colima restart`
+- observed OpenSIS recover automatically after the runtime restart without any manual `vault-agent-app` or `opensis-ui` restart
+- verified `opensis-ui`, `opensis-db`, `vault-agent-app`, `vault-agent-db`, `vault-bootstrap`, and `opensis-mysqld-exporter` all returned to healthy running state
+- verified `http://localhost:8088` returned the expected `302` redirect to `install/index.php`
+- verified the control plane reported OpenSIS as `healthy`
