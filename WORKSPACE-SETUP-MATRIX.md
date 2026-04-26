@@ -21,6 +21,8 @@ For full-workspace startup and shutdown, prefer the root wrappers:
 
 These scripts start and stop the repos in the documented order, seed missing `.env` files for `FoodPulse` and `MemFlip`, and handle the Apple Silicon `OpenSIS` local-build path automatically.
 
+Use `./scripts/workspace-start.sh --rebuild` only when you intentionally want fresh local images. The default path should reuse existing local images and containers where possible.
+
 ## Setup Matrix
 
 | Repo | Primary Start Command | Optional Helper | Env Contract | Main Local URL | Health Check | `observability-net` Alias / Aliases | Kubernetes Readiness Note | Notes |

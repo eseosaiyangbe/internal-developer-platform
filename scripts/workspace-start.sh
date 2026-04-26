@@ -11,6 +11,7 @@ Usage: ./scripts/workspace-start.sh [options]
 Start the full DevOps Easy Learning workspace in the recommended order.
 
 Options:
+  --rebuild          Force image rebuilds for local-build services before startup
   --skip-verify      Skip the final shared operator check
   --opensis-edge     Start OpenSIS with edge services enabled
   --opensis-pull     Start OpenSIS with the published UI image instead of the local build path
@@ -52,11 +53,28 @@ ensure_env_file() {
   log "Created ${repo_dir}/.env from .env.example"
 }
 
+repair_memflip_env_defaults() {
+  local env_file="${WORKSPACE_ROOT}/MemFlip/.env"
+
+  if [[ ! -f "${env_file}" ]]; then
+    return 0
+  fi
+
+  if grep -q '^DB_PASSWORD=your_database_password_here$' "${env_file}" || grep -q '^REDIS_PASSWORD=your_redis_password_here$' "${env_file}"; then
+    perl -0pi -e 's/^DB_PASSWORD=your_database_password_here$/DB_PASSWORD=gamepass123/mg; s/^REDIS_PASSWORD=your_redis_password_here$/REDIS_PASSWORD=gamepass123/mg' "${env_file}"
+    log "Repaired MemFlip placeholder credentials in MemFlip/.env"
+  fi
+}
+
 start_observability_stack() {
   log "Starting Obervability-Stack"
   (
     cd "${WORKSPACE_ROOT}/Obervability-Stack"
-    docker compose up -d
+    if [[ "${FORCE_REBUILD}" == "1" ]]; then
+      docker compose up -d --build
+    else
+      docker compose up -d
+    fi
   )
 }
 
@@ -64,7 +82,11 @@ start_swiftpay() {
   log "Starting SwiftPay"
   (
     cd "${WORKSPACE_ROOT}/SwiftPay"
-    docker compose up -d
+    if [[ "${FORCE_REBUILD}" == "1" ]]; then
+      docker compose up -d --build
+    else
+      docker compose up -d
+    fi
   )
 }
 
@@ -76,6 +98,10 @@ start_opensis() {
 
   if [[ "${arch}" == "arm64" || "${arch}" == "aarch64" ]]; then
     opensis_cmd+=(--build-local)
+  fi
+
+  if [[ "${FORCE_REBUILD}" == "1" ]]; then
+    opensis_cmd+=(--build)
   fi
 
   if [[ "${OPENSIS_PULL_IMAGE}" == "1" ]]; then
@@ -98,16 +124,25 @@ start_foodpulse() {
   ensure_env_file "${WORKSPACE_ROOT}/FoodPulse"
   (
     cd "${WORKSPACE_ROOT}/FoodPulse"
-    ./scripts/start.sh
+    if [[ "${FORCE_REBUILD}" == "1" ]]; then
+      ./scripts/start.sh --build
+    else
+      ./scripts/start.sh
+    fi
   )
 }
 
 start_memflip() {
   log "Starting MemFlip"
   ensure_env_file "${WORKSPACE_ROOT}/MemFlip"
+  repair_memflip_env_defaults
   (
     cd "${WORKSPACE_ROOT}/MemFlip"
-    docker compose up -d
+    if [[ "${FORCE_REBUILD}" == "1" ]]; then
+      docker compose up -d --build
+    else
+      docker compose up -d
+    fi
   )
 }
 
@@ -121,11 +156,16 @@ run_final_verify() {
 
 main() {
   local skip_verify=0
+  FORCE_REBUILD=0
   OPENSIS_EDGE=0
   OPENSIS_PULL_IMAGE=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --rebuild)
+        FORCE_REBUILD=1
+        shift
+        ;;
       --skip-verify)
         skip_verify=1
         shift

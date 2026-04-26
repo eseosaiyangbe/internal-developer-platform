@@ -16057,3 +16057,66 @@ Why this matters:
 
 - the workspace wrappers now behave correctly on the default macOS Bash runtime instead of only on newer Bash versions
 - this protects the operator entry point we just introduced and reduces the risk of a confusing false failure during normal start/stop use
+
+## 2026-04-26 - Workspace Start Rebuild Policy And Operator Check Fixes
+
+Correct the first real workspace-start validation issues after introducing the root wrapper.
+
+Why this mattered:
+
+- a normal `./scripts/workspace-start.sh` run should reuse local images and containers by default instead of looking like a rebuild pipeline every time
+- the operator check should validate real service health, not the wrong host port
+- a wrapper-generated `.env` file must be able to start the target app successfully
+
+Observed issues:
+
+1. `OpenSIS` and `FoodPulse` were still forcing rebuild behavior on normal startup.
+2. The control-plane health check probed `cAdvisor` on `http://localhost:8080/healthz`, which is the `MemFlip` frontend port in this workspace.
+3. `MemFlip` came up with placeholder credentials from `.env.example`, causing backend database authentication failures and a down status in the operator snapshot.
+
+Files changed:
+
+```text
+OpenSIS/scripts/compose-start.sh
+OpenSIS/docker-compose.yaml
+FoodPulse/scripts/start.sh
+MemFlip/.env.example
+Obervability-Stack/scripts/health-check.sh
+scripts/workspace-start.sh
+README.md
+WORKSPACE-SETUP-MATRIX.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- added `--build` to `OpenSIS/scripts/compose-start.sh` so normal startup now reuses local images and `--build` becomes the explicit rebuild path
+- added `--build` to `FoodPulse/scripts/start.sh` with the same policy: normal startup reuses local images, rebuild is opt-in
+- added `--rebuild` to `./scripts/workspace-start.sh` so the root wrapper can force rebuilds intentionally without making that the default path
+- corrected the `cAdvisor` health check from host `8080` to host `8082`, which matches the actual `Obervability-Stack` port mapping and avoids colliding with `MemFlip`
+- removed the stale “optional profile” warning behavior for `cAdvisor` and aligned the health check with the real default service set
+- fixed `MemFlip/.env.example` so the generated local `.env` uses working local credentials instead of placeholder passwords
+- added a small `MemFlip` `.env` repair path in the workspace wrapper so existing checkouts generated from the old example self-correct on the next start
+- added explicit doc guidance that `./scripts/workspace-start.sh` should reuse existing local images by default and that `--rebuild` is the intentional fresh-build path
+- added local image tags plus `pull_policy: never` for `OpenSIS` build-only helper images and the main UI image so normal startup stays local-first and avoids pointless registry pull attempts
+
+Validation:
+
+- `bash -n scripts/workspace-start.sh OpenSIS/scripts/compose-start.sh FoodPulse/scripts/start.sh Obervability-Stack/scripts/health-check.sh`
+- `./scripts/workspace-start.sh --help`
+- `cd OpenSIS && ./scripts/compose-start.sh --help`
+- `cd FoodPulse && ./scripts/start.sh --help`
+- reran `./scripts/workspace-start.sh --skip-verify` and confirmed the workspace reused running containers cleanly for the normal path
+- reran `./Obervability-Stack/scripts/devops-monitor.sh operator`
+
+Final verified state:
+
+- control-plane smoke check passed `31/31`
+- inventory validation passed
+- app snapshot returned `4 healthy / 0 down`
+
+Why this matters:
+
+- the root workspace wrapper now behaves like an operator tool instead of a hidden rebuild pipeline
+- the control-plane verification path now matches the real workspace port layout
+- the wrapper can safely bootstrap a clean `MemFlip` local environment instead of generating a broken one

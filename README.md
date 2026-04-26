@@ -138,6 +138,12 @@ Recommended workspace commands:
 ./scripts/workspace-stop.sh
 ```
 
+Force a rebuild only when you actually need one:
+
+```bash
+./scripts/workspace-start.sh --rebuild
+```
+
 What `./scripts/workspace-start.sh` does:
 
 1. Start `Obervability-Stack`
