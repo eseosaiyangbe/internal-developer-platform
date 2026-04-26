@@ -16120,3 +16120,34 @@ Why this matters:
 - the root workspace wrapper now behaves like an operator tool instead of a hidden rebuild pipeline
 - the control-plane verification path now matches the real workspace port layout
 - the wrapper can safely bootstrap a clean `MemFlip` local environment instead of generating a broken one
+
+## 2026-04-26 - Workspace Start Snapshot Stabilization
+
+Tighten the final verification phase of the workspace start wrapper so it does not report false negatives while fresh app probes are still settling.
+
+Why this mattered:
+
+- a rerun of `./scripts/workspace-start.sh` returned `2 healthy / 2 down` for `MemFlip` and `FoodPulse`
+- a direct live check immediately afterward showed both apps healthy and the control-plane API already reporting `4 healthy / 0 down`
+- that means the wrapper was sometimes reaching the final operator check before the control-plane snapshot had fully refreshed after startup
+
+Files changed:
+
+```text
+scripts/workspace-start.sh
+README.md
+WORKSPACE-SETUP-MATRIX.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- added a `wait_for_workspace_apps` step to `./scripts/workspace-start.sh`
+- the wrapper now polls `http://localhost:4000/api/apps/health` before the final operator check
+- the final verification now waits for `downApps=0` across the monitored app snapshot or times out after a bounded retry window
+- updated the root docs so the startup sequence now explicitly includes the control-plane snapshot stabilization step
+
+Why this matters:
+
+- the workspace wrapper now better reflects real operator intent: do not certify the stack before the shared control plane has observed it
+- this reduces noisy first-run or just-started false warnings without hiding genuine app failures

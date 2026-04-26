@@ -34,8 +34,30 @@ require_command() {
 
 ensure_docker_ready() {
   require_command docker
+  require_command curl
   docker info >/dev/null 2>&1 || fail "Docker daemon is not reachable"
   docker compose version >/dev/null 2>&1 || fail "Docker Compose is not available"
+}
+
+json_field() {
+  local payload="$1"
+  local python_expr="$2"
+
+  JSON_PAYLOAD="$payload" python3 - "$python_expr" <<'PY'
+import json
+import os
+import sys
+
+payload = json.loads(os.environ["JSON_PAYLOAD"])
+expr = sys.argv[1]
+
+if expr == "downApps":
+    print(payload.get("summary", {}).get("downApps", ""))
+elif expr == "totalApps":
+    print(payload.get("summary", {}).get("totalApps", ""))
+else:
+    raise SystemExit(1)
+PY
 }
 
 ensure_env_file() {
@@ -146,7 +168,42 @@ start_memflip() {
   )
 }
 
+wait_for_workspace_apps() {
+  local attempts=18
+  local sleep_seconds=5
+  local url="http://localhost:4000/api/apps/health"
+  local payload=""
+  local total_apps=""
+  local down_apps=""
+  local attempt
+
+  log "Waiting for control-plane app snapshot to stabilize"
+
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    payload="$(curl -fsS --max-time 15 "${url}" || true)"
+
+    if [[ -n "${payload}" ]]; then
+      total_apps="$(json_field "${payload}" "totalApps" 2>/dev/null || true)"
+      down_apps="$(json_field "${payload}" "downApps" 2>/dev/null || true)"
+
+      if [[ "${total_apps}" =~ ^[0-9]+$ ]] && [[ "${down_apps}" =~ ^[0-9]+$ ]] && [[ "${total_apps}" -gt 0 ]] && [[ "${down_apps}" -eq 0 ]]; then
+        log "Control-plane app snapshot is healthy"
+        return 0
+      fi
+
+      log "App snapshot not ready yet (attempt ${attempt}/${attempts}, total=${total_apps:-unknown}, down=${down_apps:-unknown})"
+    else
+      log "App snapshot endpoint not ready yet (attempt ${attempt}/${attempts})"
+    fi
+
+    sleep "${sleep_seconds}"
+  done
+
+  log "App snapshot did not fully stabilize before verification; continuing to operator check"
+}
+
 run_final_verify() {
+  wait_for_workspace_apps
   log "Running shared operator verification"
   (
     cd "${WORKSPACE_ROOT}"

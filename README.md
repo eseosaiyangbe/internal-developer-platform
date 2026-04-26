@@ -151,7 +151,8 @@ What `./scripts/workspace-start.sh` does:
 3. Start `OpenSIS`
 4. Start `FoodPulse`
 5. Start `MemFlip`
-6. Run the shared operator check
+6. Wait for the control-plane app snapshot to stabilize
+7. Run the shared operator check
 
 Start the full workspace:
 
