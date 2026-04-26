@@ -79,6 +79,8 @@ ensure_linux_k3s() {
 }
 
 main() {
+  local ingress_address
+
   case "${OSTYPE:-}" in
     darwin*)
       ensure_macos_k3s
@@ -95,6 +97,17 @@ main() {
   echo "k3s runtime is ready."
   kubectl config current-context
   kubectl get nodes
+
+  ingress_address="$(kubectl get svc traefik -n traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+  if [[ -z "${ingress_address}" ]]; then
+    ingress_address="$(kubectl get svc traefik -n traefik -o jsonpath='{.spec.externalIPs[0]}' 2>/dev/null || true)"
+  fi
+
+  if [[ -n "${ingress_address}" ]]; then
+    echo "Traefik ingress address: ${ingress_address}"
+  else
+    echo "Traefik ingress address is not yet assigned."
+  fi
 }
 
 main "$@"

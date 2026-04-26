@@ -14,6 +14,11 @@ It exists to prove that one workload can move from local Compose into a `dev` cl
 
 This path is the Phase 7 reference implementation for future workload migrations.
 
+It is designed to run on both:
+
+- macOS with Colima-backed `k3s`
+- Linux with a locally installed `k3s` service
+
 ## What This Path Uses
 
 Directory layout:
@@ -128,6 +133,18 @@ Current dev hostname:
 - `memflip.devops.local`
 
 Traefik handles ingress for this path.
+
+To discover the current Traefik entry address on either macOS or Linux:
+
+```bash
+kubectl get svc traefik -n traefik
+```
+
+Or use the workspace helper:
+
+```bash
+./scripts/ensure-k3s-runtime.sh
+```
 
 If local DNS is not yet wired, add a temporary hosts entry that points the hostname to the Traefik entry address for your cluster.
 
