@@ -104,6 +104,7 @@ Phase 7 will be considered successful when:
 - architecture, screenshots, and diagrams make the platform understandable without a live walkthrough
 - packaging materials show why this workspace is a serious platform engineering portfolio piece
 - Kubernetes migration guidance is concrete enough to become an implementation plan
+- the first Kubernetes implementation slice is real, documented, and reusable as a migration template
 
 Phase 6 completed when:
 

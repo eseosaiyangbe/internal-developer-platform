@@ -140,6 +140,11 @@ Mitigation:
 4. validate browser, API, probes, metrics, and logs
 5. then capture the pattern as the template for later workloads
 
+The first concrete implementation of that sequence now lives at:
+
+- `MemFlip/k8s/phase7/`
+- [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md)
+
 ## What Success Looks Like
 
 When MemFlip is migrated well, it becomes:

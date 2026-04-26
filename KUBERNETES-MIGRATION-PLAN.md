@@ -245,32 +245,39 @@ Why this phase matters:
 
 the move to Kubernetes should preserve the environment split instead of retrofitting it later.
 
-### Phase D: Migrate The Control Plane First
+### Phase D: Prove The First Workload Migration Pattern
 
 Recommended first Kubernetes implementation slice:
 
-- move `Obervability-Stack` into a cluster-scoped or namespace-scoped platform deployment model
-- preserve app scrape contracts and blackbox probing
-- validate alerts, notifications, and dashboard integrity
+- move `MemFlip` into a `dev` cluster namespace first
+- preserve browser access, backend health, metrics, and stateful dependency clarity
+- preserve a clean path back into the shared control plane narrative
 
 Why this phase matters:
 
-the control plane is the system we will rely on to validate the rest of the migration.
+the first migration should reduce ambiguity, not compound it. `MemFlip` is the cleanest low-risk proof that the workspace can move beyond Compose without losing operator clarity.
 
-### Phase E: Migrate One Workload At A Time
+Current implementation path:
+
+- [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
+- [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md)
+
+### Phase E: Migrate The Control Plane And Remaining Workloads Deliberately
 
 Recommended order:
 
 1. `MemFlip`
 2. `FoodPulse`
 3. `SwiftPay`
-4. `OpenSIS`
+4. `Obervability-Stack`
+5. `OpenSIS`
 
 Reasoning:
 
 - `MemFlip` is the cleanest low-risk onboarding candidate
 - `FoodPulse` is a good mid-complexity resilience test
 - `SwiftPay` is the flagship microservices story and deserves deliberate treatment
+- `Obervability-Stack` should move only after the first workload pattern is proven, because it is the shared platform the rest of the system depends on
 - `OpenSIS` has the most platform complexity because of Vault and legacy/runtime wrapping
 
 ### Phase F: Add Production Controls

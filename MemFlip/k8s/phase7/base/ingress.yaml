@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: memflip
+  labels:
+    app.kubernetes.io/name: memflip
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: devops-easy-learning
+    observability.dev/app: memflip
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: memflip.devops.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: memflip-backend
+                port:
+                  number: 3001
+          - path: /debug
+            pathType: Prefix
+            backend:
+              service:
+                name: memflip-backend
+                port:
+                  number: 3001
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: memflip-frontend
+                port:
+                  number: 80

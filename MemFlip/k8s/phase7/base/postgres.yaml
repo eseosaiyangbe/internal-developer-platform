@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: memflip-postgres
+  labels:
+    app.kubernetes.io/name: memflip-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: devops-easy-learning
+    observability.dev/app: memflip
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app.kubernetes.io/name: memflip-postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: memflip-postgres
+  labels:
+    app.kubernetes.io/name: memflip-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: devops-easy-learning
+    observability.dev/app: memflip
+spec:
+  serviceName: memflip-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: memflip-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: memflip-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: devops-easy-learning
+        observability.dev/app: memflip
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: memflip-app-config
+                  key: DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: memflip-app-config
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: memflip-app-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: postgres-init
+          configMap:
+            name: memflip-db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+        labels:
+          app.kubernetes.io/name: memflip-postgres
+          app.kubernetes.io/component: database
+          app.kubernetes.io/part-of: devops-easy-learning
+          observability.dev/app: memflip
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

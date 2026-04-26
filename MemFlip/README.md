@@ -163,6 +163,25 @@ curl http://localhost:8080/api/health
 
 `./scripts/docker-storage-check.sh` reports Docker storage usage, the active MemFlip container logging policy, and the largest visible Docker `json-file` logs. Use it before demos or when the shared Docker runtime starts showing disk pressure.
 
+## Phase 7 Kubernetes Path
+
+The authoritative Kubernetes migration path for the workspace is now:
+
+- [docs/local/12-phase7-k8s-dev.md](docs/local/12-phase7-k8s-dev.md)
+
+That path introduces the first production-minded `dev` cluster implementation for MemFlip using:
+
+- Traefik ingress
+- a `base` plus `overlays/dev` Kustomize structure
+- ArgoCD application wiring
+- a temporary dev-only Kubernetes secret bootstrap path that is explicitly scheduled to move to Vault later
+
+Use:
+
+- `k8s/phase7/`
+
+Treat the older `k8s/` manifests as learning-path and archive material, not the current Phase 7 deployment standard.
+
 ---
 
 ## **What You'll Build**

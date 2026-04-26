@@ -16151,3 +16151,64 @@ Why this matters:
 
 - the workspace wrapper now better reflects real operator intent: do not certify the stack before the shared control plane has observed it
 - this reduces noisy first-run or just-started false warnings without hiding genuine app failures
+
+## 2026-04-26 - MemFlip Phase 7 Kubernetes Dev Path
+
+Create the first concrete Kubernetes implementation slice for Phase 7 using `MemFlip` as the lowest-risk workload.
+
+Why this mattered:
+
+- the Phase 7 documents already named `MemFlip` as the first migration candidate, but the repo still lacked a real implementation path
+- the older `MemFlip/k8s` directory was still tutorial-oriented and did not represent the current platform standard
+- the workspace needed one clean `dev` cluster reference path aligned with Traefik, ArgoCD, and the future Vault secret model
+
+Files changed:
+
+```text
+MemFlip/k8s/phase7/base/app-config.yaml
+MemFlip/k8s/phase7/base/backend.yaml
+MemFlip/k8s/phase7/base/combined-init.sql
+MemFlip/k8s/phase7/base/frontend.yaml
+MemFlip/k8s/phase7/base/ingress.yaml
+MemFlip/k8s/phase7/base/kustomization.yaml
+MemFlip/k8s/phase7/base/postgres.yaml
+MemFlip/k8s/phase7/base/redis.yaml
+MemFlip/k8s/phase7/overlays/dev/dev-secrets.env
+MemFlip/k8s/phase7/overlays/dev/kustomization.yaml
+MemFlip/k8s/phase7/overlays/dev/namespace.yaml
+MemFlip/k8s/phase7/argocd/memflip-dev-application.yaml
+MemFlip/docs/local/12-phase7-k8s-dev.md
+MemFlip/README.md
+MEMFLIP-K8S-CANDIDATE.md
+KUBERNETES-MIGRATION-PLAN.md
+PROJECT-ROADMAP.md
+README.md
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- created a new authoritative Kubernetes path at `MemFlip/k8s/phase7/`
+- structured the manifests as `base` plus `overlays/dev` so the first cluster path is GitOps-friendly instead of tutorial-only
+- used `StatefulSet` resources for PostgreSQL and Redis, `Deployment` resources for frontend and backend, and `Ingress` with `ingressClassName: traefik`
+- kept non-secret runtime config in `ConfigMap` and introduced a dev-only `Secret` generator for cluster bootstrap
+- added an ArgoCD `Application` manifest that points to `MemFlip/k8s/phase7/overlays/dev`
+- documented the temporary secret-management compromise explicitly: checked-in dev secret material is acceptable only for local bootstrap and should later move to Vault-backed delivery
+- updated the root migration plan so it now matches the actual Phase 7 decision to migrate `MemFlip` before `Obervability-Stack`
+- updated the roadmap and root README so reviewers can find the first real Kubernetes implementation slice immediately
+
+Validation:
+
+- `kubectl kustomize MemFlip/k8s/phase7/overlays/dev`
+- `git diff --check`
+
+Validation caveat:
+
+- `kubectl apply --dry-run=client -k MemFlip/k8s/phase7/overlays/dev` could not complete on this workstation because there was no active Kubernetes API context, and `kubectl` attempted to resolve `http://localhost:80`
+- the manifests were still fully render-validated through `kubectl kustomize`
+
+Why this matters:
+
+- the repo now contains a real Phase 7 implementation slice instead of only migration theory
+- `MemFlip` can now act as the reference workload for later Kubernetes migrations
+- the platform story remains consistent: ArgoCD for GitOps, Traefik for ingress, Vault as the future secret source of truth
