@@ -35,17 +35,25 @@ docker-compose up -d
 # Access at http://localhost:8080
 ```
 
-### Local Kubernetes (k3d)
+### Local Kubernetes (k3s)
 ```bash
-# Create cluster
-k3d cluster create humor-game
+# Provision the local k3s runtime
+../../scripts/ensure-k3s-runtime.sh
 
 # Deploy application
-kubectl apply -f k8s/
+kubectl apply -k ../../k8s/overlays/dev
 
-# Access via port-forward
-kubectl port-forward svc/frontend -n humor-game 8080:80
+# Access via Traefik on the k3s node IP
+curl -H 'Host: memflip.devops.local' http://192.168.64.2/
 ```
+
+The authoritative Kubernetes path is:
+
+- [12-phase7-k8s-dev.md](./12-phase7-k8s-dev.md)
+
+The older tutorial-era manifests now live in:
+
+- [../../k8s-legacy-lab/README.md](/Users/raymond/Documents/DevOps-Easy-Learning/MemFlip/k8s-legacy-lab/README.md)
 
 ## 🎯 Learning Objectives
 

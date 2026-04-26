@@ -1,5 +1,7 @@
 # Frequently Asked Questions
 
+> Current standard: MemFlip now uses `k3s` as the local Kubernetes distribution. References to `k3d` below are historical context from the earlier learning path.
+
 ## General Questions
 
 ### Q: What is this project?

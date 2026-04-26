@@ -16212,3 +16212,82 @@ Why this matters:
 - the repo now contains a real Phase 7 implementation slice instead of only migration theory
 - `MemFlip` can now act as the reference workload for later Kubernetes migrations
 - the platform story remains consistent: ArgoCD for GitOps, Traefik for ingress, Vault as the future secret source of truth
+
+## 2026-04-26 - MemFlip Kubernetes Ownership Cleanup And Local k3s Activation
+
+Promote the new MemFlip manifests to the real `k8s` path, archive the tutorial-era manifests, and fix the missing Kubernetes API context by standing up a live local `k3s` cluster.
+
+Why this mattered:
+
+- the repo still split MemFlip between an older tutorial-era `k8s` directory and a newer implementation path
+- that preserved ambiguity about which manifests were actually current
+- the workstation had `kubectl` installed but no active cluster context, which made validation stop at render-only checks
+- the live cluster pass also exposed two real runtime issues: no active Traefik controller in the new local `k3s` profile, and a Compose-era frontend dependency on the DNS name `backend`
+
+Files changed:
+
+```text
+MemFlip/k8s/
+MemFlip/k8s-legacy-lab/
+MemFlip/k8s-legacy-lab/README.md
+MemFlip/docs/local/00-overview.md
+MemFlip/docs/local/01-prereqs.md
+MemFlip/docs/local/03-k8s-basics.md
+MemFlip/docs/local/08-troubleshooting.md
+MemFlip/docs/local/09-faq.md
+MemFlip/docs/local/10-glossary.md
+MemFlip/docs/local/11-decision-notes.md
+MemFlip/docs/local/12-phase7-k8s-dev.md
+MemFlip/docs/local/README.md
+MemFlip/docs/monitoring-access-guide.md
+MemFlip/README.md
+README.md
+WORKSTATION-BOOTSTRAP.md
+scripts/bootstrap-macos-userland.sh
+scripts/bootstrap-linux-userland.sh
+scripts/ensure-k3s-runtime.sh
+JOURNEY-RUNBOOK.md
+```
+
+What changed:
+
+- renamed the older MemFlip manifest set to `MemFlip/k8s-legacy-lab/`
+- promoted the new implementation to the authoritative `MemFlip/k8s/` path
+- added `MemFlip/k8s-legacy-lab/README.md` so the archive is explicit instead of ambiguous
+- created `scripts/ensure-k3s-runtime.sh` as the cross-platform local k3s bootstrap helper
+- updated both workstation bootstrap scripts to provision a real local `k3s` runtime instead of stopping at CLI installation
+- on this macOS workstation, enabled Colima’s embedded `k3s` control plane and switched `kubectl` to the `colima` context
+- installed Traefik into the local cluster with the official Helm chart because this Colima `k3s` profile did not ship a running Traefik controller by default
+- built and deployed the MemFlip frontend and backend images into the live cluster
+- added a compatibility Kubernetes `Service` named `backend` so the existing frontend NGINX upstream continues to resolve cleanly in Kubernetes
+- updated the active MemFlip and workstation docs so the current local Kubernetes story is `k3s`, while older `k3d` material is clearly marked as historical
+
+Validation:
+
+- `colima start --runtime docker --cpu 4 --memory 8 --disk 60 --kubernetes --network-address`
+- `kubectl get nodes`
+- `kubectl apply --dry-run=client -k MemFlip/k8s/overlays/dev`
+- `docker build -t memflip-backend:dev MemFlip/backend`
+- `docker build -t memflip-frontend:dev MemFlip/frontend`
+- `kubectl apply -k MemFlip/k8s/overlays/dev`
+- `kubectl rollout status deployment/memflip-backend -n memflip-dev --timeout=180s`
+- `kubectl rollout status deployment/memflip-frontend -n memflip-dev --timeout=180s`
+- `kubectl rollout status statefulset/memflip-postgres -n memflip-dev --timeout=180s`
+- `kubectl rollout status statefulset/memflip-redis -n memflip-dev --timeout=180s`
+- `curl -I -H 'Host: memflip.devops.local' http://192.168.64.2/`
+- `curl -s -H 'Host: memflip.devops.local' http://192.168.64.2/health`
+- `curl -s -H 'Host: memflip.devops.local' http://192.168.64.2/api/health`
+
+Final verified state:
+
+- `kubectl` context is live and points to `colima`
+- local cluster version is `v1.35.0+k3s1`
+- Traefik is deployed and serving `memflip.devops.local` on `192.168.64.2`
+- MemFlip frontend, backend, PostgreSQL, and Redis are all running in `memflip-dev`
+- frontend root, frontend health, and backend API health all responded successfully through Traefik
+
+Why this matters:
+
+- the repo now has one authoritative MemFlip Kubernetes directory instead of two competing candidates
+- the workstation no longer blocks Kubernetes validation on a dead context
+- the project is now genuinely using `k3s` as the live local distribution, not only mentioning it in planning docs

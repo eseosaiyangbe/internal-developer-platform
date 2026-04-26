@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [[ "${OSTYPE:-}" != linux* ]]; then
   echo "This script is intended for Linux."
   exit 1
@@ -210,13 +212,6 @@ install_kind() {
   chmod +x "${LOCAL_BIN}/kind"
 }
 
-install_k3d() {
-  local url
-  url="$(github_asset_url k3d-io/k3d "k3d-linux-${ARCH}$")"
-  download "${url}" "${LOCAL_BIN}/k3d"
-  chmod +x "${LOCAL_BIN}/k3d"
-}
-
 install_yq() {
   local url
   url="$(github_asset_url mikefarah/yq "yq_linux_${ARCH}$")"
@@ -305,7 +300,6 @@ main() {
   install_promtool
   install_kustomize
   install_kind
-  install_k3d
   install_argocd
 
   echo "Installing infrastructure and helper tooling..."
@@ -317,6 +311,9 @@ main() {
 
   echo "Installing Azure CLI into a local virtual environment..."
   install_azure_cli
+
+  echo "Provisioning the local k3s runtime..."
+  "${SCRIPT_DIR}/ensure-k3s-runtime.sh"
 
   cat <<'EOF'
 
@@ -334,6 +331,8 @@ Verification:
   docker version
   docker compose version
   kubectl version --client
+  kubectl get nodes
+  k3s --version
   helm version
   promtool --version
   terraform version

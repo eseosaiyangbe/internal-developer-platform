@@ -19,8 +19,8 @@ The bootstrap scripts are designed to prepare a workstation for the main workflo
 - Docker and Docker Compose
 - Docker Buildx
 - Kubernetes CLI tooling
+- local k3s runtime provisioning
 - Prometheus rule tooling (`promtool`)
-- local Kubernetes tooling
 - Terraform
 - Node.js and npm
 - AWS CLI
@@ -44,6 +44,7 @@ Notes:
 - this script targets Apple Silicon macOS
 - it installs tools into user-space locations instead of relying on Homebrew
 - it uses Colima and Lima for the local Docker runtime
+- it provisions a local k3s cluster through Colima and installs Traefik as the ingress controller
 - after bootstrap, the main Docker context should be `colima`
 
 ### Linux
@@ -59,6 +60,7 @@ Notes:
 - this script targets Linux
 - it installs most tools into user-space locations
 - it uses Docker Engine directly instead of Colima/Lima
+- it provisions a local k3s cluster with the official installer when passwordless sudo is available
 - it detects `apt-get` and `dnf` for base package installation
 - if Docker is newly installed, you may need to log out and back in before the `docker` group membership applies cleanly
 
@@ -69,6 +71,7 @@ Notes:
 ```bash
 source ~/.zprofile
 docker context use colima
+kubectl get nodes
 ```
 
 ### Linux shell refresh
@@ -86,6 +89,7 @@ docker version
 docker compose version
 docker buildx version
 kubectl version --client
+kubectl get nodes
 helm version
 promtool --version
 terraform version
@@ -113,12 +117,15 @@ The intended local runtime is:
 
 ```text
 Docker CLI -> Colima -> Lima VM -> Docker Engine
+                                 -> k3s control plane
 ```
 
 That means these two checks matter:
 
 - `docker context ls`
 - `colima status`
+- `kubectl config current-context`
+- `kubectl get nodes`
 - `docker buildx version`
 
 ### Linux
@@ -127,12 +134,15 @@ The intended local runtime is:
 
 ```text
 Docker CLI -> Docker Engine
+          -> k3s service
 ```
 
 That means these two checks matter:
 
 - `docker version`
 - `systemctl status docker` if Docker daemon access is failing
+- `systemctl status k3s` if Kubernetes access is failing
+- `kubectl get nodes`
 - `docker buildx version`
 
 ## Why This Guide Exists
@@ -142,7 +152,7 @@ This project is being built with Kubernetes in mind, but the daily proving groun
 If workstation setup is inconsistent, everything downstream becomes noisy:
 
 - Compose validation
-- k3d or kind usage
+- k3s runtime usage
 - Terraform workflows
 - cloud CLI commands
 - onboarding for other contributors
@@ -153,5 +163,6 @@ This guide keeps the machine bootstrap aligned with the workspace roadmap and ru
 
 - [bootstrap-macos-userland.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/bootstrap-macos-userland.sh)
 - [bootstrap-linux-userland.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/bootstrap-linux-userland.sh)
+- [ensure-k3s-runtime.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/ensure-k3s-runtime.sh)
 - [PROJECT-ROADMAP.md](/Users/raymond/Documents/DevOps-Easy-Learning/PROJECT-ROADMAP.md)
 - [JOURNEY-RUNBOOK.md](/Users/raymond/Documents/DevOps-Easy-Learning/JOURNEY-RUNBOOK.md)

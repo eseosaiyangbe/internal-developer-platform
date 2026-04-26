@@ -19,7 +19,7 @@ This path is the Phase 7 reference implementation for future workload migrations
 Directory layout:
 
 ```text
-MemFlip/k8s/phase7/
+MemFlip/k8s/
 ├── argocd/
 │   └── memflip-dev-application.yaml
 ├── base/
@@ -63,7 +63,7 @@ It is intentionally not over-engineered.
 
 This first `dev` overlay uses a checked-in secret generator file:
 
-- `MemFlip/k8s/phase7/overlays/dev/dev-secrets.env`
+- `MemFlip/k8s/overlays/dev/dev-secrets.env`
 
 That is acceptable only because this path is for a local `dev` cluster bootstrap and the values are non-production development credentials.
 
@@ -92,19 +92,19 @@ If your local cluster does not share the host Docker image store, import or push
 Render the overlay:
 
 ```bash
-kubectl kustomize MemFlip/k8s/phase7/overlays/dev
+kubectl kustomize MemFlip/k8s/overlays/dev
 ```
 
 Dry-run the overlay:
 
 ```bash
-kubectl apply --dry-run=client -k MemFlip/k8s/phase7/overlays/dev
+kubectl apply --dry-run=client -k MemFlip/k8s/overlays/dev
 ```
 
 ## Apply The Dev Overlay
 
 ```bash
-kubectl apply -k MemFlip/k8s/phase7/overlays/dev
+kubectl apply -k MemFlip/k8s/overlays/dev
 ```
 
 Expected namespace:
@@ -135,12 +135,12 @@ If local DNS is not yet wired, add a temporary hosts entry that points the hostn
 
 ArgoCD application manifest:
 
-- `MemFlip/k8s/phase7/argocd/memflip-dev-application.yaml`
+- `MemFlip/k8s/argocd/memflip-dev-application.yaml`
 
 Apply it after ArgoCD is available:
 
 ```bash
-kubectl apply -f MemFlip/k8s/phase7/argocd/memflip-dev-application.yaml
+kubectl apply -f MemFlip/k8s/argocd/memflip-dev-application.yaml
 ```
 
 Then verify:
@@ -162,12 +162,12 @@ The MemFlip migration should not be considered complete until all of these are t
 
 ## Relationship To The Older `MemFlip/k8s` Directory
 
-The older `MemFlip/k8s` manifests remain in the repository as learning-path artifacts.
+The older `MemFlip/k8s-legacy-lab` manifests remain in the repository as learning-path artifacts.
 
 They are not the authoritative Phase 7 migration path.
 
 Use:
 
-- `MemFlip/k8s/phase7/`
+- `MemFlip/k8s/`
 
-Do not treat the older ingress, monitoring, and tutorial manifests as the forward migration standard.
+Do not treat the older ingress, monitoring, and tutorial manifests in `MemFlip/k8s-legacy-lab/` as the forward migration standard.

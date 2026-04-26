@@ -1,5 +1,7 @@
 # Kubernetes Tutorial: Complete Learning Path
 
+> Current standard: the authoritative local Kubernetes direction is now `k3s`, with the live implementation path documented in [12-phase7-k8s-dev.md](./12-phase7-k8s-dev.md). Older `k3d` examples in this documentation set should be treated as historical learning material.
+
 *Master DevOps by building a real application that scales from local development to global production*
 
 ## 🎯 What You'll Learn
@@ -72,7 +74,7 @@ A complete production application stack featuring:
 
 **Infrastructure Layer:**
 - **Containerization**: Docker & Docker Compose
-- **Orchestration**: Kubernetes (k3d)
+- **Orchestration**: Kubernetes (k3s)
 - **Ingress**: humor-game-nginx controller
 - **Monitoring**: Prometheus (port 9090) + Grafana (port 3000)
 - **GitOps**: ArgoCD

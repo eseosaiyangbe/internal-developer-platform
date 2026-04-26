@@ -1,5 +1,7 @@
 # Glossary
 
+> Current standard: where this glossary mentions `k3d`, treat it as historical context. The active local Kubernetes distribution for MemFlip is now `k3s`.
+
 ## DevOps & Infrastructure Terms
 
 **ArgoCD**: A GitOps continuous delivery tool for Kubernetes. Automatically syncs your cluster with Git repository changes.

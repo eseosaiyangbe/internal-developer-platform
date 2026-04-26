@@ -23,10 +23,18 @@ Kubernetes is the industry standard for deploying applications at scale. Compani
 
 ## Do This
 
+The current authoritative deployment path for MemFlip is:
+
+- [12-phase7-k8s-dev.md](./12-phase7-k8s-dev.md)
+
+The older examples in this guide are retained for learning history, but the current manifests now live in:
+
+- `MemFlip/k8s/`
+- `MemFlip/k8s-legacy-lab/` for archive material
 ### Step 1: Create Your Kubernetes Cluster
 
 ```bash
-# Create a local Docker image registry (needed for pushing images used by Kubernetes (k3d) cluster)
+# Create a local Docker image registry if your chosen local runtime does not share the host image store
 k3d registry create k3d-registry --port 5000
 ```
 

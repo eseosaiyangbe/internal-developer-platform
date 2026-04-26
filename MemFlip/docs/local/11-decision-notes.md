@@ -2,18 +2,19 @@
 
 ## Architecture Decisions
 
-### Why k3d Instead of Other Local Kubernetes Options?
+### Why k3s Instead Of Other Local Kubernetes Options?
 
-**Decision**: Use k3d for local Kubernetes development
+**Decision**: Use k3s for local Kubernetes development
 **Rationale**: 
-- **Lightweight**: k3d runs k3s, which is much smaller than full Kubernetes
-- **Fast startup**: Cluster creation takes seconds, not minutes
+- **Lightweight**: k3s is much smaller than full upstream Kubernetes distributions
+- **Fast startup**: Local cluster boot is still fast while preserving a real control-plane runtime
 - **Production-like**: k3s is a certified Kubernetes distribution used in production
 - **Resource efficient**: Uses minimal RAM and CPU compared to alternatives
 
 **Alternatives considered**:
 - **minikube**: Slower startup, more resource intensive
-- **kind**: Good alternative, but k3d is faster for single-node clusters
+- **kind**: Good alternative, but it is not the chosen long-term local platform direction here
+- **k3d**: Useful historically, but we now want the actual k3s distribution instead of another wrapper layer
 - **Docker Desktop K8s**: Often unstable, resource heavy
 
 ### Why PostgreSQL + Redis Instead of Just One Database?

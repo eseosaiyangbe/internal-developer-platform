@@ -6,7 +6,7 @@
 
 By the end of this setup, you'll have:
 - **Docker** running for containerization
-- **Kubernetes tools** (kubectl, k3d) for cluster management
+- **Kubernetes tools** (kubectl, k3s runtime bootstrap) for cluster management
 - **Development tools** (Node.js, jq) for application building
 - **Package managers** (Helm) for Kubernetes applications
 
@@ -24,11 +24,8 @@ Proper tool installation prevents hours of troubleshooting later. Think of this 
 
 **For macOS (Recommended path):**
 ```bash
-# Install all tools at once using Homebrew
-brew install docker docker-compose kubectl k3d helm nodejs jq
-
-# Start Docker Desktop (required for container operations)
-# Download from: https://www.docker.com/products/docker-desktop
+# Use the workspace bootstrap so Docker, kubectl, Helm, and the local k3s runtime stay aligned
+../../scripts/bootstrap-macos-userland.sh
 ```
 
 **Expected Output:**
@@ -36,13 +33,8 @@ brew install docker docker-compose kubectl k3d helm nodejs jq
 ==> Installing docker
 ==> Installing docker-compose
 ==> Installing kubectl
-==> Installing k3d
-==> Installing helm
-==> Installing nodejs
-==> Installing jq
-==> Summary
-🍺  /opt/homebrew/Cellar now contains:
-  docker, docker-compose, kubectl, k3d, helm, nodejs, jq
+Bootstrap complete.
+k3s runtime is ready.
 ```
 
 **For Linux (Ubuntu/Debian):**
@@ -68,33 +60,18 @@ docker-compose is already the newest version (1.25.0-1).
 ```
 
 ```bash
-# Install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install kubectl /usr/local/bin/kubectl
-
-# Install k3d (lightweight Kubernetes)
-curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-```
-
-ℹ️ **Side Note:** k3d is a lightweight Kubernetes distribution that runs inside Docker containers. It's perfect for development and testing because it's fast to start, uses minimal resources, and provides a real Kubernetes experience without the overhead of full cluster management.
-
-```bash
-# Install Helm (Kubernetes package manager)
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-# Install Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs jq
+# Use the workspace bootstrap so Docker, kubectl, Helm, and the local k3s runtime stay aligned
+../../scripts/bootstrap-linux-userland.sh
 ```
 
 ### Step 2: Verify Tools Are Installed
 
 ```bash
 # Check all tools are properly installed
-docker --version        # Should show: Docker version 20.0+
+docker --version         # Should show: Docker version 20.0+
 kubectl version --client # Should show: Client Version v1.28+
-k3d version            # Should show: k3d version v5.6+
-helm version           # Should show: version.BuildInfo
+kubectl get nodes        # Should show a ready k3s node
+helm version             # Should show: version.BuildInfo
 node --version         # Should show: v18+
 npm --version          # Should show: 8.0+
 jq --version           # Should show: jq-1.6+
@@ -104,7 +81,8 @@ jq --version           # Should show: jq-1.6+
 ```bash
 Docker version 20.10.21, build 20.10.21-0ubuntu1~20.04.2
 Client Version: version.Info{Major:"1", Minor:"28", GitVersion:"v1.28.0", GitCommit:"a6eaaf4d6efc7a96940d2d4247e7206c91e14be7", GitTreeState:"clean", BuildDate:"2023-08-28T16:03:32Z", GoVersion:"go1.20.5", Compiler:"gc", Platform:"linux/amd64"}
-k3d version v5.6.0
+NAME     STATUS   ROLES           AGE   VERSION
+colima   Ready    control-plane   1m    v1.35.0+k3s1
 version.BuildInfo{Version:"v3.12.3", GitCommit:"3a31588be33fe7a89b61ea5e2022f9e2a8f2c5c7", GitTreeState:"clean", GoVersion:"go1.20.10"}
 v18.17.1
 8.19.4
@@ -171,7 +149,7 @@ This message shows that your installation appears to be working correctly.
 ```bash
 Docker version 20.0+
 Client Version: v1.28+
-k3d version v5.6+
+Ready k3s node visible via kubectl
 version.BuildInfo{Version:v3.18+}
 v18+
 8.0+
@@ -231,20 +209,21 @@ sudo install kubectl /usr/local/bin/kubectl
 kubectl version --client
 ```
 
-### Symptom: k3d cluster creation fails
-**Cause:** Docker not running or insufficient resources
+### Symptom: local k3s runtime bootstrap fails
+**Cause:** Docker or Colima is not running, or the machine does not have enough resources
 **Command to confirm:** `docker info`
 **Fix:**
 ```bash
-# Ensure Docker is running
+# Ensure Docker is running and the local k3s helper can provision the runtime
 docker info
+../../scripts/ensure-k3s-runtime.sh
 
 # Check available memory
 docker system df
 
-# Restart Docker if needed
-# macOS: Restart Docker Desktop
-# Linux: sudo systemctl restart docker
+# Restart the underlying runtime if needed
+# macOS: colima stop && colima start --runtime docker --cpu 4 --memory 8 --disk 60 --kubernetes --network-address
+# Linux: sudo systemctl restart docker && sudo systemctl restart k3s
 ```
 
 ## 💡 **Reset/Rollback Commands**
@@ -253,24 +232,24 @@ If you need to start over or fix issues:
 
 ```bash
 # Remove specific tools (macOS)
-brew uninstall docker docker-compose kubectl k3d helm nodejs jq
+rm -f ~/.local/bin/kubectl ~/.local/bin/helm ~/.local/bin/promtool ~/.local/bin/argocd
 
 # Remove specific tools (Linux)
-sudo apt-get remove docker.io docker-compose kubectl
-sudo rm -f /usr/local/bin/k3d /usr/local/bin/helm /usr/local/bin/kubectl
+sudo apt-get remove docker.io docker-compose
+sudo /usr/local/bin/k3s-uninstall.sh
 
 # Clean Docker completely
 docker system prune -a --volumes
 
-# Reset Docker Desktop (macOS)
-# Quit Docker Desktop, delete ~/Library/Containers/com.docker.docker
+# Reset local k3s runtime (macOS)
+colima delete
 ```
 
 ## What You Learned
 
 You've successfully set up a production-ready development environment with:
 - **Container runtime** (Docker) for application packaging
-- **Kubernetes tools** (kubectl, k3d) for cluster management
+- **Kubernetes tools** (kubectl, local k3s runtime) for cluster management
 - **Package management** (Helm) for Kubernetes applications
 - **Development tools** (Node.js, jq) for application development
 - **Resource verification** to ensure sufficient capacity

@@ -1,5 +1,7 @@
 # Troubleshooting Guide
 
+> Current standard: the live local cluster direction is `k3s`. Legacy `k3d` troubleshooting examples remain here as archive material and should be interpreted through the newer [12-phase7-k8s-dev.md](./12-phase7-k8s-dev.md) path.
+
 *Quick reference for common issues and their solutions*
 
 ## 🚨 Quick Reference

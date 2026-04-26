@@ -1,5 +1,7 @@
 # 📊 Monitoring Access Guide
 
+> Current standard: the authoritative local Kubernetes direction is `k3s` with Traefik. Older `k3d` access notes below remain useful only as historical reference.
+
 ## Overview
 This guide shows you how to access Prometheus and Grafana without port-forwarding using Kubernetes Ingress.
 

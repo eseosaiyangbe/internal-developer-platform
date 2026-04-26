@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [[ "${OSTYPE:-}" != darwin* ]]; then
   echo "This script is intended for macOS."
   exit 1
@@ -135,13 +137,6 @@ install_kind() {
   url="$(github_asset_url kubernetes-sigs/kind 'darwin-arm64$')"
   download "${url}" "${LOCAL_BIN}/kind"
   chmod +x "${LOCAL_BIN}/kind"
-}
-
-install_k3d() {
-  local url
-  url="$(github_asset_url k3d-io/k3d 'k3d-darwin-arm64$')"
-  download "${url}" "${LOCAL_BIN}/k3d"
-  chmod +x "${LOCAL_BIN}/k3d"
 }
 
 install_yq() {
@@ -287,7 +282,6 @@ main() {
   install_promtool
   install_kustomize
   install_kind
-  install_k3d
   install_argocd
 
   echo "Installing infrastructure and helper tooling..."
@@ -300,6 +294,9 @@ main() {
   echo "Installing Azure CLI into a local virtual environment..."
   install_azure_cli
 
+  echo "Provisioning the local k3s runtime..."
+  "${SCRIPT_DIR}/ensure-k3s-runtime.sh"
+
   cat <<'EOF'
 
 Bootstrap complete.
@@ -308,13 +305,14 @@ Next shell setup:
   source ~/.zprofile
 
 Container runtime:
-  colima start --runtime docker --cpu 4 --memory 8 --disk 60
+  colima start --runtime docker --cpu 4 --memory 8 --disk 60 --kubernetes --network-address
   docker context use colima
 
 Verification:
   docker version
   docker compose version
   kubectl version --client
+  kubectl get nodes
   helm version
   promtool --version
   terraform version

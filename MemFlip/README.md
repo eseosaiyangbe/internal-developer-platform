@@ -171,6 +171,7 @@ The authoritative Kubernetes migration path for the workspace is now:
 
 That path introduces the first production-minded `dev` cluster implementation for MemFlip using:
 
+- k3s as the local Kubernetes distribution
 - Traefik ingress
 - a `base` plus `overlays/dev` Kustomize structure
 - ArgoCD application wiring
@@ -178,9 +179,9 @@ That path introduces the first production-minded `dev` cluster implementation fo
 
 Use:
 
-- `k8s/phase7/`
+- `k8s/`
 
-Treat the older `k8s/` manifests as learning-path and archive material, not the current Phase 7 deployment standard.
+Treat the older manifest set in `k8s-legacy-lab/` as learning-path archive material, not the current deployment standard.
 
 ---
 
@@ -204,7 +205,7 @@ Treat the older `k8s/` manifests as learning-path and archive material, not the 
 | **Application** | Node.js + Express, Vanilla JS | Game logic and UI |
 | **Database** | PostgreSQL 15, Redis 7 | Persistent data and caching |
 | **Container** | Docker, Multi-stage builds | Application packaging |
-| **Orchestration** | Kubernetes (k3d), Traefik ingress direction | Container management |
+| **Orchestration** | Kubernetes (k3s), Traefik ingress direction | Container management |
 | **Monitoring** | Prometheus, Grafana | Metrics and visualization |
 | **GitOps** | ArgoCD, Git-based workflows | Automated deployments |
 | **Security** | Network Policies, Security Contexts | Defense-in-depth |
@@ -351,7 +352,7 @@ Treat the older `k8s/` manifests as learning-path and archive material, not the 
 # Essential tools (install via prerequisite guide)
 docker --version    # Container runtime
 kubectl version     # Kubernetes CLI
-k3d version        # Local Kubernetes cluster
+kubectl get nodes  # Local k3s cluster
 helm version       # Package manager
 node --version     # JavaScript runtime
 jq --version       # JSON processor
@@ -410,7 +411,7 @@ make clean-gitops
 
 # Nuclear option - remove everything
 make clean-all
-k3d cluster delete dev-cluster
+./../scripts/ensure-k3s-runtime.sh
 ```
 </details>
 
@@ -472,7 +473,7 @@ This project is licensed under the MIT License. See the project repository for l
 ## **Acknowledgments**
 
 Special thanks to the open-source community and the maintainers of:
-- **Kubernetes** and **k3d** for container orchestration
+- **Kubernetes** and **k3s** for container orchestration
 - **Prometheus** and **Grafana** for observability
 - **ArgoCD** for GitOps automation
 - **Cloudflare** for global CDN and security
