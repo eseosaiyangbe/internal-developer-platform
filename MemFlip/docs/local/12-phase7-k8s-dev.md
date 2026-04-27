@@ -33,6 +33,7 @@ MemFlip/k8s/
 │   ├── frontend.yaml
 │   ├── ingress.yaml
 │   ├── kustomization.yaml
+│   ├── networkpolicy.yaml
 │   ├── postgres.yaml
 │   └── redis.yaml
 └── overlays/
@@ -53,6 +54,7 @@ The current `dev` shape is:
 - `Ingress`: Traefik
 - `ConfigMap`: non-secret runtime configuration
 - `Secret`: dev-only Kubernetes secret generated from `dev-secrets.env`
+- `NetworkPolicy`: default deny plus explicit workload traffic rules
 
 ## Why This Is The Right First Slice
 
@@ -63,6 +65,12 @@ This implementation keeps the first migration disciplined:
 - aligned with the root platform direction: ArgoCD, Traefik, and future Vault
 
 It is intentionally not over-engineered.
+
+It does include a small but meaningful security baseline:
+
+- namespace-scoped default deny network policy
+- explicit frontend, backend, PostgreSQL, and Redis traffic rules
+- DNS egress only where the workload needs it
 
 ## Important Secret-Management Note
 
@@ -91,6 +99,29 @@ docker build -t memflip-frontend:dev MemFlip/frontend
 ```
 
 If your local cluster does not share the host Docker image store, import or push these images using the cluster-specific workflow before applying the manifests.
+
+## Use The Operator Scripts
+
+Recommended operator path:
+
+```bash
+cd MemFlip
+./scripts/k8s-dev-deploy.sh
+```
+
+Verification only:
+
+```bash
+cd MemFlip
+./scripts/k8s-dev-verify.sh
+```
+
+Tear down the dev slice:
+
+```bash
+cd MemFlip
+./scripts/k8s-dev-destroy.sh
+```
 
 ## Validate The Manifests
 

@@ -16327,3 +16327,19 @@ Validation sequence:
 - verified `opensis-ui`, `opensis-db`, `vault-agent-app`, `vault-agent-db`, `vault-bootstrap`, and `opensis-mysqld-exporter` all returned to healthy running state
 - verified `http://localhost:8088` returned the expected `302` redirect to `install/index.php`
 - verified the control plane reported OpenSIS as `healthy`
+
+## 2026-04-27 02:28 EDT - MemFlip Kubernetes operator workflow and network baseline
+
+What we improved:
+
+- added `MemFlip/scripts/k8s-dev-deploy.sh` so the first Kubernetes slice has one repeatable deployment entrypoint instead of scattered manual commands
+- added `MemFlip/scripts/k8s-dev-verify.sh` to validate ingress, frontend health, backend health, backend metrics, PostgreSQL readiness, and Redis reachability against the live cluster
+- added `MemFlip/scripts/k8s-dev-destroy.sh` for clean teardown of the dev overlay
+- added `MemFlip/k8s/base/networkpolicy.yaml` to establish a minimal but real security baseline with namespace default deny and explicit workload traffic rules
+- updated `MemFlip/docs/local/12-phase7-k8s-dev.md` and `MemFlip/README.md` so the docs now point to the operator scripts and call out the network policy layer
+
+Why this matters:
+
+- the MemFlip Kubernetes slice is now more reusable as a migration template instead of only being “the manifests that worked once”
+- the operator path is shorter and less error-prone
+- the dev slice now demonstrates not only deployment and ingress, but also a deliberate intra-namespace traffic policy

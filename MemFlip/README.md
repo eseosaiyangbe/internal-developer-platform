@@ -168,6 +168,7 @@ curl http://localhost:8080/api/health
 The authoritative Kubernetes migration path for the workspace is now:
 
 - [docs/local/12-phase7-k8s-dev.md](docs/local/12-phase7-k8s-dev.md)
+  Kubernetes Phase 7 operator path with `./scripts/k8s-dev-deploy.sh`, verification, and teardown workflow.
 
 That path introduces the first production-minded `dev` cluster implementation for MemFlip using:
 

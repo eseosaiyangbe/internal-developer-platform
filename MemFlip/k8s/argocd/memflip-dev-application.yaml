@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/eseosaiyangbe/DevOps-Easy-Learning.git
     targetRevision: main
-    path: MemFlip/k8s/phase7/overlays/dev
+    path: MemFlip/k8s/overlays/dev
   destination:
     server: https://kubernetes.default.svc
     namespace: memflip-dev
