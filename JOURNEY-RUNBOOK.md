@@ -16359,3 +16359,57 @@ Validation:
 - rebuilt the live `devops-monitor-ui` container
 - verified `/api/apps` now returns MemFlip with `environment=hybrid`, `namespace=memflip-dev`, and the new Kubernetes runbook commands
 - verified `/api/apps/health` still reports MemFlip as healthy
+
+## 2026-04-27 03:04 EDT - SwiftPay Phase 7 k3s dev overlay introduced
+
+What we changed:
+
+- added a new owned local Kubernetes path under `SwiftPay/k8s/overlays/dev`
+- kept the older `SwiftPay/k8s/overlays/local` path intact as legacy MicroK8s learner content instead of trying to pass it off as the current workspace standard
+- introduced operator scripts:
+  - `SwiftPay/scripts/k8s-dev-deploy.sh`
+  - `SwiftPay/scripts/k8s-dev-verify.sh`
+  - `SwiftPay/scripts/k8s-dev-destroy.sh`
+- aligned the new dev slice to the shared workspace platform direction:
+  - `k3s` as the local cluster runtime
+  - Traefik ingress
+  - namespace `swiftpay-dev`
+  - local self-hosted Postgres, Redis, and RabbitMQ inside the cluster
+
+Why we did it this way:
+
+- SwiftPay already had substantial Kubernetes assets, but the local path was still shaped around MicroK8s, an internal registry flow, and ingress assumptions that no longer match the workspace standard
+- reusing the base manifests while introducing a clean `dev` overlay preserves the business logic and existing cloud work, but gives us a first-class Phase 7 path that is easier to operate and explain
+- keeping the older MicroK8s content as legacy material avoids breaking earlier learner guidance while still moving the active platform story forward
+
+## 2026-04-27 03:39 EDT - SwiftPay k3s slice validated and reflected in the control plane
+
+What we validated:
+
+- `SwiftPay/scripts/k8s-dev-deploy.sh` completed a live deployment into `swiftpay-dev`
+- Traefik ingress came up on:
+  - `www.swiftpay.devops.local`
+  - `swiftpay.devops.local`
+  - `api.swiftpay.devops.local`
+- `SwiftPay/scripts/k8s-dev-verify.sh` passed end to end
+- the verification path confirmed:
+  - frontend ingress
+  - API gateway health
+  - registration flow
+  - wallet lookup
+  - transactions API
+  - notifications API
+  - PostgreSQL, Redis, and RabbitMQ reachability
+
+What we had to fix on the way:
+
+- the inherited database migration job was blocked by two-sided network policy gaps
+- the inherited migration shell block was too fragile for the live `sh` runtime and had to be replaced with a simpler deterministic SQL bootstrap in the dev overlay
+- notification-service initially crashed because the shared logger only disables file logging when `CONTAINER_ENV=true`; the overlay now sets that explicitly for the containerized dev slice
+
+What we changed in the control plane:
+
+- marked SwiftPay as `hybrid` instead of local-only
+- moved its Kubernetes namespace metadata to `swiftpay-dev`
+- exposed the SwiftPay k3s deploy and verify commands in the control-plane metadata
+- updated the service comparison, demo center, and operator page copy so the UI now reflects SwiftPay as the second real k3s migration slice
