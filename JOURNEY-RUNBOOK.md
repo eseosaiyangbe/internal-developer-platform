@@ -16343,3 +16343,19 @@ Why this matters:
 - the MemFlip Kubernetes slice is now more reusable as a migration template instead of only being “the manifests that worked once”
 - the operator path is shorter and less error-prone
 - the dev slice now demonstrates not only deployment and ingress, but also a deliberate intra-namespace traffic policy
+
+## 2026-04-26 23:15 EDT - Control plane now reflects MemFlip as the first live k3s slice
+
+What we changed:
+
+- updated the control-plane app inventory in `Obervability-Stack/ui-next/lib/monitored-apps.ts` so MemFlip is no longer described as a local-only demo app
+- marked MemFlip as a `hybrid` environment workload and aligned its Kubernetes namespace to `memflip-dev`
+- exposed the MemFlip Kubernetes deploy and verify commands in the control-plane metadata and app detail page
+- updated the MemFlip operator copy in the compare view, demo center, and app detail guide so the UI now says what is true operationally: MemFlip is both an onboarding app and the first real k3s migration slice
+
+Validation:
+
+- `npm run type-check` passed in `Obervability-Stack/ui-next`
+- rebuilt the live `devops-monitor-ui` container
+- verified `/api/apps` now returns MemFlip with `environment=hybrid`, `namespace=memflip-dev`, and the new Kubernetes runbook commands
+- verified `/api/apps/health` still reports MemFlip as healthy
