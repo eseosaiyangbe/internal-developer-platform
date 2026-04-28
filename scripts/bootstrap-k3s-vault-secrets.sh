@@ -71,13 +71,13 @@ ensure_vault_path() {
   local path="$1"
   local command="$2"
 
-  if [[ "$ROTATE_SECRETS" -eq 0 ]] && vault_exec_with_token "vault kv get '${path}' >/dev/null 2>&1"; then
+  if [[ "$ROTATE_SECRETS" -eq 0 ]] && vault_exec_with_token "vault kv get '${path}' >/dev/null 2>&1" >/dev/null 2>&1; then
     echo "[vault-bootstrap] Reusing existing secret at ${path}"
     return 0
   fi
 
   echo "[vault-bootstrap] Writing secret at ${path}"
-  vault_exec_with_token "${command}"
+  vault_exec_with_token "${command}" >/dev/null
 }
 
 require_command kubectl
@@ -154,12 +154,16 @@ write_policy "memflip-dev" 'path "kv/data/devops-easy-learning/memflip/dev/*" { 
 write_policy "memflip-prod" 'path "kv/data/devops-easy-learning/memflip/prod/*" { capabilities = ["read"] }'
 write_policy "swiftpay-dev" 'path "kv/data/devops-easy-learning/swiftpay/dev/*" { capabilities = ["read"] }'
 write_policy "swiftpay-prod" 'path "kv/data/devops-easy-learning/swiftpay/prod/*" { capabilities = ["read"] }'
+write_policy "foodpulse-dev" 'path "kv/data/devops-easy-learning/foodpulse/dev/*" { capabilities = ["read"] }'
+write_policy "foodpulse-prod" 'path "kv/data/devops-easy-learning/foodpulse/prod/*" { capabilities = ["read"] }'
 
 echo "[vault-bootstrap] Configuring Vault Kubernetes roles"
 vault_exec_with_token "vault write auth/kubernetes/role/memflip-dev bound_service_account_names=memflip-vault-reader bound_service_account_namespaces=memflip-dev audience=vault token_policies=memflip-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/memflip-prod bound_service_account_names=memflip-vault-reader bound_service_account_namespaces=memflip-prod audience=vault token_policies=memflip-prod ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-dev bound_service_account_names=swiftpay-vault-reader bound_service_account_namespaces=swiftpay-dev audience=vault token_policies=swiftpay-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-prod bound_service_account_names=swiftpay-vault-reader bound_service_account_namespaces=swiftpay-prod audience=vault token_policies=swiftpay-prod ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-dev bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-dev audience=vault token_policies=foodpulse-dev ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-prod bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-prod audience=vault token_policies=foodpulse-prod ttl=1h >/dev/null"
 
 MEMFLIP_DEV_DB_PASSWORD="gamepass123"
 MEMFLIP_DEV_REDIS_PASSWORD="gamepass123"
@@ -174,6 +178,10 @@ SWIFTPAY_DEV_RABBITMQ_USER="swiftpay"
 SWIFTPAY_DEV_RABBITMQ_PASSWORD="swiftpay123"
 SWIFTPAY_DEV_RABBITMQ_URL="amqp://swiftpay:swiftpay123@rabbitmq:5672"
 SWIFTPAY_DEV_JWT_SECRET="J8vmoWX/NIIcBunMHhkMmok7ZViKS/OaQovGmp9ETm2+puxFEL/lt+egqTNRLM3J"
+FOODPULSE_DEV_DB_USER="foodpulse"
+FOODPULSE_DEV_DB_PASSWORD="change-me"
+FOODPULSE_DEV_REDIS_PASSWORD="admin"
+FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD="admin"
 
 MEMFLIP_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 MEMFLIP_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
@@ -189,6 +197,10 @@ SWIFTPAY_PROD_JWT_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
 SWIFTPAY_PROD_REDIS_URL="rediss://:${SWIFTPAY_PROD_REDIS_PASSWORD}@swiftpay-redis.prod.internal:6380"
 SWIFTPAY_PROD_RABBITMQ_USER="swiftpay"
 SWIFTPAY_PROD_RABBITMQ_URL="amqps://swiftpay:${SWIFTPAY_PROD_RABBITMQ_PASSWORD}@swiftpay-rabbitmq.prod.internal:5671"
+FOODPULSE_PROD_DB_USER="foodpulse"
+FOODPULSE_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+FOODPULSE_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 
 ensure_vault_path "kv/devops-easy-learning/memflip/dev/app" \
   "vault kv put kv/devops-easy-learning/memflip/dev/app DB_PASSWORD='${MEMFLIP_DEV_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_DEV_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_DEV_JWT_SECRET}' >/dev/null"
@@ -212,6 +224,14 @@ ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/rabbitmq" \
   "vault kv put kv/devops-easy-learning/swiftpay/prod/rabbitmq RABBITMQ_USER='${SWIFTPAY_PROD_RABBITMQ_USER}' RABBITMQ_PASSWORD='${SWIFTPAY_PROD_RABBITMQ_PASSWORD}' RABBITMQ_URL='${SWIFTPAY_PROD_RABBITMQ_URL}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/app" \
   "vault kv put kv/devops-easy-learning/swiftpay/prod/app JWT_SECRET='${SWIFTPAY_PROD_JWT_SECRET}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/foodpulse/dev/postgres" \
+  "vault kv put kv/devops-easy-learning/foodpulse/dev/postgres username='${FOODPULSE_DEV_DB_USER}' password='${FOODPULSE_DEV_DB_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/foodpulse/dev/app" \
+  "vault kv put kv/devops-easy-learning/foodpulse/dev/app FOODPULSE_DB_PASSWORD='${FOODPULSE_DEV_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_DEV_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/postgres" \
+  "vault kv put kv/devops-easy-learning/foodpulse/prod/postgres username='${FOODPULSE_PROD_DB_USER}' password='${FOODPULSE_PROD_DB_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/app" \
+  "vault kv put kv/devops-easy-learning/foodpulse/prod/app FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}' >/dev/null"
 
 echo "[vault-bootstrap] Vault and External Secrets platform is ready"
 echo "[vault-bootstrap] Init material stored at ${VAULT_INIT_FILE}"

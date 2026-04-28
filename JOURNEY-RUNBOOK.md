@@ -16524,3 +16524,29 @@ Why this matters:
 - Vault is now the active source of truth for both `dev` and `prod` secret paths for these two Kubernetes workloads
 - the overlay model is more production-aligned because Git now stores only desired state and secret references
 - the local `k3s` experience stays portable across macOS and Linux because the Vault dependency now lives in the cluster path instead of hanging off a Docker Compose runtime
+
+## 2026-04-28 - Extended the Vault-first overlay pattern into FoodPulse
+
+Objective:
+
+- remove the remaining git-stored Kubernetes secrets from the `FoodPulse` `dev` path
+- make `FoodPulse` `dev` and `prod` follow the same Vault-plus-External-Secrets pattern as `MemFlip` and `SwiftPay`
+- keep the Phase 7 Kubernetes story consistent across all three migrated workloads
+
+What changed:
+
+- added Vault-backed `SecretStore` and `ExternalSecret` resources to:
+  - `FoodPulse/k8s/overlays/dev`
+  - `FoodPulse/k8s/overlays/prod`
+- removed the tracked dev-only secret files:
+  - `FoodPulse/k8s/overlays/dev/dev-secrets.env`
+  - `FoodPulse/k8s/overlays/dev/postgres-app-secret.yaml`
+- added `FoodPulse/k8s/argocd/foodpulse-prod-application.yaml`
+- extended `scripts/bootstrap-k3s-vault-secrets.sh` to create Vault roles, policies, and secret paths for `foodpulse-dev` and `foodpulse-prod`
+- wired `FoodPulse/scripts/k8s-dev-deploy.sh` to bootstrap the shared Vault and External Secrets platform automatically
+
+Why this matters:
+
+- the workspace now has one consistent Kubernetes secret pattern across `MemFlip`, `SwiftPay`, and `FoodPulse`
+- both `dev` and `prod` overlays now keep live secret values out of Git
+- the local `k3s` path is more credible because secret delivery behavior now matches the production direction instead of diverging by application
