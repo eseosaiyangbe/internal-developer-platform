@@ -170,13 +170,14 @@ The authoritative Kubernetes migration path for the workspace is now:
 - [docs/local/12-phase7-k8s-dev.md](docs/local/12-phase7-k8s-dev.md)
   Kubernetes Phase 7 operator path with `./scripts/k8s-dev-deploy.sh`, verification, and teardown workflow.
 
-That path introduces the first production-minded `dev` cluster implementation for MemFlip using:
+That path introduces the owned production-minded Kubernetes shape for MemFlip using:
 
 - k3s as the local Kubernetes distribution
 - Traefik ingress
-- a `base` plus `overlays/dev` Kustomize structure
+- a `base` plus `overlays/dev` and `overlays/prod` Kustomize structure
 - ArgoCD application wiring
-- a temporary dev-only Kubernetes secret bootstrap path that is explicitly scheduled to move to Vault later
+- a temporary dev-only Kubernetes secret bootstrap path
+- a Vault-backed production overlay that assumes External Secrets Operator materializes runtime secrets from Vault
 
 Use:
 

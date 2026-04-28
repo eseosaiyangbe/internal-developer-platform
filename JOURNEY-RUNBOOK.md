@@ -16464,3 +16464,34 @@ Why this matters:
   - a microservices workload on `k3s`
   - a stateful resilience workload on `k3s`
 - that gives us a much stronger foundation before we move the observability stack itself into Kubernetes
+
+## 2026-04-28 - Added MemFlip and SwiftPay production overlays
+
+Objective:
+
+- add first-class `prod` overlays to `MemFlip` and `SwiftPay`
+- keep live secret values out of git
+- align both overlays with the workspace direction that Vault is the source of truth for secrets and ArgoCD is the reconciler
+
+What changed:
+
+- added `MemFlip/k8s/overlays/prod` with:
+  - namespace-scoped Vault `SecretStore`
+  - `ExternalSecret` for `memflip-app-secrets`
+  - larger production-oriented scale and storage patches
+  - `MemFlip/k8s/argocd/memflip-prod-application.yaml`
+- added `SwiftPay/k8s/overlays/prod` with:
+  - Vault-backed `ExternalSecret` materialization into `db-secrets`
+  - production ingress hosts and scale patches
+  - namespace-scoped Vault `SecretStore`
+  - `SwiftPay/k8s/argocd/swiftpay-prod-application.yaml`
+- updated `MemFlip` and `SwiftPay` docs so the `prod` contract is explicit:
+  - no runtime secrets in git
+  - Vault remains the secret source of truth
+  - `dev` secret generators are transitional and local-only
+
+Why this matters:
+
+- the workspace now treats `prod` as a first-class deployment contract for both the onboarding app and the microservices workload
+- the repo is more honest about how secrets should be handled in production
+- this reduces the gap between the current `k3s` learning path and the future GitOps-plus-Vault production architecture

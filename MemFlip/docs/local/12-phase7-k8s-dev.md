@@ -26,7 +26,8 @@ Directory layout:
 ```text
 MemFlip/k8s/
 ├── argocd/
-│   └── memflip-dev-application.yaml
+│   ├── memflip-dev-application.yaml
+│   └── memflip-prod-application.yaml
 ├── base/
 │   ├── app-config.yaml
 │   ├── backend.yaml
@@ -37,10 +38,16 @@ MemFlip/k8s/
 │   ├── postgres.yaml
 │   └── redis.yaml
 └── overlays/
-    └── dev/
-        ├── dev-secrets.env
+    ├── dev/
+    │   ├── dev-secrets.env
+    │   ├── kustomization.yaml
+    │   └── namespace.yaml
+    └── prod/
         ├── kustomization.yaml
-        └── namespace.yaml
+        ├── namespace.yaml
+        ├── vault-external-secret.yaml
+        ├── vault-secret-store.yaml
+        └── vault-serviceaccount.yaml
 ```
 
 The current `dev` shape is:
@@ -55,6 +62,14 @@ The current `dev` shape is:
 - `ConfigMap`: non-secret runtime configuration
 - `Secret`: dev-only Kubernetes secret generated from `dev-secrets.env`
 - `NetworkPolicy`: default deny plus explicit workload traffic rules
+
+The current `prod` shape is:
+
+- `Namespace`: `memflip-prod`
+- `Ingress`: `memflip.prod.example.com`
+- `SecretStore`: namespace-scoped Vault connector for External Secrets Operator
+- `ExternalSecret`: Vault-backed materialization of `memflip-app-secrets`
+- higher application replica counts and larger persistent volumes than `dev`
 
 ## Why This Is The Right First Slice
 
@@ -86,8 +101,9 @@ The intended progression is:
 
 1. prove the workload migration pattern
 2. prove GitOps reconciliation with ArgoCD
-3. replace dev secret material with Vault-backed delivery
-4. never use this checked-in secret path for production
+3. keep `prod` on Vault-backed delivery from the start
+4. replace dev secret material with Vault-backed delivery as the next secret-management hardening step
+5. never use this checked-in secret path for production
 
 ## Build The Application Images
 
