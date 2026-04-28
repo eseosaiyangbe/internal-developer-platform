@@ -9,6 +9,7 @@ Build and deploy the MemFlip Phase 7 dev overlay to the current Kubernetes conte
 
 Options:
   --skip-build     Reuse existing local images
+  --skip-secrets-platform  Skip shared Vault and External Secrets bootstrap
   --skip-apply     Only build and validate; do not apply manifests
   --hostname HOST  Override ingress hostname validation target
   -h, --help       Show this help message
@@ -16,14 +17,20 @@ EOF
 }
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 HOSTNAME_OVERRIDE="memflip.devops.local"
 SKIP_BUILD=0
+SKIP_SECRETS_PLATFORM=0
 SKIP_APPLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build)
       SKIP_BUILD=1
+      shift
+      ;;
+    --skip-secrets-platform)
+      SKIP_SECRETS_PLATFORM=1
       shift
       ;;
     --skip-apply)
@@ -47,6 +54,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$ROOT_DIR"
+
+if [[ "$SKIP_SECRETS_PLATFORM" -eq 0 ]]; then
+  "${WORKSPACE_ROOT}/scripts/bootstrap-k3s-vault-secrets.sh" >/dev/null
+fi
 
 echo "[memflip-k8s] Validating kustomize overlay"
 kubectl kustomize k8s/overlays/dev >/dev/null

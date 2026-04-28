@@ -16495,3 +16495,32 @@ Why this matters:
 - the workspace now treats `prod` as a first-class deployment contract for both the onboarding app and the microservices workload
 - the repo is more honest about how secrets should be handled in production
 - this reduces the gap between the current `k3s` learning path and the future GitOps-plus-Vault production architecture
+
+## 2026-04-28 - Made Vault the active source of truth for MemFlip and SwiftPay dev and prod
+
+Objective:
+
+- stop relying on git-stored Kubernetes secrets in the `dev` overlays
+- install a shared Vault and External Secrets platform into the local `k3s` cluster
+- make both `dev` and `prod` overlays consume secrets from Vault through the same operator pattern
+
+What changed:
+
+- added `scripts/bootstrap-k3s-vault-secrets.sh`
+- added `scripts/vault-k3s-values.yaml`
+- converted `MemFlip/k8s/overlays/dev` from a checked-in secret generator to:
+  - `vault-serviceaccount.yaml`
+  - `vault-secret-store.yaml`
+  - `vault-external-secret.yaml`
+- converted `SwiftPay/k8s/overlays/dev` from a checked-in `db-secrets` manifest to:
+  - `vault-serviceaccount.yaml`
+  - `vault-secret-store.yaml`
+  - `vault-external-secrets.yaml`
+- updated both `prod` overlays to use the shared in-cluster Vault service URL
+- wired `MemFlip/scripts/k8s-dev-deploy.sh` and `SwiftPay/scripts/k8s-dev-deploy.sh` to bootstrap the shared secrets platform automatically
+
+Why this matters:
+
+- Vault is now the active source of truth for both `dev` and `prod` secret paths for these two Kubernetes workloads
+- the overlay model is more production-aligned because Git now stores only desired state and secret references
+- the local `k3s` experience stays portable across macOS and Linux because the Vault dependency now lives in the cluster path instead of hanging off a Docker Compose runtime

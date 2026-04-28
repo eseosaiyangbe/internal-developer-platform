@@ -39,9 +39,11 @@ MemFlip/k8s/
 │   └── redis.yaml
 └── overlays/
     ├── dev/
-    │   ├── dev-secrets.env
     │   ├── kustomization.yaml
-    │   └── namespace.yaml
+    │   ├── namespace.yaml
+    │   ├── vault-external-secret.yaml
+    │   ├── vault-secret-store.yaml
+    │   └── vault-serviceaccount.yaml
     └── prod/
         ├── kustomization.yaml
         ├── namespace.yaml
@@ -60,7 +62,8 @@ The current `dev` shape is:
 - `Service`: frontend, backend, postgres, redis
 - `Ingress`: Traefik
 - `ConfigMap`: non-secret runtime configuration
-- `Secret`: dev-only Kubernetes secret generated from `dev-secrets.env`
+- `SecretStore`: namespace-scoped Vault connector for External Secrets Operator
+- `ExternalSecret`: Vault-backed materialization of `memflip-app-secrets`
 - `NetworkPolicy`: default deny plus explicit workload traffic rules
 
 The current `prod` shape is:
@@ -87,23 +90,22 @@ It does include a small but meaningful security baseline:
 - explicit frontend, backend, PostgreSQL, and Redis traffic rules
 - DNS egress only where the workload needs it
 
-## Important Secret-Management Note
+## Secret-Management Standard
 
-This first `dev` overlay uses a checked-in secret generator file:
+Both `dev` and `prod` now treat Vault as the source of truth.
 
-- `MemFlip/k8s/overlays/dev/dev-secrets.env`
+The Kubernetes path assumes:
 
-That is acceptable only because this path is for a local `dev` cluster bootstrap and the values are non-production development credentials.
+1. Vault is installed in the cluster namespace `vault`
+2. External Secrets Operator is installed in namespace `external-secrets`
+3. the workspace bootstrap script seeds the required secret paths in Vault
+4. each overlay materializes only the Kubernetes Secret objects the workloads consume
 
-It is not the final secret-management standard.
+Bootstrap the shared secrets platform from the workspace root:
 
-The intended progression is:
-
-1. prove the workload migration pattern
-2. prove GitOps reconciliation with ArgoCD
-3. keep `prod` on Vault-backed delivery from the start
-4. replace dev secret material with Vault-backed delivery as the next secret-management hardening step
-5. never use this checked-in secret path for production
+```bash
+./scripts/bootstrap-k3s-vault-secrets.sh
+```
 
 ## Build The Application Images
 
@@ -124,6 +126,8 @@ Recommended operator path:
 cd MemFlip
 ./scripts/k8s-dev-deploy.sh
 ```
+
+That deploy script now bootstraps the shared Vault and External Secrets platform automatically unless you pass `--skip-secrets-platform`.
 
 Verification only:
 

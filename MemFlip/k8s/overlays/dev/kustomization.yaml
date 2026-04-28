@@ -5,15 +5,10 @@ namespace: memflip-dev
 
 resources:
   - namespace.yaml
+  - vault-serviceaccount.yaml
+  - vault-secret-store.yaml
+  - vault-external-secret.yaml
   - ../../base
-
-secretGenerator:
-  - name: memflip-app-secrets
-    envs:
-      - dev-secrets.env
-
-generatorOptions:
-  disableNameSuffixHash: true
 
 images:
   - name: memflip-backend

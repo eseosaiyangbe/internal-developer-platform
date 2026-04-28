@@ -176,8 +176,7 @@ That path introduces the owned production-minded Kubernetes shape for MemFlip us
 - Traefik ingress
 - a `base` plus `overlays/dev` and `overlays/prod` Kustomize structure
 - ArgoCD application wiring
-- a temporary dev-only Kubernetes secret bootstrap path
-- a Vault-backed production overlay that assumes External Secrets Operator materializes runtime secrets from Vault
+- Vault-backed secret delivery for both `dev` and `prod` through External Secrets Operator
 
 Use:
 

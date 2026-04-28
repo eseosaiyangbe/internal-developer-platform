@@ -178,6 +178,10 @@ traefik/*.local.yml
 *apikey*
 !.env.template
 !k8s/secrets.template.yaml
+!k8s/overlays/dev/vault-secret-store.yaml
+!k8s/overlays/dev/vault-external-secret.yaml
+!k8s/overlays/prod/vault-secret-store.yaml
+!k8s/overlays/prod/vault-external-secret.yaml
 
 # Scripts with secrets
 scripts/*secret*
