@@ -615,15 +615,23 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - unified smoke-check runner
 - root Makefile or task runner
 
+#### 7.4 Kubernetes Implementation Slices
+
+- prove the migration pattern with real `k3s` workload slices
+- keep Docker Compose as the learning baseline while Kubernetes becomes the production direction
+- start with simpler workloads, then move into stateful resilience, then platform migration
+
 ### Deliverables
 
 - portfolio-ready documentation
 - architecture visuals
 - credible engineering story
+- real local `k3s` workload slices for `MemFlip`, `SwiftPay`, and `FoodPulse`
 
 ### Success Criteria
 
 - repo can be shown to employers, collaborators, or students without extra context
+- at least one frontend/backend workload, one microservices workload, and one stateful resilience workload run credibly on the owned `k3s` path
 
 ---
 

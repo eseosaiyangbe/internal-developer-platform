@@ -16413,3 +16413,54 @@ What we changed in the control plane:
 - moved its Kubernetes namespace metadata to `swiftpay-dev`
 - exposed the SwiftPay k3s deploy and verify commands in the control-plane metadata
 - updated the service comparison, demo center, and operator page copy so the UI now reflects SwiftPay as the second real k3s migration slice
+
+## 2026-04-28 05:20 EDT - FoodPulse gained an owned k3s path with CloudNativePG and Sentinel-aware Redis failover
+
+What we changed:
+
+- created an owned Kubernetes path under `FoodPulse/k8s` with:
+  - `base`
+  - `overlays/dev`
+  - `overlays/prod`
+  - `argocd/foodpulse-dev-application.yaml`
+- kept the Docker Compose path intact as the HAProxy-backed learning and drill environment
+- introduced `CloudNativePG` for the Kubernetes PostgreSQL path instead of carrying the Compose Postgres HAProxy model into the cluster
+- replaced the Kubernetes Redis access pattern with Sentinel-aware client discovery instead of HAProxy
+- updated `FoodPulse/api` to use `ioredis`, allowing the application to support both:
+  - standalone/proxy-backed Compose Redis
+  - Sentinel-discovered Kubernetes Redis
+- added operator scripts:
+  - `FoodPulse/scripts/install-cnpg-operator.sh`
+  - `FoodPulse/scripts/k8s-dev-deploy.sh`
+  - `FoodPulse/scripts/k8s-dev-verify.sh`
+  - `FoodPulse/scripts/k8s-dev-destroy.sh`
+- added Kubernetes documentation:
+  - `FoodPulse/k8s/README.md`
+  - `FoodPulse/docs/k8s/architecture.md`
+  - `FoodPulse/docs/k8s/k3s-dev-deployment.md`
+
+What we learned during rollout:
+
+- the first namespace-wide ingress policy for `FoodPulse` was too restrictive and blocked CloudNativePG operator-to-instance communication
+- PostgreSQL came up, but the cluster stayed in a status-extraction error until the policy explicitly allowed ingress from `cnpg-system`
+- this was a useful production-style catch: network policy hardening is only credible when operator control traffic is accounted for intentionally
+
+Validation:
+
+- `kubectl kustomize FoodPulse/k8s/overlays/dev`
+- `kubectl kustomize FoodPulse/k8s/overlays/prod`
+- `kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/dev`
+- `kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/prod`
+- live `k3s` deployment passed through `FoodPulse/scripts/k8s-dev-deploy.sh`
+- verification passed through `FoodPulse/scripts/k8s-dev-verify.sh`
+- Traefik ingress is live for `foodpulse.devops.local`
+- the control plane now reports `FoodPulse` as `environment=hybrid` in namespace `foodpulse-dev`
+
+Why this matters:
+
+- `FoodPulse` is now the third real Kubernetes implementation slice in Phase 7
+- the workspace now demonstrates:
+  - a small onboarding app on `k3s`
+  - a microservices workload on `k3s`
+  - a stateful resilience workload on `k3s`
+- that gives us a much stronger foundation before we move the observability stack itself into Kubernetes
