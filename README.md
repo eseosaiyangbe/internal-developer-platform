@@ -193,6 +193,7 @@ All monitored apps are currently healthy
 | [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
 | [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
 | [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md) | deeper Kubernetes plan for the shared observability control plane |
+| [Obervability-Stack/k8s/README.md](Obervability-Stack/k8s/README.md) | owned Kubernetes path for the shared observability control plane |
 | [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
 | [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md) | first concrete k3s-based Kubernetes implementation slice for MemFlip in `dev` |
 | [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | startup commands, ports, health checks, and aliases |
@@ -257,4 +258,5 @@ The current Phase 7 documentation spine is:
 - [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
 - [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md)
 - [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
+- [Obervability-Stack/k8s/README.md](Obervability-Stack/k8s/README.md)
 - [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)

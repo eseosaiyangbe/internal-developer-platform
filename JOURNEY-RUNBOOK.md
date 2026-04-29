@@ -16643,3 +16643,118 @@ Follow-up work:
 - define the owned observability-stack `k3s` `dev` architecture and file layout
 - define the stronger `prod` contract for the control plane before manifest implementation
 - keep app-level command logging explicit as the control-plane slice begins
+
+## 2026-04-29 04:54 EDT - Observability-stack Kubernetes scaffold introduced with explicit dev and prod overlays
+
+Objective:
+
+- create the owned `Obervability-Stack/k8s` path instead of leaving the control-plane migration as a documentation-only plan
+- model both `dev` and `prod` environments from the start
+- keep Vault as the secret source of truth and ArgoCD as the intended reconciler
+- validate the initial scaffold with real render and client dry-run checks before claiming progress
+
+Commands:
+
+```bash
+rg --files Obervability-Stack | rg '(^|/)k8s(/|$)|helm|chart|argocd|ingress|traefik|namespace|postgres|prisma|docker-compose|compose|prometheus|alertmanager|grafana|loki|promtail|cadvisor|blackbox|node-exporter'
+sed -n '1,260p' Obervability-Stack/docker-compose.yml
+sed -n '260,520p' Obervability-Stack/docker-compose.yml
+sed -n '1,220p' Obervability-Stack/ui-next/prisma/schema.prisma
+sed -n '1,220p' Obervability-Stack/ui-next/env.example
+sed -n '1,260p' Obervability-Stack/scripts/health-check.sh
+sed -n '1,260p' Obervability-Stack/prometheus/prometheus.yml
+sed -n '1,260p' Obervability-Stack/loki/config.yml
+sed -n '1,260p' Obervability-Stack/loki/promtail-config.yml
+sed -n '1,240p' Obervability-Stack/alertmanager/config.yml
+sed -n '1,220p' Obervability-Stack/grafana/datasources/datasource.yml
+sed -n '1,220p' Obervability-Stack/grafana/dashboards/dashboard.yml
+sed -n '1,260p' Obervability-Stack/ui-next/Dockerfile
+mkdir -p Obervability-Stack/k8s/base/config/grafana-dashboards/system Obervability-Stack/k8s/base/config/grafana-dashboards/application
+cp Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/k8s/base/config/alert_rules.yml
+cp Obervability-Stack/prometheus/recording_rules.yml Obervability-Stack/k8s/base/config/recording_rules.yml
+cp Obervability-Stack/blackbox/blackbox.yml Obervability-Stack/k8s/base/config/blackbox.yml
+cp Obervability-Stack/grafana/dashboards/system/node-exporter.json Obervability-Stack/k8s/base/config/grafana-dashboards/system/node-exporter.json
+cp Obervability-Stack/grafana/dashboards/application/foodpulse-operations.json Obervability-Stack/k8s/base/config/grafana-dashboards/application/foodpulse-operations.json
+cp Obervability-Stack/grafana/dashboards/application/memflip-onboarding.json Obervability-Stack/k8s/base/config/grafana-dashboards/application/memflip-onboarding.json
+cp Obervability-Stack/grafana/dashboards/application/opensis-operations.json Obervability-Stack/k8s/base/config/grafana-dashboards/application/opensis-operations.json
+cp Obervability-Stack/grafana/dashboards/application/swiftpay-money-flow.json Obervability-Stack/k8s/base/config/grafana-dashboards/application/swiftpay-money-flow.json
+bash -n Obervability-Stack/scripts/k8s-dev-deploy.sh Obervability-Stack/scripts/k8s-dev-verify.sh Obervability-Stack/scripts/k8s-dev-destroy.sh scripts/bootstrap-k3s-vault-secrets.sh
+kubectl kustomize Obervability-Stack/k8s/overlays/dev >/tmp/obs-dev.yaml
+kubectl kustomize Obervability-Stack/k8s/overlays/prod >/tmp/obs-prod.yaml
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/dev >/tmp/obs-dev-dry.out
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/prod >/tmp/obs-prod-dry.out
+./scripts/bootstrap-k3s-vault-secrets.sh --skip-helm
+chmod +x Obervability-Stack/scripts/k8s-dev-deploy.sh Obervability-Stack/scripts/k8s-dev-verify.sh Obervability-Stack/scripts/k8s-dev-destroy.sh
+cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-build --skip-apply --skip-runtime --skip-secrets-platform
+date '+%Y-%m-%d %H:%M %Z'
+git status --short
+```
+
+What we learned:
+
+- the control-plane repo had no owned Kubernetes path yet, which made this the right time to create one cleanly instead of trying to retrofit around older assumptions
+- Prometheus and the UI are still wired to Docker-era target names and browser URLs in the Compose path, so the Kubernetes path needed its own control-plane configuration set rather than a direct Compose translation
+- Kustomize security rules do not allow config generators to read files outside the kustomization tree, which forced us to vendor the exact dashboard and rule files we depend on into the owned `k8s/base/config` path
+- the shared Vault bootstrap already worked well for app workloads, and it was straightforward to extend it for observability-specific roles and secret paths once the control-plane contract was explicit
+
+Problems encountered:
+
+- the first Kustomize render failed because `k8s/base/kustomization.yaml` referenced files outside the owned tree
+- the first `k8s-dev-deploy.sh` helper version tried to be too clever about reapplying the database-init job from a streamed manifest
+- the new helper scripts were not executable yet, which caused a `permission denied` failure on the first validation-only run
+
+Fixes applied:
+
+- created `Obervability-Stack/k8s` with:
+  - `base`
+  - `overlays/dev`
+  - `overlays/prod`
+  - `argocd`
+- added the first owned control-plane resources for:
+  - PostgreSQL through CloudNativePG
+  - Prometheus
+  - Alertmanager
+  - Grafana
+  - Loki
+  - Promtail
+  - node-exporter
+  - cAdvisor
+  - blackbox-exporter
+  - `devops-monitor-ui`
+- added Vault-backed `ExternalSecret` flow for:
+  - PostgreSQL app credentials
+  - UI runtime secrets
+  - Grafana admin credentials
+- extended `scripts/bootstrap-k3s-vault-secrets.sh` with:
+  - `observability-dev`
+  - `observability-prod`
+  - seeded Vault paths for PostgreSQL, UI auth secret, and Grafana admin credentials
+- added operator scripts:
+  - `Obervability-Stack/scripts/k8s-dev-deploy.sh`
+  - `Obervability-Stack/scripts/k8s-dev-verify.sh`
+  - `Obervability-Stack/scripts/k8s-dev-destroy.sh`
+- corrected the deploy helper so it now behaves like a real operator entrypoint instead of a brittle streamed-manifest workaround
+- corrected helper script permissions and revalidated the deploy helper in `--skip-apply` mode
+
+Validation:
+
+- `bash -n` passed for the new control-plane scripts and the shared Vault bootstrap
+- `kubectl kustomize Obervability-Stack/k8s/overlays/dev` passed
+- `kubectl kustomize Obervability-Stack/k8s/overlays/prod` passed
+- `kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/dev` passed
+- `kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/prod` passed
+- `./scripts/bootstrap-k3s-vault-secrets.sh --skip-helm` successfully seeded the new observability Vault roles and secret paths
+- `cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-build --skip-apply --skip-runtime --skip-secrets-platform` passed
+
+Why this matters:
+
+- the control-plane Kubernetes move is now a real implementation track, not only a design note
+- both `dev` and `prod` are modeled from the first owned scaffold, which keeps us from backfilling environment boundaries later
+- the workspace now uses one consistent secret-management pattern across the migrated app workloads and the control plane itself
+- the next step can now focus on live control-plane rollout and parity verification instead of starting from directory and manifest zero
+
+Follow-up work:
+
+- run the first live `Obervability-Stack` `k3s` `dev` deployment and work through any runtime parity gaps
+- decide how to bridge `OpenSIS` observability continuity while it remains outside the cluster
+- tighten the control-plane manifests further where the first live deploy exposes stateful or permissions-specific issues

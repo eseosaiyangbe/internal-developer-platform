@@ -156,6 +156,8 @@ write_policy "swiftpay-dev" 'path "kv/data/devops-easy-learning/swiftpay/dev/*" 
 write_policy "swiftpay-prod" 'path "kv/data/devops-easy-learning/swiftpay/prod/*" { capabilities = ["read"] }'
 write_policy "foodpulse-dev" 'path "kv/data/devops-easy-learning/foodpulse/dev/*" { capabilities = ["read"] }'
 write_policy "foodpulse-prod" 'path "kv/data/devops-easy-learning/foodpulse/prod/*" { capabilities = ["read"] }'
+write_policy "observability-dev" 'path "kv/data/devops-easy-learning/observability/dev/*" { capabilities = ["read"] }'
+write_policy "observability-prod" 'path "kv/data/devops-easy-learning/observability/prod/*" { capabilities = ["read"] }'
 
 echo "[vault-bootstrap] Configuring Vault Kubernetes roles"
 vault_exec_with_token "vault write auth/kubernetes/role/memflip-dev bound_service_account_names=memflip-vault-reader bound_service_account_namespaces=memflip-dev audience=vault token_policies=memflip-dev ttl=1h >/dev/null"
@@ -164,6 +166,8 @@ vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-dev bound_servi
 vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-prod bound_service_account_names=swiftpay-vault-reader bound_service_account_namespaces=swiftpay-prod audience=vault token_policies=swiftpay-prod ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-dev bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-dev audience=vault token_policies=foodpulse-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-prod bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-prod audience=vault token_policies=foodpulse-prod ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/observability-dev bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-dev audience=vault token_policies=observability-dev ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/observability-prod bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-prod audience=vault token_policies=observability-prod ttl=1h >/dev/null"
 
 MEMFLIP_DEV_DB_PASSWORD="gamepass123"
 MEMFLIP_DEV_REDIS_PASSWORD="gamepass123"
@@ -182,6 +186,12 @@ FOODPULSE_DEV_DB_USER="foodpulse"
 FOODPULSE_DEV_DB_PASSWORD="change-me"
 FOODPULSE_DEV_REDIS_PASSWORD="admin"
 FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD="admin"
+OBSERVABILITY_DEV_DB_USER="observability_app"
+OBSERVABILITY_DEV_DB_PASSWORD="observability_dev_password"
+OBSERVABILITY_DEV_DB_NAME="observability_dev"
+OBSERVABILITY_DEV_NEXTAUTH_SECRET="observability-dev-nextauth-change-before-shared-dev"
+OBSERVABILITY_DEV_GRAFANA_ADMIN_USER="admin"
+OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD="admin"
 
 MEMFLIP_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 MEMFLIP_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
@@ -201,6 +211,12 @@ FOODPULSE_PROD_DB_USER="foodpulse"
 FOODPULSE_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 FOODPULSE_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+OBSERVABILITY_PROD_DB_USER="observability_app"
+OBSERVABILITY_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+OBSERVABILITY_PROD_DB_NAME="observability_prod"
+OBSERVABILITY_PROD_NEXTAUTH_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
+OBSERVABILITY_PROD_GRAFANA_ADMIN_USER="admin"
+OBSERVABILITY_PROD_GRAFANA_ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 
 ensure_vault_path "kv/devops-easy-learning/memflip/dev/app" \
   "vault kv put kv/devops-easy-learning/memflip/dev/app DB_PASSWORD='${MEMFLIP_DEV_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_DEV_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_DEV_JWT_SECRET}' >/dev/null"
@@ -232,6 +248,18 @@ ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/postgres" \
   "vault kv put kv/devops-easy-learning/foodpulse/prod/postgres username='${FOODPULSE_PROD_DB_USER}' password='${FOODPULSE_PROD_DB_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/app" \
   "vault kv put kv/devops-easy-learning/foodpulse/prod/app FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/dev/postgres" \
+  "vault kv put kv/devops-easy-learning/observability/dev/postgres username='${OBSERVABILITY_DEV_DB_USER}' password='${OBSERVABILITY_DEV_DB_PASSWORD}' database='${OBSERVABILITY_DEV_DB_NAME}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/dev/ui" \
+  "vault kv put kv/devops-easy-learning/observability/dev/ui NEXTAUTH_SECRET='${OBSERVABILITY_DEV_NEXTAUTH_SECRET}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/dev/grafana" \
+  "vault kv put kv/devops-easy-learning/observability/dev/grafana admin_user='${OBSERVABILITY_DEV_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/prod/postgres" \
+  "vault kv put kv/devops-easy-learning/observability/prod/postgres username='${OBSERVABILITY_PROD_DB_USER}' password='${OBSERVABILITY_PROD_DB_PASSWORD}' database='${OBSERVABILITY_PROD_DB_NAME}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/prod/ui" \
+  "vault kv put kv/devops-easy-learning/observability/prod/ui NEXTAUTH_SECRET='${OBSERVABILITY_PROD_NEXTAUTH_SECRET}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/observability/prod/grafana" \
+  "vault kv put kv/devops-easy-learning/observability/prod/grafana admin_user='${OBSERVABILITY_PROD_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_PROD_GRAFANA_ADMIN_PASSWORD}' >/dev/null"
 
 echo "[vault-bootstrap] Vault and External Secrets platform is ready"
 echo "[vault-bootstrap] Init material stored at ${VAULT_INIT_FILE}"
