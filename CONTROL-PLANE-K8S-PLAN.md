@@ -7,11 +7,17 @@ This document deepens the Kubernetes plan for `Obervability-Stack`.
 The root migration plan explains the full workspace direction.
 This document focuses specifically on the control plane because it is the dependency we will rely on to validate every later workload migration.
 
-## Why The Control Plane Goes First
+## Why The Control Plane Goes Next
 
-Migrating workloads before the control plane would weaken visibility during the move.
+The workspace has already proven three workload slices on `k3s`:
 
-The control plane should go first because it provides:
+- `MemFlip` as the frontend/backend reference
+- `SwiftPay` as the microservices reference
+- `FoodPulse` as the stateful resilience reference
+
+That means the control plane should go next, not later.
+
+The control plane should go next because it provides:
 
 - app probes
 - metrics ingestion
@@ -21,6 +27,8 @@ The control plane should go first because it provides:
 - notification and incident flow continuity
 
 If this layer is unstable, the rest of the migration becomes harder to observe and trust.
+
+`OpenSIS` is intentionally sequenced after the control-plane slice because its Vault-heavy legacy runtime path is the most operationally sensitive workload in the workspace.
 
 ## Scope
 
@@ -49,6 +57,11 @@ Reason:
 - keeps platform services separate from application namespaces
 - makes ownership boundaries easier to reason about
 - avoids hiding platform concerns inside one workload namespace
+
+Recommended environment split:
+
+- `platform-observability-dev`
+- `platform-observability-prod`
 
 ## Resource Direction
 
@@ -158,6 +171,11 @@ Environment approach:
 - `dev`: dedicated lower-risk Postgres backend
 - `prod`: separate Postgres backend with stricter durability and credentials
 
+Recommended execution model:
+
+- `dev`: in-cluster PostgreSQL with PVC-backed durability sized for local `k3s`
+- `prod`: dedicated PostgreSQL backend with stronger backup, restore, and upgrade controls
+
 ### Prometheus Data
 
 Recommended direction:
@@ -197,6 +215,35 @@ Recommended pattern:
 - exposure of internal components only when operationally justified
 
 The UI should remain the main operator entry point.
+
+Suggested ingress contract:
+
+- `dev`: local hostnames such as `controlplane.devops.local`, `grafana.devops.local`, and deliberately limited direct service exposure
+- `prod`: environment-specific FQDNs with tighter auth, TLS, and direct-service exposure only when operationally justified
+
+## Environment Model
+
+### `dev`
+
+The `dev` control-plane slice should optimize for:
+
+- fast local rebuilds
+- PVC-backed but modest retention
+- in-cluster PostgreSQL
+- Vault-backed secret delivery through External Secrets Operator
+- ArgoCD-managed manifests with developer-safe sync expectations
+- enough direct backend exposure to validate Grafana, Prometheus, Loki, and Alertmanager during migration
+
+### `prod`
+
+The `prod` control-plane slice should optimize for:
+
+- stricter ingress and authentication boundaries
+- retention, backup, and restore that are explicitly documented
+- stronger PostgreSQL durability and upgrade handling
+- Vault as the mandatory secret source of truth
+- ArgoCD promotion flow instead of ad hoc apply paths
+- minimal direct service exposure outside the operator surfaces that truly need it
 
 ## Observability Continuity Requirements
 
@@ -262,6 +309,7 @@ Define `dev` control-plane resource manifests:
 - Services
 - PVCs
 - Ingress
+- Vault-backed `SecretStore` and `ExternalSecret` objects where runtime secrets are required
 
 ### Step 3
 
@@ -272,6 +320,7 @@ Deploy the `dev` control plane and validate:
 - alerts evaluate
 - notifications flow
 - logs query successfully
+- existing migrated workloads remain observable through the new platform path
 
 ### Step 4
 
@@ -285,6 +334,8 @@ Define the stronger `prod` variant:
 - storage and retention
 - database durability
 - backup and restore
+- Vault-first secret delivery
+- ArgoCD application structure and promotion path
 
 ## Risks
 
@@ -320,3 +371,4 @@ This plan is successful when:
 - the control plane can move to Kubernetes without losing operator continuity
 - configuration, secrets, storage, and ingress are modeled explicitly
 - the control plane remains the trusted validation layer for later workload migrations
+- both `dev` and `prod` are defined clearly enough that implementation can proceed without redesigning the environment model mid-flight

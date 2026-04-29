@@ -262,21 +262,28 @@ Current implementation path:
 - [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
 - [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md)
 
+Current status:
+
+- `MemFlip` is live as the first frontend/backend `k3s` slice
+- `SwiftPay` is live as the microservices `k3s` slice
+- `FoodPulse` is live as the stateful resilience `k3s` slice
+- Vault is now the active secret source of truth for these app overlays in both `dev` and `prod`
+
 ### Phase E: Migrate The Control Plane And Remaining Workloads Deliberately
 
 Recommended order:
 
-1. `MemFlip`
-2. `FoodPulse`
-3. `SwiftPay`
-4. `Obervability-Stack`
-5. `OpenSIS`
+1. `MemFlip` complete
+2. `SwiftPay` complete
+3. `FoodPulse` complete
+4. `Obervability-Stack` next
+5. `OpenSIS` after the control-plane slice
 
 Reasoning:
 
-- `MemFlip` is the cleanest low-risk onboarding candidate
-- `FoodPulse` is a good mid-complexity resilience test
-- `SwiftPay` is the flagship microservices story and deserves deliberate treatment
+- `MemFlip` proved the low-risk onboarding candidate path
+- `SwiftPay` proved the flagship microservices path
+- `FoodPulse` proved the stateful resilience path
 - `Obervability-Stack` should move only after the first workload pattern is proven, because it is the shared platform the rest of the system depends on
 - `OpenSIS` has the most platform complexity because of Vault and legacy/runtime wrapping
 
@@ -381,12 +388,12 @@ Mitigation:
 
 The clean next implementation order is:
 
-1. tighten the root architecture and portfolio docs
-2. formalize `dev` and `prod` config expectations at the root level
-3. formalize ArgoCD and Vault as root platform standards
-4. define the control-plane Kubernetes resource plan
-5. migrate `MemFlip` as the first low-risk app
-6. validate observability continuity before moving to the next workload
+1. refresh the roadmap and control-plane docs so they match the three completed workload slices
+2. define the observability-stack `dev` and `prod` resource model concretely
+3. build the owned control-plane `k3s` `dev` slice
+4. validate observability continuity against the migrated workloads
+5. define the stronger `prod` control-plane contract
+6. move `OpenSIS` only after the platform slice is stable
 
 Supporting planning documents:
 

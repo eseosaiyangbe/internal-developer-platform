@@ -30,6 +30,18 @@ Each meaningful phase should record:
 6. why the step mattered
 7. follow-up work
 
+## Command Logging Standard
+
+The runbook must capture the exact commands used for meaningful work.
+
+That means:
+
+- do not rely on summary bullets alone when shell commands or cluster commands were part of the work
+- include the literal command block for validation, rollout, debugging, and recovery steps
+- if a section only summarizes outcomes, treat that as incomplete and correct it in the next related update
+
+Recent Phase 7 entries drifted into summary mode in a few places. That is a documentation-quality gap, not a new standard. Going forward, every meaningful platform step should include an explicit `Commands` block.
+
 ## Workspace Inventory
 
 Current workspace root:
@@ -16550,3 +16562,84 @@ Why this matters:
 - the workspace now has one consistent Kubernetes secret pattern across `MemFlip`, `SwiftPay`, and `FoodPulse`
 - both `dev` and `prod` overlays now keep live secret values out of Git
 - the local `k3s` path is more credible because secret delivery behavior now matches the production direction instead of diverging by application
+
+## 2026-04-29 04:32 EDT - Phase 7 refresh and control-plane Kubernetes next-step correction
+
+Objective:
+
+- correct the roadmap so it reflects the actual Phase 7 state
+- define the observability-stack Kubernetes slice as the next active implementation step
+- make `dev` and `prod` explicit requirements for the control-plane move
+- fix the runbook process drift where some recent entries summarized outcomes without capturing the exact command trail
+
+Commands:
+
+```bash
+git status --short
+rg -n "Phase 7|Phase 8|In progress|Complete|Kubernetes|FoodPulse|SwiftPay|MemFlip|OpenSIS" PROJECT-ROADMAP.md KUBERNETES-MIGRATION-PLAN.md README.md WORKSPACE-ARCHITECTURE.md
+sed -n '1,220p' PROJECT-ROADMAP.md
+sed -n '1,220p' CONTROL-PLANE-K8S-PLAN.md
+sed -n '220,520p' CONTROL-PLANE-K8S-PLAN.md
+sed -n '1,220p' JOURNEY-RUNBOOK.md
+rg -n "Command|Commands|Ran|kubectl|helm|git push|workspace-start|Vault-first|FoodPulse|SwiftPay|MemFlip" JOURNEY-RUNBOOK.md | tail -n 80
+tail -n 220 JOURNEY-RUNBOOK.md
+rg -n "hybrid|namespace|kubernetesDeploy|kubernetesVerify|MemFlip|SwiftPay|FoodPulse|OpenSIS" Obervability-Stack/ui-next/lib/monitored-apps.ts
+rg -n "Vault-first|Vault is the source of truth|External Secrets|prod overlay|k3s dev|k3s" MemFlip/README.md SwiftPay/README.md FoodPulse/README.md MemFlip/docs/local/12-phase7-k8s-dev.md SwiftPay/docs/k3s-dev-deployment.md FoodPulse/docs/k8s/k3s-dev-deployment.md
+sed -n '618,660p' PROJECT-ROADMAP.md
+sed -n '240,290p' KUBERNETES-MIGRATION-PLAN.md
+sed -n '332,405p' KUBERNETES-MIGRATION-PLAN.md
+sed -n '120,190p' Obervability-Stack/docs/APP_ONBOARDING_TEMPLATE.md
+date '+%Y-%m-%d %H:%M %Z'
+git diff --check
+git status --short
+```
+
+What we learned:
+
+- the repo state is stronger than the roadmap wording now suggests
+- Phase 7 has already delivered three real workload slices on `k3s`:
+  - `MemFlip`
+  - `SwiftPay`
+  - `FoodPulse`
+- the control plane inventory already reflects those apps as `hybrid` workloads with Kubernetes deploy and verify runbooks
+- the next clean engineering move is no longer “prove the first Kubernetes slice”
+- the next clean engineering move is the observability-stack Kubernetes slice, with `OpenSIS` intentionally sequenced after it
+- the runbook still promised “every command we ran,” but several recent Phase 7 sections relied too much on summary bullets and not enough on literal command blocks
+
+Problems encountered:
+
+- roadmap and migration wording had drifted behind the real implementation state
+- the control-plane plan did not yet make the `dev` and `prod` split explicit enough
+- recent runbook entries were useful, but some of them were not command-complete
+
+Fixes applied:
+
+- updated `PROJECT-ROADMAP.md` so Phase 7 now explicitly recognizes:
+  - three completed workload Kubernetes slices
+  - the observability-stack `dev` and `prod` Kubernetes plan as the next success target
+- updated `KUBERNETES-MIGRATION-PLAN.md` so the migration order now reflects reality:
+  - `MemFlip` complete
+  - `SwiftPay` complete
+  - `FoodPulse` complete
+  - `Obervability-Stack` next
+  - `OpenSIS` after the platform move
+- updated `CONTROL-PLANE-K8S-PLAN.md` so the control-plane slice now treats:
+  - `platform-observability-dev`
+  - `platform-observability-prod`
+  - Vault-backed secret delivery
+  - ArgoCD promotion flow
+  - explicit `dev` versus `prod` ingress and database posture
+- added a runbook-level `Command Logging Standard` so future sections are expected to include exact command blocks, not only summaries
+
+Why this matters:
+
+- the repo now tells the truth about where we are in Phase 7
+- the next implementation step is now unambiguous
+- the control-plane migration can be designed cleanly instead of being improvised in the middle of implementation
+- the runbook standard is now reinforced before more platform work lands
+
+Follow-up work:
+
+- define the owned observability-stack `k3s` `dev` architecture and file layout
+- define the stronger `prod` contract for the control plane before manifest implementation
+- keep app-level command logging explicit as the control-plane slice begins

@@ -86,7 +86,7 @@ The work is divided into seven phases.
 
 ## Current Focus
 
-We are currently entering **Phase 7: production-style maturity and portfolio packaging**.
+We are currently in **Phase 7: production-style maturity and portfolio packaging**.
 
 Phase 6 is complete. Its completed intent was:
 
@@ -104,7 +104,8 @@ Phase 7 will be considered successful when:
 - architecture, screenshots, and diagrams make the platform understandable without a live walkthrough
 - packaging materials show why this workspace is a serious platform engineering portfolio piece
 - Kubernetes migration guidance is concrete enough to become an implementation plan
-- the first Kubernetes implementation slice is real, documented, and reusable as a migration template
+- three workload Kubernetes slices are real, documented, and reusable as migration templates
+- the observability stack has a clean `dev` and `prod` Kubernetes implementation plan with Vault, ArgoCD, Traefik, and PostgreSQL modeled explicitly
 
 Phase 6 completed when:
 
@@ -620,6 +621,7 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - prove the migration pattern with real `k3s` workload slices
 - keep Docker Compose as the learning baseline while Kubernetes becomes the production direction
 - start with simpler workloads, then move into stateful resilience, then platform migration
+- treat `dev` and `prod` as first-class environments for the control-plane slice, not as an afterthought
 
 ### Deliverables
 
@@ -627,11 +629,13 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - architecture visuals
 - credible engineering story
 - real local `k3s` workload slices for `MemFlip`, `SwiftPay`, and `FoodPulse`
+- an explicit control-plane Kubernetes plan for both `dev` and `prod`
 
 ### Success Criteria
 
 - repo can be shown to employers, collaborators, or students without extra context
 - at least one frontend/backend workload, one microservices workload, and one stateful resilience workload run credibly on the owned `k3s` path
+- the next implementation step is unambiguous: `Obervability-Stack` is the active Kubernetes slice, with `OpenSIS` deliberately sequenced after the platform move
 
 ---
 
