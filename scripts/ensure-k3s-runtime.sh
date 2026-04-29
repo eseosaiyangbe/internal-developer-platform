@@ -7,6 +7,26 @@ have_sudo() {
   command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1
 }
 
+tune_inotify_limits_linux() {
+  have_sudo || return 0
+
+  sudo tee /etc/sysctl.d/90-devops-easy-learning-k3s.conf >/dev/null <<'EOF'
+fs.inotify.max_user_instances = 1024
+fs.inotify.max_user_watches = 1048576
+fs.inotify.max_queued_events = 32768
+EOF
+  sudo sysctl --system >/dev/null
+}
+
+tune_inotify_limits_colima() {
+  colima ssh -- sudo tee /etc/sysctl.d/90-devops-easy-learning-k3s.conf >/dev/null <<'EOF'
+fs.inotify.max_user_instances = 1024
+fs.inotify.max_user_watches = 1048576
+fs.inotify.max_queued_events = 32768
+EOF
+  colima ssh -- sudo sysctl --system >/dev/null
+}
+
 ensure_traefik_with_helm() {
   command -v helm >/dev/null 2>&1 || {
     echo "Helm is required to install Traefik for the local k3s runtime."
@@ -46,6 +66,7 @@ ensure_macos_k3s() {
   }
 
   colima start --runtime docker --cpu 4 --memory 8 --disk 60 --kubernetes --network-address >/dev/null
+  tune_inotify_limits_colima
   kubectl config use-context colima >/dev/null 2>&1 || true
   kubectl get nodes >/dev/null
   ensure_traefik_with_helm
@@ -74,6 +95,7 @@ ensure_linux_k3s() {
   fi
 
   export KUBECONFIG="${HOME}/.kube/config"
+  tune_inotify_limits_linux
   kubectl get nodes >/dev/null
   ensure_traefik_with_helm
 }

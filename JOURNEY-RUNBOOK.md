@@ -16758,3 +16758,171 @@ Follow-up work:
 - run the first live `Obervability-Stack` `k3s` `dev` deployment and work through any runtime parity gaps
 - decide how to bridge `OpenSIS` observability continuity while it remains outside the cluster
 - tighten the control-plane manifests further where the first live deploy exposes stateful or permissions-specific issues
+
+## 2026-04-29 05:33 EDT - Observability-stack k3s dev rollout hardened and verified live
+
+Objective:
+
+- move the control-plane Kubernetes path from render-valid scaffolding into a real live `k3s` `dev` deployment
+- close the runtime parity gaps exposed by the first live rollout
+- restore exact command logging while we fix the control-plane slice in real time
+- verify not only that the control-plane pods are running, but that Prometheus can scrape the expected platform and app targets
+
+Commands:
+
+```bash
+kubectl get pods,job,svc,ingress,externalsecret,secretstore -n platform-observability-dev -o wide
+kubectl get cluster -n platform-observability-dev -o wide
+git status --short
+kubectl logs promtail-zb47x -n platform-observability-dev --tail=200
+kubectl logs cadvisor-wfgc5 -n platform-observability-dev --tail=200
+kubectl logs job/devops-monitor-db-init -n platform-observability-dev --tail=200
+sed -n '1,260p' Obervability-Stack/ui-next/Dockerfile
+sed -n '1,260p' Obervability-Stack/scripts/k8s-dev-deploy.sh
+sed -n '1,240p' Obervability-Stack/k8s/base/ui.yaml
+sed -n '1,240p' Obervability-Stack/k8s/base/promtail.yaml
+sed -n '1,260p' Obervability-Stack/k8s/base/cadvisor.yaml
+sed -n '1,260p' Obervability-Stack/k8s/base/config/promtail-config.yml
+sed -n '1,260p' Obervability-Stack/k8s/base/config/prometheus.yml
+sed -n '1,220p' MemFlip/scripts/k8s-dev-verify.sh
+sed -n '1,220p' FoodPulse/scripts/k8s-dev-verify.sh
+sed -n '1,220p' SwiftPay/scripts/k8s-dev-verify.sh
+colima ssh -- sh -lc 'sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches fs.file-max'
+colima ssh -- sh -lc 'ulimit -n'
+cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-build --skip-runtime
+cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-build --skip-runtime --skip-secrets-platform
+cd Obervability-Stack && ./scripts/k8s-dev-destroy.sh
+cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-runtime --skip-secrets-platform
+kubectl kustomize Obervability-Stack/k8s/overlays/dev >/dev/null
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/dev >/dev/null
+docker build -t devops-monitor-ui:dev Obervability-Stack/ui-next
+docker build --target builder -t devops-monitor-db-init:dev Obervability-Stack/ui-next
+colima ssh -- sudo tee /etc/sysctl.d/90-devops-easy-learning-k3s.conf >/dev/null <<'EOF'
+fs.inotify.max_user_instances = 1024
+fs.inotify.max_user_watches = 1048576
+fs.inotify.max_queued_events = 32768
+EOF
+colima ssh -- sudo sysctl --system >/dev/null
+cd Obervability-Stack && ./scripts/k8s-dev-deploy.sh --skip-runtime --skip-secrets-platform
+kubectl delete pod promtail-zb47x -n platform-observability-dev
+kubectl delete pod cadvisor-wfgc5 -n platform-observability-dev
+kubectl rollout status daemonset/promtail -n platform-observability-dev --timeout=180s
+kubectl rollout status daemonset/cadvisor -n platform-observability-dev --timeout=180s
+kubectl port-forward -n platform-observability-dev svc/prometheus 19090:9090
+curl -fsS 'http://127.0.0.1:19090/api/v1/targets'
+kubectl get svc -n memflip-dev
+kubectl get svc -n swiftpay-dev
+kubectl get svc -n foodpulse-dev
+kubectl exec -n memflip-dev deploy/memflip-backend -- sh -lc 'wget -qO- http://127.0.0.1:3001/metrics | head -n 5'
+kubectl exec -n foodpulse-dev deploy/foodpulse-api -- sh -lc 'wget -qO- http://127.0.0.1:4567/metrics | head -n 5'
+kubectl exec -n swiftpay-dev deploy/api-gateway -- sh -lc 'wget -qO- http://127.0.0.1:3000/metrics | head -n 5'
+kubectl apply -k MemFlip/k8s/overlays/dev
+kubectl apply -k FoodPulse/k8s/overlays/dev
+kubectl apply -k SwiftPay/k8s/overlays/dev
+kubectl apply -k Obervability-Stack/k8s/overlays/dev
+kubectl delete pod prometheus-0 -n platform-observability-dev
+kubectl wait --for=condition=Ready pod/prometheus-0 -n platform-observability-dev --timeout=240s
+kubectl port-forward -n platform-observability-dev svc/prometheus 19092:9090
+curl -fsS 'http://127.0.0.1:19092/api/v1/targets' | jq -r '.data.activeTargets[] | select(.labels.job=="memflip-backend" or .labels.job=="foodpulse-api" or .labels.job=="swiftpay-api-gateway" or .labels.job=="swiftpay-auth-service" or .labels.job=="swiftpay-notification-service" or .labels.job=="swiftpay-transaction-service" or .labels.job=="swiftpay-wallet-service" or .labels.job=="cadvisor" or .labels.job=="promtail") | [.labels.job, .health, (.lastError // "")] | @tsv'
+curl -I -H 'Host: controlplane.devops.local' http://192.168.64.2/
+curl -I -H 'Host: grafana.devops.local' http://192.168.64.2/
+./Obervability-Stack/scripts/k8s-dev-verify.sh
+date '+%Y-%m-%d %H:%M %Z'
+git status --short
+```
+
+What we learned:
+
+- the first live control-plane rollout failed in the right way: it exposed real runtime assumptions instead of hiding them behind render-valid manifests
+- the local `devops-monitor-ui` runtime image was not an acceptable database-init image because it does not carry the full Prisma and seed toolchain the Compose path relied on
+- Colima `k3s` defaults were too conservative for the combination of Promtail and cAdvisor, and the correct fix was to tune the node-level inotify limits in the shared runtime bootstrap instead of weakening the agents blindly
+- the app-side Kubernetes slices were close to observability-ready, but Prometheus still needed two final alignment passes:
+  - correct internal service names for the SwiftPay `k3s` services
+  - explicit network-policy ingress for cross-namespace Prometheus scraping
+
+Problems encountered:
+
+- `devops-monitor-ui` and `devops-monitor-db-init` initially failed in-cluster because only the local Docker image existed; the cluster runtime could not pull it
+- `devops-monitor-db-init` failed repeatedly because it used the runtime UI image and tried to install Prisma dynamically at runtime
+- `promtail` crashed with `failed to make file target manager: too many open files`
+- `cAdvisor` crashed with `inotify_init: too many open files`
+- Prometheus discovered several app metrics jobs, but some were still down because:
+  - SwiftPay jobs still referenced stale service names from an earlier naming pattern
+  - MemFlip and FoodPulse network policies did not yet allow scraping from the observability namespace
+  - SwiftPay’s API gateway metrics job needed to scrape the service port `80`, not the container port `3000`
+- the first strengthened verification script assumed the completed database-init job would still exist, but the job was already removed by TTL cleanup
+
+Fixes applied:
+
+- updated `Obervability-Stack/scripts/k8s-dev-deploy.sh` to:
+  - build and import both `devops-monitor-ui:dev` and `devops-monitor-db-init:dev`
+  - build the migration image from the Dockerfile `builder` target
+  - delete and recreate the database-init job cleanly during reapply
+- updated `Obervability-Stack/k8s/base/ui.yaml` to:
+  - use `devops-monitor-db-init:dev` for the job
+  - set `ttlSecondsAfterFinished: 600`
+- updated `Obervability-Stack/k8s/base/config/promtail-config.yml` to use narrow static pod log paths for:
+  - `platform-observability-dev`
+  - `memflip-dev`
+  - `swiftpay-dev`
+  - `foodpulse-dev`
+- updated `scripts/ensure-k3s-runtime.sh` so local `k3s` bootstrap now writes and applies:
+  - `fs.inotify.max_user_instances = 1024`
+  - `fs.inotify.max_user_watches = 1048576`
+  - `fs.inotify.max_queued_events = 32768`
+- updated `Obervability-Stack/k8s/base/cadvisor.yaml` to mount the host `containerd` socket path and register the containerd factory correctly
+- updated `Obervability-Stack/k8s/base/config/prometheus.yml` to:
+  - correct SwiftPay internal service names
+  - correct the SwiftPay API gateway scrape to service port `80`
+- updated app-side network policies so Prometheus in both:
+  - `platform-observability-dev`
+  - `platform-observability-prod`
+  can scrape:
+  - MemFlip backend metrics
+  - FoodPulse API metrics
+  - SwiftPay service metrics
+- updated `Obervability-Stack/scripts/k8s-dev-verify.sh` so the verification path now checks:
+  - core pod readiness
+  - ingress availability
+  - Prometheus target health
+  - TTL-aged database-init behavior
+- updated `Obervability-Stack/k8s/README.md` so the repo now describes the control-plane slice as a live `k3s` `dev` path instead of only a scaffold
+
+Validation:
+
+- live `k3s` `dev` deployment succeeded through `./Obervability-Stack/scripts/k8s-dev-deploy.sh --skip-runtime --skip-secrets-platform`
+- `observability-postgres` reported `Cluster in healthy state`
+- the database-init job completed successfully and applied Prisma migration `20260424180000_init_postgresql`
+- demo users were seeded successfully
+- `promtail` and `cAdvisor` both recovered after node-level inotify tuning and fresh daemonset pod recreation
+- `cAdvisor` registered the containerd factory successfully after the manifest update
+- `curl -I -H 'Host: controlplane.devops.local' http://192.168.64.2/` returned `HTTP/1.1 200 OK`
+- `curl -I -H 'Host: grafana.devops.local' http://192.168.64.2/` returned `HTTP/1.1 302 Found`
+- `./Obervability-Stack/scripts/k8s-dev-verify.sh` passed
+- Prometheus now reports `up` for the critical platform and app targets:
+  - `cadvisor`
+  - `promtail`
+  - `memflip-backend`
+  - `foodpulse-api`
+  - `swiftpay-api-gateway`
+  - `swiftpay-auth-service`
+  - `swiftpay-notification-service`
+  - `swiftpay-transaction-service`
+  - `swiftpay-wallet-service`
+
+Why this matters:
+
+- the observability-stack Kubernetes path is now more than a document or scaffold; it is a live, operator-validated `k3s` `dev` control-plane slice
+- the shared runtime bootstrap now carries the node-level tuning the platform needs, which protects future macOS and Linux local `k3s` runs from the same failure mode
+- the cross-workload observability story is now materially stronger because Prometheus can scrape the migrated workload metrics directly instead of depending only on blackbox probes
+- the verification workflow now checks the outcomes we actually care about in production-style operations:
+  - services up
+  - ingress reachable
+  - database initialized
+  - Prometheus targets healthy
+
+Follow-up work:
+
+- decide whether to formalize the observability namespace label strategy further so cross-namespace metrics access stays easy to reason about in `prod`
+- extend the same control-plane migration truth into the Phase 7 roadmap and architecture docs where needed
+- keep `OpenSIS` as the last advanced bridge workload after the control plane and three app classes are stable
