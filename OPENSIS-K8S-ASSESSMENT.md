@@ -10,6 +10,10 @@ It exists to answer one question clearly:
 
 `OpenSIS` is not starting from zero.
 
+The older Kubernetes tree discussed in this assessment is now preserved at:
+
+- [OpenSIS/k8s-legacy-platform](/Users/raymond/Documents/DevOps-Easy-Learning/OpenSIS/k8s-legacy-platform)
+
 The repo already contains:
 
 - a substantial `k8s/` tree
@@ -65,9 +69,9 @@ Recommendation:
 - treat remaining `nginx` guidance as historical or transitional
 - keep public-edge concerns separate from the core app ingress contract
 
-### 3. The current `OpenSIS` base duplicates observability concerns that now belong to the shared control plane
+### 3. The current legacy `OpenSIS` base duplicates observability concerns that now belong to the shared control plane
 
-The existing `OpenSIS/k8s/base` includes:
+The existing legacy `OpenSIS/k8s-legacy-platform/base` includes:
 
 - Prometheus
 - Grafana

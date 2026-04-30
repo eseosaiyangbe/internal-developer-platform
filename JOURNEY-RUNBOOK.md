@@ -17135,3 +17135,61 @@ Why this matters:
 - the assessment tells us what to preserve and what to retire:
   - preserve Vault Injector, MariaDB, session Redis, and GitOps structure
   - retire older ingress, observability duplication, and cluster-lifecycle assumptions
+
+## 2026-04-30 - Archive Legacy OpenSIS Kubernetes Tree And Create New Owned Path
+
+What happened:
+
+- based on the `OpenSIS` assessment, we decided the repo should not keep treating the older `OpenSIS/k8s` tree as the active standard
+- the right move was to preserve that older implementation intact as legacy reference material and create a new clean `OpenSIS/k8s` ownership boundary for this workspace
+
+Commands run:
+
+```bash
+cd /Users/raymond/Documents/DevOps-Easy-Learning
+git status --short
+find OpenSIS -maxdepth 2 -type d | sort
+rg -n "OpenSIS/k8s|k8s/README.md|k8s/overlays|k8s/gitops|Kubernetes Base|From-Scratch Local Bootstrap|Production-Grade CI/CD Blueprint" README.md PROJECT-ROADMAP.md KUBERNETES-MIGRATION-PLAN.md CONTROL-PLANE-K8S-PLAN.md OPENSIS-K8S-ASSESSMENT.md OpenSIS/README.md OpenSIS/docs OpenSIS/scripts OpenSIS/tests -g '!**/node_modules/**'
+mv OpenSIS/k8s OpenSIS/k8s-legacy-platform
+mkdir -p OpenSIS/k8s/base OpenSIS/k8s/overlays/dev OpenSIS/k8s/overlays/prod OpenSIS/k8s/argocd
+kubectl kustomize OpenSIS/k8s/overlays/dev
+kubectl kustomize OpenSIS/k8s/overlays/prod
+git diff --check
+```
+
+Fixes applied:
+
+- moved the previous Kubernetes tree to `OpenSIS/k8s-legacy-platform`
+- created a new clean owned path at `OpenSIS/k8s`
+- added the new owned path documents and stubs:
+  - `OpenSIS/k8s/README.md`
+  - `OpenSIS/k8s/base/kustomization.yaml`
+  - `OpenSIS/k8s/overlays/dev/kustomization.yaml`
+  - `OpenSIS/k8s/overlays/prod/kustomization.yaml`
+  - `OpenSIS/k8s/argocd/README.md`
+  - `OpenSIS/k8s/argocd/opensis-dev-application.yaml`
+  - `OpenSIS/k8s/argocd/opensis-prod-application.yaml`
+- marked the legacy path clearly in:
+  - `OpenSIS/k8s-legacy-platform/README.md`
+  - `OpenSIS/k8s-legacy-platform/overlays/README.md`
+- updated repo-facing documentation so the split between active and legacy paths is explicit in:
+  - `OpenSIS/README.md`
+  - `OpenSIS/docs/03-kubernetes-bootstrap-guide.md`
+  - `OPENSIS-K8S-ASSESSMENT.md`
+
+Validation:
+
+- `kubectl kustomize OpenSIS/k8s/overlays/dev` now renders successfully
+- `kubectl kustomize OpenSIS/k8s/overlays/prod` now renders successfully
+- `git diff --check` passed after formatting cleanup
+
+Why this matters:
+
+- the repo now has a clean ownership boundary for the next Phase 7 `OpenSIS` implementation work
+- the older engineering history is preserved instead of discarded
+- future `OpenSIS` Kubernetes work can now align directly to the shared workspace standards:
+  - Traefik
+  - Vault-first secret delivery
+  - Argo CD
+  - shared observability
+  - explicit `dev` and `prod` contracts
