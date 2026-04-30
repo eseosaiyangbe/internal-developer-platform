@@ -131,6 +131,27 @@ Linux:
 
 Both bootstrap paths install Docker tooling, Kubernetes tooling, Terraform, cloud CLIs, and `promtool`, so rule validation and operator checks work consistently on macOS and Linux.
 
+If you want to open the local `k3s` slices in a browser through Traefik, populate the local host mappings after bootstrap:
+
+```bash
+./scripts/setup-devops-local-hosts.sh
+```
+
+If you only want to preview the generated line first:
+
+```bash
+./scripts/setup-devops-local-hosts.sh --print
+```
+
+Then the browser entrypoints are:
+
+- `http://controlplane.devops.local`
+- `http://grafana.devops.local`
+- `http://vault.devops.local`
+- `http://memflip.devops.local`
+- `http://www.swiftpay.devops.local`
+- `http://foodpulse.devops.local`
+
 Recommended workspace commands:
 
 ```bash

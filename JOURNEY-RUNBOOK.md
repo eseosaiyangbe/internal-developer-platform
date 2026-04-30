@@ -16926,3 +16926,63 @@ Follow-up work:
 - decide whether to formalize the observability namespace label strategy further so cross-namespace metrics access stays easy to reason about in `prod`
 - extend the same control-plane migration truth into the Phase 7 roadmap and architecture docs where needed
 - keep `OpenSIS` as the last advanced bridge workload after the control plane and three app classes are stable
+
+## 2026-04-30 - Vault UI Browser Ingress On k3s
+
+What happened:
+
+- the shared `k3s` slices already had browser-safe Traefik hosts for the control plane, Grafana, MemFlip, SwiftPay, and FoodPulse
+- Vault still required a manual `kubectl port-forward`, which broke the otherwise consistent local browser path
+- we standardized Vault UI on the same Traefik ingress model so local operators can reach it through `vault.devops.local`
+
+Commands run:
+
+```bash
+cd /Users/raymond/Documents/DevOps-Easy-Learning
+kubectl get ingress -A -o wide
+kubectl get svc -A | egrep 'vault|traefik'
+sed -n '1,240p' scripts/vault-k3s-values.yaml
+sed -n '1,260p' scripts/bootstrap-k3s-vault-secrets.sh
+helm list -n vault
+helm get values vault -n vault
+helm show values hashicorp/vault | rg -n "ingress|ui:" -A8 -B4
+helm show values hashicorp/vault | sed -n '448,490p'
+helm show values hashicorp/vault | sed -n '1081,1125p'
+grep -n 'devops.local' /etc/hosts || true
+./scripts/bootstrap-k3s-vault-secrets.sh
+kubectl get ingress -n vault -o wide
+curl -fsSI -H 'Host: vault.devops.local' http://192.168.64.2/
+kubectl describe ingress -n vault
+chmod +x ./scripts/setup-devops-local-hosts.sh
+./scripts/setup-devops-local-hosts.sh --print
+git diff -- scripts/vault-k3s-values.yaml README.md WORKSTATION-BOOTSTRAP.md Obervability-Stack/k8s/README.md JOURNEY-RUNBOOK.md
+```
+
+Fixes applied:
+
+- updated `scripts/vault-k3s-values.yaml` to enable the Vault Helm chart ingress
+- standardized the ingress on:
+  - `ingressClassName: traefik`
+  - router entrypoint `web`
+  - host `vault.devops.local`
+- added `scripts/setup-devops-local-hosts.sh` so the required `.devops.local` hostnames can be populated consistently on macOS and Linux
+- updated the root and control-plane docs so the browser path is explicit in:
+  - `README.md`
+  - `WORKSTATION-BOOTSTRAP.md`
+  - `Obervability-Stack/k8s/README.md`
+
+Validation:
+
+- `./scripts/bootstrap-k3s-vault-secrets.sh` reconciled the Helm release with the new values
+- `kubectl get ingress -n vault -o wide` now shows a live Vault ingress
+- `curl -fsSI -H 'Host: vault.devops.local' http://192.168.64.2/` returned a successful HTTP response through Traefik
+- `./scripts/setup-devops-local-hosts.sh --print` rendered the expected host entry using the live Traefik address
+
+Why this matters:
+
+- the local `k3s` experience is now consistent across the platform and workload slices
+- Vault no longer needs a one-off port-forward path just to reach the UI in a browser
+- the local access story now matches the production-style direction more closely:
+  - Traefik for ingress
+  - Vault as the secret source of truth
+  - browser-safe hostnames for operator workflows

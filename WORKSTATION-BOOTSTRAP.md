@@ -109,6 +109,37 @@ docker pull hello-world
 docker run --rm hello-world
 ```
 
+## Local Browser Hostnames
+
+The local `k3s` path uses Traefik and friendly `.devops.local` hostnames.
+
+After bootstrap and after `./scripts/ensure-k3s-runtime.sh` is healthy, get the current Traefik address:
+
+```bash
+kubectl get svc -n traefik traefik
+```
+
+Then populate `/etc/hosts` with the workspace helper:
+
+```bash
+./scripts/setup-devops-local-hosts.sh
+```
+
+These hosts map the main local browser paths for:
+
+- the observability control plane
+- Grafana
+- Vault UI
+- MemFlip
+- SwiftPay
+- FoodPulse
+
+If you want to preview the generated host line before applying it:
+
+```bash
+./scripts/setup-devops-local-hosts.sh --print
+```
+
 ## Expected Runtime Direction
 
 ### macOS

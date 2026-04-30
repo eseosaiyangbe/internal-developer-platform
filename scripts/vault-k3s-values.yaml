@@ -17,6 +17,16 @@ server:
   dataStorage:
     enabled: true
     size: 10Gi
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: web
+    activeService: false
+    hosts:
+      - host: vault.devops.local
+        paths:
+          - /
 
 injector:
   enabled: false
