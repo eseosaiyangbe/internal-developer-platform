@@ -16986,3 +16986,91 @@ Why this matters:
   - Traefik for ingress
   - Vault as the secret source of truth
   - browser-safe hostnames for operator workflows
+
+## 2026-04-30 - Enable Vault userpass For Local Operator Access
+
+What happened:
+
+- local Vault already had `token/` and `kubernetes/` auth enabled
+- browser access through `vault.devops.local` was working, but human operators still needed the root token for interactive login
+- we enabled `userpass/` for the local lab and created:
+  - `admin` with broad local admin rights
+  - `readonly` with read-only access to the workspace secret paths
+
+Commands run:
+
+```bash
+cd /Users/raymond/Documents/DevOps-Easy-Learning
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json)
+kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault auth list"
+kubectl exec -i -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; cat > /tmp/local-admin-policy.hcl <<'EOF'
+path \"*\" {
+  capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\", \"sudo\"]
+}
+EOF
+cat > /tmp/local-readonly-policy.hcl <<'EOF'
+path \"kv/data/devops-easy-learning/*\" {
+  capabilities = [\"read\"]
+}
+
+path \"kv/metadata/devops-easy-learning/*\" {
+  capabilities = [\"list\", \"read\"]
+}
+
+path \"auth/token/lookup-self\" {
+  capabilities = [\"read\"]
+}
+
+path \"auth/token/renew-self\" {
+  capabilities = [\"update\"]
+}
+
+path \"auth/token/revoke-self\" {
+  capabilities = [\"update\"]
+}
+
+path \"sys/capabilities-self\" {
+  capabilities = [\"update\"]
+}
+EOF
+vault auth enable userpass >/dev/null 2>&1 || true
+vault policy write local-admin /tmp/local-admin-policy.hcl >/dev/null
+vault policy write local-readonly /tmp/local-readonly-policy.hcl >/dev/null
+vault write auth/userpass/users/admin password='admin@123' policies='local-admin' >/dev/null
+vault write auth/userpass/users/readonly password='admin@123' policies='local-readonly' >/dev/null
+vault auth list"
+kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=admin password='admin@123' -format=json" | jq -r '.auth.policies | join(",")'
+kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=readonly password='admin@123' -format=json" | jq -r '.auth.policies | join(",")'
+READONLY_TOKEN=$(kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=readonly password='admin@123' -format=json" | jq -r '.auth.client_token')
+kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$READONLY_TOKEN'; vault kv get -format=json kv/devops-easy-learning/memflip/dev/app" | jq -r '.data.data | keys | join(",")'
+kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$READONLY_TOKEN'; vault kv put kv/devops-easy-learning/memflip/dev/app test='should-fail'"
+```
+
+Fixes applied:
+
+- enabled `userpass/` in the live local cluster Vault
+- created policy `local-admin` with full administrative capabilities for local break-glass operator use
+- created policy `local-readonly` with read/list scope for `kv/devops-easy-learning/*`
+- created local users:
+  - `admin`
+  - `readonly`
+- set the password for both local lab users to `admin@123` per operator request
+
+Validation:
+
+- `vault auth list` now shows `userpass/`
+- `admin` login succeeded and returned policy set `default,local-admin`
+- `readonly` login succeeded and returned policy set `default,local-readonly`
+- `readonly` can read workspace secret data
+- `readonly` write attempt against `kv/devops-easy-learning/memflip/dev/app` failed with `403 permission denied`, which confirms the policy boundary is working
+
+Why this matters:
+
+- local browser login no longer depends on pasting the Vault root token for every operator session
+- the lab now has a cleaner human access split:
+  - admin path for controlled operator actions
+  - readonly path for inspection and learning
+- this keeps the local experience practical without changing the long-term production direction:
+  - workloads continue to use `kubernetes` auth
+  - Vault remains the secret source of truth
+  - stronger human auth like OIDC can replace `userpass` later in a real production environment
