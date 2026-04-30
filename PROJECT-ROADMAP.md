@@ -629,13 +629,15 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - architecture visuals
 - credible engineering story
 - real local `k3s` workload slices for `MemFlip`, `SwiftPay`, and `FoodPulse`
-- an explicit control-plane Kubernetes plan for both `dev` and `prod`
+- a live control-plane `k3s` `dev` slice plus an explicit `prod` contract
+- an explicit, owned Kubernetes migration decision for `OpenSIS`
 
 ### Success Criteria
 
 - repo can be shown to employers, collaborators, or students without extra context
 - at least one frontend/backend workload, one microservices workload, and one stateful resilience workload run credibly on the owned `k3s` path
-- the next implementation step is unambiguous: `Obervability-Stack` is the active Kubernetes slice, with `OpenSIS` deliberately sequenced after the platform move
+- the shared observability platform runs credibly on the owned `k3s` path for `dev`
+- the next implementation step is unambiguous: `OpenSIS` is the active Kubernetes slice, deliberately sequenced after the platform move
 
 ---
 

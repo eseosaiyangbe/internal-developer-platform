@@ -267,6 +267,7 @@ Current status:
 - `MemFlip` is live as the first frontend/backend `k3s` slice
 - `SwiftPay` is live as the microservices `k3s` slice
 - `FoodPulse` is live as the stateful resilience `k3s` slice
+- `Obervability-Stack` is now live as the shared control-plane `k3s` `dev` slice
 - Vault is now the active secret source of truth for these app overlays in both `dev` and `prod`
 
 ### Phase E: Migrate The Control Plane And Remaining Workloads Deliberately
@@ -276,15 +277,15 @@ Recommended order:
 1. `MemFlip` complete
 2. `SwiftPay` complete
 3. `FoodPulse` complete
-4. `Obervability-Stack` next
-5. `OpenSIS` after the control-plane slice
+4. `Obervability-Stack` complete for the owned `dev` slice
+5. `OpenSIS` next
 
 Reasoning:
 
 - `MemFlip` proved the low-risk onboarding candidate path
 - `SwiftPay` proved the flagship microservices path
 - `FoodPulse` proved the stateful resilience path
-- `Obervability-Stack` should move only after the first workload pattern is proven, because it is the shared platform the rest of the system depends on
+- `Obervability-Stack` moved only after the workload patterns were proven, because it is the shared platform the rest of the system depends on
 - `OpenSIS` has the most platform complexity because of Vault and legacy/runtime wrapping
 
 ### Phase F: Add Production Controls
@@ -388,18 +389,25 @@ Mitigation:
 
 The clean next implementation order is:
 
-1. refresh the roadmap and control-plane docs so they match the three completed workload slices
-2. define the observability-stack `dev` and `prod` resource model concretely
-3. build the owned control-plane `k3s` `dev` slice
-4. validate observability continuity against the migrated workloads
-5. define the stronger `prod` control-plane contract
-6. move `OpenSIS` only after the platform slice is stable
+1. refresh the roadmap and migration docs so they reflect the live control-plane slice
+2. assess the existing `OpenSIS` Kubernetes tree against the new workspace standards
+3. preserve the right `OpenSIS` primitives:
+   - Vault Injector
+   - MariaDB `StatefulSet`
+   - Redis-backed sessions
+4. remove or retire outdated `OpenSIS` assumptions:
+   - `nginx`-centric ingress guidance
+   - embedded full-platform observability stack components
+   - repo-owned cluster lifecycle assumptions
+5. build the owned `OpenSIS` `k3s` `dev` slice on the shared workspace runtime
+6. define the stricter `OpenSIS` `prod` contract after the `dev` path is stable
 
 Supporting planning documents:
 
 - [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
 - [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
 - [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
+- [OPENSIS-K8S-ASSESSMENT.md](OPENSIS-K8S-ASSESSMENT.md)
 
 ## Success Criteria
 

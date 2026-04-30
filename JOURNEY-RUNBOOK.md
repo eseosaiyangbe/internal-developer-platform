@@ -17074,3 +17074,64 @@ Why this matters:
   - workloads continue to use `kubernetes` auth
   - Vault remains the secret source of truth
   - stronger human auth like OIDC can replace `userpass` later in a real production environment
+
+## 2026-04-30 - Refresh Phase 7 Roadmap And Sweep OpenSIS Kubernetes Path
+
+What happened:
+
+- Phase 7 docs were behind the real workspace state
+- the roadmap still described `Obervability-Stack` as the next Kubernetes slice even though the owned `k3s` `dev` control-plane rollout is already live
+- before writing any `OpenSIS` manifests, we swept the existing repo to understand whether the right move was greenfield implementation or selective ownership of the older `k8s/` tree
+
+Commands run:
+
+```bash
+cd /Users/raymond/Documents/DevOps-Easy-Learning
+sed -n '590,700p' PROJECT-ROADMAP.md
+sed -n '260,420p' KUBERNETES-MIGRATION-PLAN.md
+rg -n "k8s|vault|argocd|traefik|compose-start|docker-compose|StatefulSet|Ingress|ExternalSecret|SecretStore" OpenSIS -g '!**/node_modules/**'
+find OpenSIS -maxdepth 3 \( -path 'OpenSIS/app' -o -path 'OpenSIS/node_modules' -o -path 'OpenSIS/vendor' \) -prune -o -type f | sed 's#^#/#' | sort | rg '/OpenSIS/(README|docs/|k8s/|docker-compose|scripts/|TROUBLESHOOTING|SECURITY_NOTES)'
+sed -n '1,260p' OpenSIS/README.md
+sed -n '1,260p' OpenSIS/k8s/README.md
+sed -n '1,260p' OpenSIS/docs/03-kubernetes-bootstrap-guide.md
+sed -n '1,260p' OpenSIS/docs/06-architecture-reference.md
+sed -n '1,260p' OpenSIS/k8s/base/kustomization.yaml
+sed -n '1,260p' OpenSIS/k8s/base/opensis-db/statefulset.yaml
+find OpenSIS/k8s -maxdepth 3 -type f | sort
+sed -n '1,260p' OpenSIS/k8s/overlays/README.md
+sed -n '1,260p' OpenSIS/scripts/k8s-start.sh
+sed -n '1,260p' OpenSIS/k8s/gitops/README.md
+sed -n '1,260p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,260p' OpenSIS/k8s/overlays/prod/kustomization.yaml
+git diff --check
+```
+
+Findings captured:
+
+- `OpenSIS` already has a substantial Kubernetes tree with:
+  - Vault Agent Injector
+  - Argo CD applications
+  - MariaDB `StatefulSet`
+  - session Redis
+  - backup workflows
+- the strongest reusable part of that path is the Vault-first runtime file rendering model
+- the weakest aligned parts are:
+  - `nginx`-centric ingress assumptions
+  - embedded full-platform observability components inside the `OpenSIS` app path
+  - repo-owned cluster lifecycle assumptions that do not match the shared workspace `k3s` runtime
+
+Fixes applied:
+
+- updated `PROJECT-ROADMAP.md` so Phase 7 now reflects that the shared observability platform is already live on the owned `k3s` path
+- updated `KUBERNETES-MIGRATION-PLAN.md` so `OpenSIS` is now the explicit next active Kubernetes slice
+- added `OPENSIS-K8S-ASSESSMENT.md` as the working migration decision document for the `OpenSIS` slice
+- added the new assessment document to `README.md`
+
+Why this matters:
+
+- the roadmap now matches reality instead of lagging behind the platform work
+- the next implementation target is now explicit and defensible: `OpenSIS`
+- we do not need to guess whether `OpenSIS` should be rebuilt from zero
+- the assessment tells us what to preserve and what to retire:
+  - preserve Vault Injector, MariaDB, session Redis, and GitOps structure
+  - retire older ingress, observability duplication, and cluster-lifecycle assumptions
