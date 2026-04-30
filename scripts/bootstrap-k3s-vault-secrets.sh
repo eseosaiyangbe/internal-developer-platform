@@ -6,7 +6,8 @@ usage() {
 Usage: ./scripts/bootstrap-k3s-vault-secrets.sh [options]
 
 Install or reconcile the shared k3s Vault and External Secrets platform,
-configure Vault Kubernetes auth, and seed workspace secrets for MemFlip and SwiftPay.
+configure Vault Kubernetes auth, and seed workspace secrets for the migrated
+workspace applications.
 
 Options:
   --rotate-secrets  Overwrite existing seeded app secrets in Vault
@@ -156,6 +157,8 @@ write_policy "swiftpay-dev" 'path "kv/data/devops-easy-learning/swiftpay/dev/*" 
 write_policy "swiftpay-prod" 'path "kv/data/devops-easy-learning/swiftpay/prod/*" { capabilities = ["read"] }'
 write_policy "foodpulse-dev" 'path "kv/data/devops-easy-learning/foodpulse/dev/*" { capabilities = ["read"] }'
 write_policy "foodpulse-prod" 'path "kv/data/devops-easy-learning/foodpulse/prod/*" { capabilities = ["read"] }'
+write_policy "opensis-dev" 'path "kv/data/devops-easy-learning/opensis/dev/*" { capabilities = ["read"] }'
+write_policy "opensis-prod" 'path "kv/data/devops-easy-learning/opensis/prod/*" { capabilities = ["read"] }'
 write_policy "observability-dev" 'path "kv/data/devops-easy-learning/observability/dev/*" { capabilities = ["read"] }'
 write_policy "observability-prod" 'path "kv/data/devops-easy-learning/observability/prod/*" { capabilities = ["read"] }'
 
@@ -166,6 +169,8 @@ vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-dev bound_servi
 vault_exec_with_token "vault write auth/kubernetes/role/swiftpay-prod bound_service_account_names=swiftpay-vault-reader bound_service_account_namespaces=swiftpay-prod audience=vault token_policies=swiftpay-prod ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-dev bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-dev audience=vault token_policies=foodpulse-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/foodpulse-prod bound_service_account_names=foodpulse-vault-reader bound_service_account_namespaces=foodpulse-prod audience=vault token_policies=foodpulse-prod ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/opensis-dev bound_service_account_names=opensis-vault-reader bound_service_account_namespaces=opensis-dev audience=vault token_policies=opensis-dev ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/kubernetes/role/opensis-prod bound_service_account_names=opensis-vault-reader bound_service_account_namespaces=opensis-prod audience=vault token_policies=opensis-prod ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/observability-dev bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-dev audience=vault token_policies=observability-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/observability-prod bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-prod audience=vault token_policies=observability-prod ttl=1h >/dev/null"
 
@@ -186,6 +191,12 @@ FOODPULSE_DEV_DB_USER="foodpulse"
 FOODPULSE_DEV_DB_PASSWORD="change-me"
 FOODPULSE_DEV_REDIS_PASSWORD="admin"
 FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD="admin"
+OPENSIS_DEV_DB_HOST="opensis-db"
+OPENSIS_DEV_DB_PORT="3306"
+OPENSIS_DEV_DB_NAME="opensis"
+OPENSIS_DEV_DB_USER="opensis"
+OPENSIS_DEV_DB_PASSWORD="opensis123"
+OPENSIS_DEV_DB_ROOT_PASSWORD="opensis-root-123"
 OBSERVABILITY_DEV_DB_USER="observability_app"
 OBSERVABILITY_DEV_DB_PASSWORD="observability_dev_password"
 OBSERVABILITY_DEV_DB_NAME="observability_dev"
@@ -211,6 +222,12 @@ FOODPULSE_PROD_DB_USER="foodpulse"
 FOODPULSE_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 FOODPULSE_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+OPENSIS_PROD_DB_HOST="opensis-db"
+OPENSIS_PROD_DB_PORT="3306"
+OPENSIS_PROD_DB_NAME="opensis"
+OPENSIS_PROD_DB_USER="opensis"
+OPENSIS_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+OPENSIS_PROD_DB_ROOT_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 OBSERVABILITY_PROD_DB_USER="observability_app"
 OBSERVABILITY_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 OBSERVABILITY_PROD_DB_NAME="observability_prod"
@@ -248,6 +265,14 @@ ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/postgres" \
   "vault kv put kv/devops-easy-learning/foodpulse/prod/postgres username='${FOODPULSE_PROD_DB_USER}' password='${FOODPULSE_PROD_DB_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/app" \
   "vault kv put kv/devops-easy-learning/foodpulse/prod/app FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/opensis/dev/app" \
+  "vault kv put kv/devops-easy-learning/opensis/dev/app DB_HOST='${OPENSIS_DEV_DB_HOST}' DB_PORT='${OPENSIS_DEV_DB_PORT}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/opensis/dev/db" \
+  "vault kv put kv/devops-easy-learning/opensis/dev/db MYSQL_ROOT_PASSWORD='${OPENSIS_DEV_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/opensis/prod/app" \
+  "vault kv put kv/devops-easy-learning/opensis/prod/app DB_HOST='${OPENSIS_PROD_DB_HOST}' DB_PORT='${OPENSIS_PROD_DB_PORT}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' >/dev/null"
+ensure_vault_path "kv/devops-easy-learning/opensis/prod/db" \
+  "vault kv put kv/devops-easy-learning/opensis/prod/db MYSQL_ROOT_PASSWORD='${OPENSIS_PROD_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/observability/dev/postgres" \
   "vault kv put kv/devops-easy-learning/observability/dev/postgres username='${OBSERVABILITY_DEV_DB_USER}' password='${OBSERVABILITY_DEV_DB_PASSWORD}' database='${OBSERVABILITY_DEV_DB_NAME}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/observability/dev/ui" \

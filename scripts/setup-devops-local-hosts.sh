@@ -25,6 +25,7 @@ DOMAINS=(
   grafana.devops.local
   vault.devops.local
   memflip.devops.local
+  opensis.devops.local
   www.swiftpay.devops.local
   swiftpay.devops.local
   api.swiftpay.devops.local
@@ -107,5 +108,6 @@ echo "  http://controlplane.devops.local"
 echo "  http://grafana.devops.local"
 echo "  http://vault.devops.local"
 echo "  http://memflip.devops.local"
+echo "  http://opensis.devops.local"
 echo "  http://www.swiftpay.devops.local"
 echo "  http://foodpulse.devops.local"

@@ -17193,3 +17193,45 @@ Why this matters:
   - Argo CD
   - shared observability
   - explicit `dev` and `prod` contracts
+
+## 2026-04-30 - OpenSIS owned k3s slice completed
+
+Summary:
+- completed the new owned `OpenSIS/k8s` path so it follows the same migration contract as `MemFlip`, `SwiftPay`, and `FoodPulse`
+- added `dev` and `prod` overlays, Vault-backed `SecretStore` and `ExternalSecret` resources, and OpenSIS-specific deploy/verify/destroy scripts
+- seeded OpenSIS `dev` and `prod` Vault paths and Kubernetes auth roles through the shared bootstrap
+- validated a live `opensis-dev` rollout on the shared `k3s` runtime with Traefik ingress at `opensis.devops.local`
+- corrected three real rollout blockers during validation:
+  - unschedulable initial dev resource requests on the shared single-node cluster
+  - Kubernetes secret-volume collision with the service-account mount path under `/run/secrets`
+  - OpenSIS bootstrap behavior that generated `Data.php` too early and forced a 500 against an empty schema instead of redirecting to `install/index.php`
+
+Commands:
+```bash
+git status --short
+find OpenSIS/k8s -maxdepth 3 -type f | sort
+sed -n '1,240p' scripts/bootstrap-k3s-vault-secrets.sh
+sed -n '1,240p' Obervability-Stack/scripts/k8s-dev-deploy.sh
+sed -n '1,220p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,220p' OpenSIS/k8s/overlays/prod/kustomization.yaml
+sed -n '1,240p' scripts/setup-devops-local-hosts.sh
+sed -n '1,220p' OpenSIS/Dockerfile
+chmod +x OpenSIS/scripts/k8s-dev-deploy.sh OpenSIS/scripts/k8s-dev-verify.sh OpenSIS/scripts/k8s-dev-destroy.sh
+bash -n OpenSIS/scripts/k8s-dev-deploy.sh OpenSIS/scripts/k8s-dev-verify.sh OpenSIS/scripts/k8s-dev-destroy.sh scripts/bootstrap-k3s-vault-secrets.sh scripts/setup-devops-local-hosts.sh
+kubectl kustomize OpenSIS/k8s/overlays/dev
+kubectl kustomize OpenSIS/k8s/overlays/prod
+./scripts/bootstrap-k3s-vault-secrets.sh --skip-helm
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/dev
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/prod
+./OpenSIS/scripts/k8s-dev-deploy.sh
+kubectl get pods -n opensis-dev -o wide
+kubectl describe pod -n opensis-dev opensis-db-0
+kubectl logs -n opensis-dev deploy/opensis-ui --tail=120
+kubectl delete deployment -n opensis-dev opensis-ui --ignore-not-found=true
+kubectl delete statefulset -n opensis-dev opensis-db --ignore-not-found=true
+kubectl delete pod -n opensis-dev --all --ignore-not-found=true
+kubectl apply -k OpenSIS/k8s/overlays/dev
+kubectl rollout status deployment/opensis-ui -n opensis-dev --timeout=300s
+./OpenSIS/scripts/k8s-dev-verify.sh
+./OpenSIS/scripts/k8s-dev-deploy.sh --skip-runtime --skip-build --skip-secrets-platform
+```

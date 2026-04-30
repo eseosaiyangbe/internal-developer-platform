@@ -259,3 +259,13 @@ The correct approach is:
 - align the owned path with the workspace standards already proven elsewhere
 
 That gives the project the final advanced workload it still needs, without letting older design choices drag the platform story backward.
+
+## Current Outcome
+
+That recommendation is now implemented at the `dev` level:
+
+- the legacy tree is archived under [OpenSIS/k8s-legacy-platform](/Users/raymond/Documents/DevOps-Easy-Learning/OpenSIS/k8s-legacy-platform)
+- the owned path lives under [OpenSIS/k8s](/Users/raymond/Documents/DevOps-Easy-Learning/OpenSIS/k8s)
+- the `opensis-dev` namespace is live on the shared `k3s` runtime
+- Vault-backed External Secrets now materialize the OpenSIS app and DB env files
+- the first-run browser path correctly redirects to `install/index.php`

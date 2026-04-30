@@ -278,7 +278,7 @@ Recommended order:
 2. `SwiftPay` complete
 3. `FoodPulse` complete
 4. `Obervability-Stack` complete for the owned `dev` slice
-5. `OpenSIS` next
+5. `OpenSIS` complete for the owned `dev` slice
 
 Reasoning:
 
@@ -286,7 +286,7 @@ Reasoning:
 - `SwiftPay` proved the flagship microservices path
 - `FoodPulse` proved the stateful resilience path
 - `Obervability-Stack` moved only after the workload patterns were proven, because it is the shared platform the rest of the system depends on
-- `OpenSIS` has the most platform complexity because of Vault and legacy/runtime wrapping
+- `OpenSIS` had the most platform complexity because of Vault and legacy/runtime wrapping, which is why it was sequenced last among the workload slices
 
 ### Phase F: Add Production Controls
 
@@ -389,18 +389,18 @@ Mitigation:
 
 The clean next implementation order is:
 
-1. refresh the roadmap and migration docs so they reflect the live control-plane slice
-2. assess the existing `OpenSIS` Kubernetes tree against the new workspace standards
-3. preserve the right `OpenSIS` primitives:
-   - Vault Injector
-   - MariaDB `StatefulSet`
-   - Redis-backed sessions
-4. remove or retire outdated `OpenSIS` assumptions:
-   - `nginx`-centric ingress guidance
-   - embedded full-platform observability stack components
-   - repo-owned cluster lifecycle assumptions
-5. build the owned `OpenSIS` `k3s` `dev` slice on the shared workspace runtime
-6. define the stricter `OpenSIS` `prod` contract after the `dev` path is stable
+1. refresh the roadmap and migration docs so they reflect the completed `OpenSIS` slice
+2. tighten promotion and environment guidance around the now-live workload set
+3. keep Compose as the learning baseline while the owned `k3s` paths remain the production-style direction
+4. decide whether the next portfolio step is deeper production controls or a formal Phase 7 closeout
+
+Current `OpenSIS` status:
+
+- the legacy tree is archived under `OpenSIS/k8s-legacy-platform`
+- the owned path lives under `OpenSIS/k8s`
+- `opensis-dev` is live on the shared `k3s` runtime
+- Vault is the active secret source of truth for both `dev` and `prod` overlays
+- the first-run application state now redirects cleanly to `install/index.php`
 
 Supporting planning documents:
 

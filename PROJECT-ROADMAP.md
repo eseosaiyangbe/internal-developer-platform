@@ -104,7 +104,7 @@ Phase 7 will be considered successful when:
 - architecture, screenshots, and diagrams make the platform understandable without a live walkthrough
 - packaging materials show why this workspace is a serious platform engineering portfolio piece
 - Kubernetes migration guidance is concrete enough to become an implementation plan
-- three workload Kubernetes slices are real, documented, and reusable as migration templates
+- four workload Kubernetes slices are real, documented, and reusable as migration templates
 - the observability stack has a clean `dev` and `prod` Kubernetes implementation plan with Vault, ArgoCD, Traefik, and PostgreSQL modeled explicitly
 
 Phase 6 completed when:
@@ -630,14 +630,14 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - credible engineering story
 - real local `k3s` workload slices for `MemFlip`, `SwiftPay`, and `FoodPulse`
 - a live control-plane `k3s` `dev` slice plus an explicit `prod` contract
-- an explicit, owned Kubernetes migration decision for `OpenSIS`
+- a live owned `OpenSIS` `k3s` `dev` slice plus an explicit `prod` contract
 
 ### Success Criteria
 
 - repo can be shown to employers, collaborators, or students without extra context
 - at least one frontend/backend workload, one microservices workload, and one stateful resilience workload run credibly on the owned `k3s` path
 - the shared observability platform runs credibly on the owned `k3s` path for `dev`
-- the next implementation step is unambiguous: `OpenSIS` is the active Kubernetes slice, deliberately sequenced after the platform move
+- the workload migration set is now complete across frontend/backend, microservices, stateful resilience, and the legacy monolith path
 
 ---
 
