@@ -133,6 +133,7 @@ These hosts map the main local browser paths for:
 - MemFlip
 - SwiftPay
 - FoodPulse
+- OpenSIS
 
 If you want to preview the generated host line before applying it:
 

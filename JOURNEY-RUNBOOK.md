@@ -17659,3 +17659,67 @@ Measured outcome:
 - OpenSIS requests changed from `50m CPU / 624Mi memory` to `45m CPU / 600Mi memory`
 - OpenSIS remained healthy through the rollout
 - operator verification remained green with `4 healthy / 0 down`
+
+## 2026-05-01 - Full Phase 7 k3s dev certification pass across the migrated platform
+
+Summary:
+- ran the full Kubernetes development certification pass across the shared platform:
+  - control plane
+  - Vault-backed secrets platform
+  - MemFlip
+  - SwiftPay
+  - FoodPulse
+  - OpenSIS
+- verified namespace presence, ingress coverage, pod health, and `ExternalSecret` synchronization across the migrated set
+- ran the control-plane and per-app verification entrypoints end to end
+- validated direct browser-entrypoint reachability for all primary hosts except one local workstation resolution gap
+- confirmed that `opensis.devops.local` ingress itself is healthy through direct host-header validation against Traefik, and that the remaining issue is only a stale `/etc/hosts` line on the workstation
+- corrected documentation drift so browser-entrypoint guidance now includes OpenSIS consistently
+
+Commands:
+```bash
+kubectl get ns
+kubectl get ingress -A -o wide
+kubectl get pods -A -o wide
+kubectl get secretstore,externalsecret -A
+bash -n MemFlip/scripts/k8s-dev-verify.sh SwiftPay/scripts/k8s-dev-verify.sh FoodPulse/scripts/k8s-dev-verify.sh OpenSIS/scripts/k8s-dev-verify.sh Obervability-Stack/scripts/k8s-dev-verify.sh
+./Obervability-Stack/scripts/k8s-dev-verify.sh
+./MemFlip/scripts/k8s-dev-verify.sh
+./FoodPulse/scripts/k8s-dev-verify.sh
+./SwiftPay/scripts/k8s-dev-verify.sh
+./OpenSIS/scripts/k8s-dev-verify.sh
+kubectl get ingress -n vault -o wide
+kubectl exec -n vault vault-0 -- sh -lc 'vault status -format=json'
+for url in http://controlplane.devops.local http://grafana.devops.local http://memflip.devops.local http://www.swiftpay.devops.local http://api.swiftpay.devops.local/health http://foodpulse.devops.local http://opensis.devops.local http://vault.devops.local; do printf '%s ' \"$url\"; curl -sS -o /dev/null -w '%{http_code}\\n' \"$url\"; done
+grep -n 'devops.local' /etc/hosts
+sed -n '1,260p' scripts/setup-devops-local-hosts.sh
+sed -n '132,162p' README.md
+sed -n '120,155p' WORKSTATION-BOOTSTRAP.md
+sed -n '72,96p' Obervability-Stack/k8s/README.md
+curl -sS -o /dev/null -w '%{http_code}\\n' -H 'Host: opensis.devops.local' http://192.168.64.2/
+curl -sS -o /dev/null -w '%{http_code}\\n' -H 'Host: opensis.devops.local' http://192.168.64.2/install/index.php
+kubectl describe node colima | sed -n '/Allocated resources:/,/Events:/p'
+sudo -n ./scripts/setup-devops-local-hosts.sh
+```
+
+Measured outcome:
+- all per-app verification scripts passed
+- control-plane verification passed
+- `SecretStore` objects were valid in all migrated namespaces
+- all expected `ExternalSecret` objects were `Ready=True`
+- node allocation at certification time:
+  - CPU requests: `2015m` (`50%`)
+  - Memory requests: `4984Mi` (`62%`)
+- direct browser entrypoints passed for:
+  - `controlplane.devops.local`
+  - `grafana.devops.local`
+  - `memflip.devops.local`
+  - `www.swiftpay.devops.local`
+  - `api.swiftpay.devops.local/health`
+  - `foodpulse.devops.local`
+  - `vault.devops.local`
+- `OpenSIS` ingress passed host-header validation with:
+  - `/` -> `302`
+  - `/install/index.php` -> `200`
+- one local workstation follow-up remains:
+  - refresh `/etc/hosts` with `./scripts/setup-devops-local-hosts.sh` so `opensis.devops.local` resolves in the browser

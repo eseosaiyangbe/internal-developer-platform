@@ -70,7 +70,8 @@ If you are evaluating the project quickly, use this order:
 2. read [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) for the short-form project narrative
 3. read [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) for the system model and workload roles
 4. read [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) to see how the local lab maps to the target platform direction
-5. read [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) and [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) for proof that incidents, fixes, and operator workflows were executed for real
+5. read [PHASE7-K3S-DEV-CERTIFICATION.md](PHASE7-K3S-DEV-CERTIFICATION.md) for the full Kubernetes development acceptance result
+6. read [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) and [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) for proof that incidents, fixes, and operator workflows were executed for real
 
 If you want to run it instead of just review it:
 
@@ -151,6 +152,7 @@ Then the browser entrypoints are:
 - `http://memflip.devops.local`
 - `http://www.swiftpay.devops.local`
 - `http://foodpulse.devops.local`
+- `http://opensis.devops.local`
 
 Recommended workspace commands:
 
@@ -210,6 +212,7 @@ All monitored apps are currently healthy
 | [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
 | [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
 | [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |
+| [PHASE7-K3S-DEV-CERTIFICATION.md](PHASE7-K3S-DEV-CERTIFICATION.md) | formal Phase 7 Kubernetes development certification result |
 | [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md) | root architecture narrative and platform model |
 | [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
 | [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
@@ -276,6 +279,7 @@ The current Phase 7 documentation spine is:
 
 - [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md)
 - [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md)
+- [PHASE7-K3S-DEV-CERTIFICATION.md](PHASE7-K3S-DEV-CERTIFICATION.md)
 - [WORKSPACE-ARCHITECTURE.md](WORKSPACE-ARCHITECTURE.md)
 - [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
 - [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md)
