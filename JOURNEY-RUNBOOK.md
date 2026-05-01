@@ -17269,3 +17269,36 @@ kubectl get secretstore,externalsecret -A
 cd Obervability-Stack/ui-next && npx tsx scripts/validate-monitored-apps.ts
 ./Obervability-Stack/scripts/devops-monitor.sh operator
 ```
+
+## 2026-05-01 - Resolve stalled SwiftPay dev migration job on shared k3s node
+
+Summary:
+- confirmed the long-running `swiftpay-dev` `db-migration-job` was not blocked by secrets or image issues, but by single-node scheduler pressure on `colima`
+- verified that node CPU requests were pinned at `100%` even though actual CPU usage was low, because multiple SwiftPay dev services were over-requesting CPU for a shared lab cluster
+- reduced SwiftPay dev-only resource requests for `api-gateway`, `auth-service`, `notification-service`, `transaction-service`, and `wallet-service`
+- recreated the stalled migration job and confirmed it ran to `Completed`
+- added a no-surge dev rollout strategy for SwiftPay stateless services so future dev-only changes do not require temporary extra headroom on the single-node cluster
+
+Commands:
+```bash
+kubectl describe node colima
+kubectl top pods -A
+kubectl describe pod db-migration-job-z8zqr -n swiftpay-dev
+kubectl get events -n swiftpay-dev --sort-by=.lastTimestamp | tail -n 40
+sed -n '1,260p' SwiftPay/k8s/overlays/dev/kustomization.yaml
+sed -n '1,220p' SwiftPay/k8s/base/deployments/api-gateway.yaml
+sed -n '1,220p' SwiftPay/k8s/base/deployments/auth-service.yaml
+sed -n '1,220p' SwiftPay/k8s/base/deployments/transaction-service.yaml
+sed -n '1,220p' SwiftPay/k8s/base/deployments/wallet-service.yaml
+sed -n '1,220p' SwiftPay/k8s/base/deployments/notification-service.yaml
+kubectl kustomize SwiftPay/k8s/overlays/dev
+kubectl apply --dry-run=client -k SwiftPay/k8s/overlays/dev
+kubectl delete job db-migration-job -n swiftpay-dev --ignore-not-found
+kubectl apply -k SwiftPay/k8s/overlays/dev
+kubectl delete pod -n swiftpay-dev api-gateway-5fd555ffd6-t9ztb auth-service-76cfb559fd-5kxmt notification-service-79d9c68fd6-564t9 transaction-service-86c5cf6d8d-6256v wallet-service-7d7ff9f4f6-9db8p
+kubectl get pods -n swiftpay-dev
+kubectl logs job/db-migration-job -n swiftpay-dev --tail=120
+kubectl get deploy -n swiftpay-dev
+kubectl get rs -n swiftpay-dev
+kubectl describe node colima | sed -n '/swiftpay-dev/,+10p'
+```
