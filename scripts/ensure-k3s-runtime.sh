@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devops-easy-learning"
+VAULT_INIT_FILE="${STATE_DIR}/k3s-vault-init.json"
 
 have_sudo() {
   command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1
@@ -53,6 +55,23 @@ ensure_traefik_with_helm() {
   fi
 
   kubectl rollout status deployment/traefik -n traefik --timeout=180s >/dev/null
+}
+
+reconcile_shared_vault_platform() {
+  if [[ ! -f "${VAULT_INIT_FILE}" ]]; then
+    return 0
+  fi
+
+  if ! kubectl get namespace vault >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! kubectl get namespace external-secrets >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "Reconciling shared Vault and External Secrets platform..."
+  "${SCRIPT_DIR}/bootstrap-k3s-vault-secrets.sh" --skip-helm >/dev/null
 }
 
 ensure_macos_k3s() {
@@ -119,6 +138,8 @@ main() {
   echo "k3s runtime is ready."
   kubectl config current-context
   kubectl get nodes
+
+  reconcile_shared_vault_platform
 
   ingress_address="$(kubectl get svc traefik -n traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
   if [[ -z "${ingress_address}" ]]; then

@@ -17235,3 +17235,37 @@ kubectl rollout status deployment/opensis-ui -n opensis-dev --timeout=300s
 ./OpenSIS/scripts/k8s-dev-verify.sh
 ./OpenSIS/scripts/k8s-dev-deploy.sh --skip-runtime --skip-build --skip-secrets-platform
 ```
+
+## 2026-05-01 - Reconcile k3s Vault restart recovery and inventory namespace contract
+
+Summary:
+- fixed the control-plane inventory validator so the owned Kubernetes namespace contract now accepts `app`, `app-dev`, and `app-prod` instead of incorrectly enforcing only the legacy bare app id
+- hardened the shared local `k3s` runtime bootstrap so `./scripts/ensure-k3s-runtime.sh` now re-runs the Vault and External Secrets reconciliation path automatically when local Vault state exists
+- verified that the post-restart sealed-Vault condition was cleared, `SecretStore` objects returned to `Ready=True`, and the operator path recovered to a clean pass
+- confirmed that the `workspace-start.sh` inventory failures were validator drift, not runtime application failure
+
+Commands:
+```bash
+rg -n "OpenSIS|vault|namespace mismatch|k3s|External Secrets|sealed|workspace-start" /Users/raymond/.codex/memories/MEMORY.md
+sed -n '1,260p' Obervability-Stack/ui-next/scripts/validate-monitored-apps.ts
+sed -n '1,320p' scripts/bootstrap-k3s-vault-secrets.sh
+kubectl get pods -n vault -o wide
+kubectl get secretstore,externalsecret -A
+sed -n '1,260p' scripts/ensure-k3s-runtime.sh
+sed -n '1,220p' scripts/workspace-start.sh
+sed -n '1,260p' Obervability-Stack/scripts/operator-first-check.sh
+bash -n scripts/ensure-k3s-runtime.sh scripts/bootstrap-k3s-vault-secrets.sh
+./scripts/ensure-k3s-runtime.sh
+kubectl describe secretstore vault-backend -n memflip-dev
+kubectl logs deployment/external-secrets -n external-secrets --tail=200
+kubectl exec -n vault vault-0 -- sh -lc 'vault status'
+kubectl rollout restart deployment/external-secrets -n external-secrets
+kubectl rollout status deployment/external-secrets -n external-secrets --timeout=180s
+kubectl rollout restart deployment/external-secrets-cert-controller -n external-secrets
+kubectl rollout status deployment/external-secrets-cert-controller -n external-secrets --timeout=180s
+kubectl rollout restart deployment/external-secrets-webhook -n external-secrets
+kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=180s
+kubectl get secretstore,externalsecret -A
+cd Obervability-Stack/ui-next && npx tsx scripts/validate-monitored-apps.ts
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
