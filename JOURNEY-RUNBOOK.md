@@ -17447,3 +17447,120 @@ Measured outcome:
 - CPU reservation fell from `79%` to `58%`
 - memory reservation fell from `86%` to `65%`
 - operator verification remained green with `4 healthy / 0 down`
+
+## 2026-05-01 - Extend requested-versus-live right-sizing to the observability platform slice
+
+Summary:
+- extended the requested-versus-live audit pattern to the always-on `Obervability-Stack` `dev` namespace
+- confirmed the platform slice was more balanced than `FoodPulse`, but still had clear CPU over-reservation across `alertmanager`, `blackbox-exporter`, `devops-monitor-ui`, `grafana`, `loki`, `prometheus`, `node-exporter`, `promtail`, and `observability-postgres`
+- applied conservative `dev`-only request trims and no-surge rollout strategy patches without weakening the `prod` contract
+- identified a second `CloudNativePG` dev operability issue: default restart and switchover timers are too slow for single-node lab reconciliation after resource-only changes, so the `dev` overlay now shortens those timers explicitly
+- verified that the full control-plane operator path stayed green after the platform rollout
+
+Commands:
+```bash
+kubectl top pods -n platform-observability-dev
+kubectl get deploy,statefulset,daemonset -n platform-observability-dev -o wide
+rg -n "resources:|requests:|limits:|strategy:|maxSurge|maxUnavailable" Obervability-Stack/k8s/base Obervability-Stack/k8s/overlays/dev | sed -n '1,260p'
+sed -n '1,220p' Obervability-Stack/k8s/base/prometheus.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/loki.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/grafana.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/ui.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/alertmanager.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/blackbox-exporter.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/promtail.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/node-exporter.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/cadvisor.yaml
+sed -n '1,220p' Obervability-Stack/k8s/base/postgres-cluster.yaml
+sed -n '1,240p' Obervability-Stack/k8s/overlays/dev/kustomization.yaml
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+const ns='platform-observability-dev';
+const pods = JSON.parse(execSync(`kubectl get pods -n ${ns} -o json`, {encoding:'utf8'})).items;
+const topLines = execSync(`kubectl top pods -n ${ns}`, {encoding:'utf8'}).trim().split('\n').slice(1);
+function cpuToM(v){ if(v.endsWith('m')) return Number(v.slice(0,-1)); return Number(v)*1000; }
+function memToMi(v){ if(v.endsWith('Ki')) return Number(v.slice(0,-2))/1024; if(v.endsWith('Mi')) return Number(v.slice(0,-2)); if(v.endsWith('Gi')) return Number(v.slice(0,-2))*1024; return Number(v); }
+let reqCpu=0, reqMem=0;
+for (const pod of pods) for (const c of pod.spec.containers||[]) { const r=c.resources?.requests||{}; if(r.cpu) reqCpu+=cpuToM(r.cpu); if(r.memory) reqMem+=memToMi(r.memory); }
+let liveCpu=0, liveMem=0;
+for (const line of topLines){ const p=line.trim().split(/\s+/); if(p.length<3) continue; liveCpu+=cpuToM(p[1]); liveMem+=memToMi(p[2]); }
+console.log(JSON.stringify({namespace:ns, podCount:pods.length, reqCpuM:reqCpu, reqMemMi:reqMem, liveCpuM:liveCpu, liveMemMi:liveMem, cpuRatio:(reqCpu/liveCpu).toFixed(1), memRatio:(reqMem/liveMem).toFixed(1)}, null, 2));
+NODE
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+const ns='platform-observability-dev';
+const pods = JSON.parse(execSync(`kubectl get pods -n ${ns} -o json`, {encoding:'utf8'})).items;
+const topRows = new Map();
+for (const line of execSync(`kubectl top pods -n ${ns}`, {encoding:'utf8'}).trim().split('\n').slice(1)) {
+  const p=line.trim().split(/\s+/); if(p.length<3) continue; topRows.set(p[0], {cpu:p[1], mem:p[2]});
+}
+function cpuToM(v){ if(!v) return 0; if(v.endsWith('m')) return Number(v.slice(0,-1)); return Number(v)*1000; }
+function memToMi(v){ if(!v) return 0; if(v.endsWith('Ki')) return Number(v.slice(0,-2))/1024; if(v.endsWith('Mi')) return Number(v.slice(0,-2)); if(v.endsWith('Gi')) return Number(v.slice(0,-2))*1024; return Number(v); }
+for (const pod of pods) {
+  let reqCpu=0, reqMem=0;
+  for (const c of pod.spec.containers||[]) {
+    const r=c.resources?.requests||{};
+    if(r.cpu) reqCpu+=cpuToM(r.cpu);
+    if(r.memory) reqMem+=memToMi(r.memory);
+  }
+  const live=topRows.get(pod.metadata.name) || {cpu:'0m', mem:'0Mi'};
+  const liveCpu=cpuToM(live.cpu), liveMem=memToMi(live.mem);
+  console.log([pod.metadata.name, reqCpu, liveCpu, liveCpu ? (reqCpu/liveCpu).toFixed(1) : 'n/a', reqMem, liveMem, liveMem ? (reqMem/liveMem).toFixed(1) : 'n/a'].join('\t'));
+}
+NODE
+kubectl kustomize Obervability-Stack/k8s/overlays/dev >/tmp/observability-dev-render.yaml
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/dev >/tmp/observability-dev-dryrun.txt
+bash -n Obervability-Stack/scripts/k8s-dev-deploy.sh Obervability-Stack/scripts/k8s-dev-verify.sh Obervability-Stack/scripts/k8s-dev-destroy.sh
+kubectl apply -k Obervability-Stack/k8s/overlays/dev
+kubectl rollout status deployment/alertmanager -n platform-observability-dev --timeout=180s
+kubectl rollout status deployment/blackbox-exporter -n platform-observability-dev --timeout=180s
+kubectl rollout status deployment/devops-monitor-ui -n platform-observability-dev --timeout=180s
+kubectl rollout status deployment/grafana -n platform-observability-dev --timeout=180s
+kubectl rollout status statefulset/loki -n platform-observability-dev --timeout=180s
+kubectl rollout status statefulset/prometheus -n platform-observability-dev --timeout=180s
+kubectl rollout status daemonset/node-exporter -n platform-observability-dev --timeout=180s
+kubectl rollout status daemonset/promtail -n platform-observability-dev --timeout=180s
+kubectl wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True cluster/observability-postgres -n platform-observability-dev --timeout=300s
+kubectl get pods -n platform-observability-dev -o wide
+kubectl logs deployment/devops-monitor-ui -n platform-observability-dev --tail=60
+kubectl describe deployment devops-monitor-ui -n platform-observability-dev | tail -n 60
+kubectl describe pod prometheus-0 -n platform-observability-dev | tail -n 80
+kubectl describe pod loki-0 -n platform-observability-dev | tail -n 80
+kubectl logs prometheus-0 -n platform-observability-dev --tail=80
+kubectl logs loki-0 -n platform-observability-dev --tail=80
+kubectl wait --for=condition=Ready pod/loki-0 -n platform-observability-dev --timeout=120s
+kubectl wait --for=condition=Ready pod/prometheus-0 -n platform-observability-dev --timeout=120s
+kubectl describe node colima | sed -n '/Allocated resources:/,/Events:/p'
+kubectl top pods -n platform-observability-dev
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+const ns='platform-observability-dev';
+const pods = JSON.parse(execSync(`kubectl get pods -n ${ns} -o json`, {encoding:'utf8'})).items;
+const topRows = new Map();
+for (const line of execSync(`kubectl top pods -n ${ns}`, {encoding:'utf8'}).trim().split('\n').slice(1)) {
+  const p=line.trim().split(/\s+/); if(p.length<3) continue; topRows.set(p[0], {cpu:p[1], mem:p[2]});
+}
+function cpuToM(v){ if(!v) return 0; if(v.endsWith('m')) return Number(v.slice(0,-1)); return Number(v)*1000; }
+function memToMi(v){ if(!v) return 0; if(v.endsWith('Ki')) return Number(v.slice(0,-2))/1024; if(v.endsWith('Mi')) return Number(v.slice(0,-2)); if(v.endsWith('Gi')) return Number(v.slice(0,-2))*1024; return Number(v); }
+let reqCpu=0, reqMem=0, liveCpu=0, liveMem=0;
+for (const pod of pods) {
+  for (const c of pod.spec.containers||[]) {
+    const r=c.resources?.requests||{};
+    if(r.cpu) reqCpu+=cpuToM(r.cpu);
+    if(r.memory) reqMem+=memToMi(r.memory);
+  }
+  const live=topRows.get(pod.metadata.name) || {cpu:'0m', mem:'0Mi'};
+  liveCpu += cpuToM(live.cpu);
+  liveMem += memToMi(live.mem);
+}
+console.log(JSON.stringify({reqCpuM:reqCpu, reqMemMi:reqMem, liveCpuM:liveCpu, liveMemMi:liveMem, cpuRatio:(reqCpu/liveCpu).toFixed(1), memRatio:(reqMem/liveMem).toFixed(1)}, null, 2));
+NODE
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Measured outcome:
+- cluster requests dropped further from `2325m CPU / 5152Mi memory` to `2020m CPU / 5008Mi memory`
+- node CPU reservation fell from `58%` to `50%`
+- node memory reservation fell from `65%` to `63%`
+- observability namespace requests dropped from `700m CPU / 1568Mi memory` to `395m CPU / 1424Mi memory`
+- operator verification remained green with `4 healthy / 0 down`

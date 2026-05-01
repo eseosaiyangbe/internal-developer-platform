@@ -123,3 +123,76 @@ This keeps the resilience pattern intact while reducing the scheduler pressure c
   - `Obervability-Stack`
   - `OpenSIS`
   - `SwiftPay` HPAs and rollout posture
+
+## Second-Round Platform Pass
+
+On `2026-05-01`, the same audit pattern was extended to the always-on `Obervability-Stack` `dev` slice.
+
+### Before Platform Right-Sizing
+
+- platform namespace requests:
+  - CPU: `700m`
+  - Memory: `1568Mi`
+- measured live usage:
+  - CPU: `64m`
+  - Memory: `1008Mi`
+- ratio:
+  - CPU: `10.9x`
+  - Memory: `1.6x`
+
+### Safe Dev-Only Changes Applied
+
+- reduced CPU requests for:
+  - `alertmanager`
+  - `blackbox-exporter`
+  - `devops-monitor-ui`
+  - `grafana`
+  - `loki`
+  - `prometheus`
+  - `node-exporter`
+  - `promtail`
+  - `observability-postgres`
+- preserved more conservative memory for:
+  - `promtail`
+  - `cadvisor`
+  - `prometheus`
+
+This was deliberate. Those components either already had modest headroom or were close enough to live memory usage that aggressive cuts would have been reckless.
+
+### Additional Platform Finding
+
+`CloudNativePG` in the observability slice inherits long default restart and switchover timers.
+
+That is a sound default for resilient environments, but it is unnecessarily slow for the shared single-node `dev` lab when we are only changing resource requests. A `dev`-only CNPG operations patch now shortens:
+
+- `startDelay`
+- `stopDelay`
+- `smartShutdownTimeout`
+- `switchoverDelay`
+
+This keeps `prod` behavior untouched while making `dev` rollouts materially more operable.
+
+### After Platform Right-Sizing
+
+- platform namespace requests:
+  - CPU: `395m`
+  - Memory: `1424Mi`
+- measured live usage after stabilization:
+  - CPU: `71m`
+  - Memory: `460Mi`
+- ratio:
+  - CPU: `5.6x`
+  - Memory: `3.1x`
+
+### Cluster-Level Outcome
+
+After the application and observability right-sizing passes:
+
+- node CPU requests dropped to `2020m` (`50%`)
+- node memory requests dropped to `5008Mi` (`63%`)
+
+The full operator verification remained green:
+
+- smoke check: `30/30`
+- inventory check: `0` errors
+- workspace app snapshot: `4 healthy / 0 down`
