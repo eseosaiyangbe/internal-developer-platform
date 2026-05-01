@@ -17755,3 +17755,98 @@ Measured outcome:
 - password reset write succeeded
 - lockout clear request to `sys/locked-users/.../unlock/admin` returned `HTTP 204`
 - `admin` login then succeeded again and returned policy set `default,local-admin`
+
+## 2026-05-01 - Clear k3s control-plane alert drift for SwiftPay and OpenSIS
+
+Summary:
+- investigated a 9-alert burst from the shared Kubernetes control plane and traced it to two different contract gaps rather than nine real workload outages
+- confirmed that SwiftPay backend services were healthy in-cluster, but the blackbox exporter could not reach them because the `swiftpay-dev` ingress policy only allowed Prometheus traffic
+- confirmed that the owned `OpenSIS/k8s` slice was app-healthy but had not yet reintroduced the MariaDB exporter, Apache exporter, and Vault synthetic exporter signals that the control plane rules still expected
+- restored those owned OpenSIS observability components directly in the new `OpenSIS/k8s` path, wired them into Prometheus, and aligned Vault auth with projected `audience=vault` Kubernetes tokens
+- patched the OpenSIS Vault synthetic exporter to read the Vault-first workspace secret paths actually used by the k3s migration (`devops-easy-learning/opensis/...`)
+- extended the OpenSIS database secret contract with exporter credentials, updated Vault seeding to merge them into existing paths, and reconciled MariaDB so the exporter account was created and granted
+- reloaded Prometheus, reran OpenSIS and observability verification, and confirmed the control-plane alerts dropped back to zero active alerts
+
+Commands:
+```bash
+curl -sS http://controlplane.devops.local/api/alerts | jq '.'
+kubectl exec -n platform-observability-dev prometheus-0 -- sh -lc "wget -qO- http://127.0.0.1:9090/api/v1/alerts" | jq -r '.data.alerts[] | [.labels.alertname, .state, .labels.service, .labels.component, .annotations.summary] | @tsv'
+kubectl exec -n platform-observability-dev alertmanager-599fb7f749-n2fd9 -- sh -lc "wget -qO- http://127.0.0.1:9093/api/v2/alerts/groups"
+sed -n '260,640p' Obervability-Stack/k8s/base/config/alert_rules.yml
+sed -n '1,260p' Obervability-Stack/k8s/base/config/recording_rules.yml
+sed -n '1,240p' Obervability-Stack/k8s/base/config/prometheus.yml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/auth-service.yaml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/wallet-service.yaml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/transaction-service.yaml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/notification-service.yaml
+kubectl get svc -n swiftpay-dev
+kubectl get endpoints -n swiftpay-dev auth-service wallet-service transaction-service notification-service -o wide
+kubectl exec -n swiftpay-dev deploy/api-gateway -- sh -lc 'for u in http://auth-service:3004/health http://wallet-service:3001/health http://transaction-service:3002/health http://notification-service:3003/health; do echo === $u; wget -qO- "$u"; echo; done'
+kubectl exec -n platform-observability-dev deploy/blackbox-exporter -- wget -qO- 'http://127.0.0.1:9115/probe?module=http_2xx&target=http://auth-service.swiftpay-dev.svc.cluster.local:3004/health'
+sed -n '120,220p' SwiftPay/k8s/overlays/dev/supplemental-networkpolicy.yaml
+sed -n '1,260p' OpenSIS/k8s/base/kustomization.yaml
+rg --files OpenSIS/k8s/base
+sed -n '1,260p' OpenSIS/k8s/base/ui.yaml
+sed -n '1,260p' OpenSIS/k8s/base/db.yaml
+sed -n '1,260p' OpenSIS/k8s/base/networkpolicy.yaml
+sed -n '1,260p' OpenSIS/observability/vault-synthetic-exporter.py
+sed -n '1,220p' OpenSIS/observability/mysqld-exporter-entrypoint.sh
+sed -n '1,220p' OpenSIS/docker/apache/status.conf
+sed -n '1,240p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,220p' OpenSIS/k8s/overlays/dev/vault-app-external-secret.yaml
+sed -n '1,220p' OpenSIS/k8s/overlays/dev/vault-db-external-secret.yaml
+sed -n '1,260p' scripts/bootstrap-k3s-vault-secrets.sh
+bash -n scripts/bootstrap-k3s-vault-secrets.sh OpenSIS/scripts/k8s-dev-deploy.sh OpenSIS/scripts/k8s-dev-verify.sh Obervability-Stack/scripts/k8s-dev-verify.sh
+kubectl kustomize OpenSIS/k8s/overlays/dev >/tmp/opensis-kustomize.yaml
+kubectl kustomize OpenSIS/k8s/overlays/prod >/tmp/opensis-kustomize-prod.yaml
+kubectl kustomize Obervability-Stack/k8s/overlays/dev >/tmp/observability-kustomize.yaml
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/dev
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/prod
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/dev
+./scripts/bootstrap-k3s-vault-secrets.sh --skip-helm
+kubectl apply -k SwiftPay/k8s/overlays/dev
+kubectl apply -k OpenSIS/k8s/overlays/dev
+./OpenSIS/scripts/k8s-dev-deploy.sh --skip-runtime --skip-build --skip-secrets-platform
+kubectl apply -k Obervability-Stack/k8s/overlays/dev
+kubectl rollout restart statefulset/prometheus -n platform-observability-dev
+kubectl rollout status statefulset/prometheus -n platform-observability-dev --timeout=300s
+kubectl wait --for=condition=complete job/devops-monitor-db-init -n platform-observability-dev --timeout=180s
+kubectl logs -n opensis-dev deploy/opensis-vault-synthetic-exporter --tail=50
+kubectl logs -n opensis-dev deploy/opensis-mysqld-exporter --tail=50
+kubectl exec -n opensis-dev deploy/opensis-vault-synthetic-exporter -- sh -lc 'wget -qO- http://127.0.0.1:9105/metrics'
+kubectl exec -n opensis-dev deploy/opensis-mysqld-exporter -- sh -lc 'wget -qO- http://127.0.0.1:9104/metrics | egrep "^(mysql_up|mysql_global_status_threads_connected|mysql_global_variables_max_connections)"'
+kubectl exec -n opensis-dev statefulset/opensis-db -- sh -lc '. /opt/opensis/secrets/db.env; mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT user,host FROM mysql.user WHERE user IN (\"opensis_exporter\", \"opensis\");"'
+kubectl apply -k OpenSIS/k8s/overlays/dev
+kubectl rollout restart deployment/opensis-vault-synthetic-exporter -n opensis-dev
+kubectl rollout restart statefulset/opensis-db -n opensis-dev
+kubectl rollout status deployment/opensis-vault-synthetic-exporter -n opensis-dev --timeout=180s
+kubectl rollout status statefulset/opensis-db -n opensis-dev --timeout=300s
+kubectl rollout restart deployment/opensis-mysqld-exporter -n opensis-dev
+kubectl rollout status deployment/opensis-mysqld-exporter -n opensis-dev --timeout=180s
+./Obervability-Stack/scripts/k8s-dev-verify.sh
+curl -sS http://controlplane.devops.local/api/alerts | jq '.summary, (.alerts | length)'
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Measured outcome:
+- SwiftPay backend blackbox probes were restored by allowing `blackbox-exporter` alongside Prometheus through the `swiftpay-dev` observability ingress policy
+- new owned OpenSIS k3s observability services came up healthy:
+  - `opensis-mariadb`
+  - `opensis-apache`
+  - `opensis-vault`
+- Prometheus target verification passed for:
+  - `opensis-mariadb`
+  - `opensis-apache`
+  - `opensis-vault`
+  - all existing critical SwiftPay, MemFlip, FoodPulse, and platform jobs
+- OpenSIS exporter metrics converged to healthy values:
+  - `mysql_up = 1`
+  - `opensis:vault_all_required_secrets_readable = 1`
+  - `opensis:vault_health = 1`
+  - `opensis:apache_up = 1`
+- control-plane alert state dropped from 9 app-facing active alerts to `0`
+- the remaining transient infrastructure warning seen during remediation was `HighContainerCPUUsage` in `pending` state only, not a firing application outage
+- end-to-end operator verification remained green with:
+  - smoke check `30/30`
+  - inventory validation `Errors: 0`
+  - workspace snapshot `4 healthy / 0 down`

@@ -81,6 +81,21 @@ ensure_vault_path() {
   vault_exec_with_token "${command}" >/dev/null
 }
 
+ensure_vault_patch_or_put() {
+  local path="$1"
+  local put_command="$2"
+  local patch_command="$3"
+
+  if vault_exec_with_token "vault kv get '${path}' >/dev/null 2>&1" >/dev/null 2>&1; then
+    echo "[vault-bootstrap] Patching existing secret at ${path}"
+    vault_exec_with_token "${patch_command}" >/dev/null
+    return 0
+  fi
+
+  echo "[vault-bootstrap] Writing secret at ${path}"
+  vault_exec_with_token "${put_command}" >/dev/null
+}
+
 require_command kubectl
 require_command helm
 require_command jq
@@ -197,6 +212,8 @@ OPENSIS_DEV_DB_NAME="opensis"
 OPENSIS_DEV_DB_USER="opensis"
 OPENSIS_DEV_DB_PASSWORD="opensis123"
 OPENSIS_DEV_DB_ROOT_PASSWORD="opensis-root-123"
+OPENSIS_DEV_MYSQL_EXPORTER_USER="opensis_exporter"
+OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD="opensis-exporter-123"
 OBSERVABILITY_DEV_DB_USER="observability_app"
 OBSERVABILITY_DEV_DB_PASSWORD="observability_dev_password"
 OBSERVABILITY_DEV_DB_NAME="observability_dev"
@@ -228,6 +245,8 @@ OPENSIS_PROD_DB_NAME="opensis"
 OPENSIS_PROD_DB_USER="opensis"
 OPENSIS_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 OPENSIS_PROD_DB_ROOT_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
+OPENSIS_PROD_MYSQL_EXPORTER_USER="opensis_exporter"
+OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 OBSERVABILITY_PROD_DB_USER="observability_app"
 OBSERVABILITY_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 OBSERVABILITY_PROD_DB_NAME="observability_prod"
@@ -267,12 +286,14 @@ ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/app" \
   "vault kv put kv/devops-easy-learning/foodpulse/prod/app FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/opensis/dev/app" \
   "vault kv put kv/devops-easy-learning/opensis/dev/app DB_HOST='${OPENSIS_DEV_DB_HOST}' DB_PORT='${OPENSIS_DEV_DB_PORT}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/opensis/dev/db" \
-  "vault kv put kv/devops-easy-learning/opensis/dev/db MYSQL_ROOT_PASSWORD='${OPENSIS_DEV_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' >/dev/null"
+ensure_vault_patch_or_put "kv/devops-easy-learning/opensis/dev/db" \
+  "vault kv put kv/devops-easy-learning/opensis/dev/db MYSQL_ROOT_PASSWORD='${OPENSIS_DEV_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}' >/dev/null" \
+  "vault kv patch kv/devops-easy-learning/opensis/dev/db MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/opensis/prod/app" \
   "vault kv put kv/devops-easy-learning/opensis/prod/app DB_HOST='${OPENSIS_PROD_DB_HOST}' DB_PORT='${OPENSIS_PROD_DB_PORT}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/opensis/prod/db" \
-  "vault kv put kv/devops-easy-learning/opensis/prod/db MYSQL_ROOT_PASSWORD='${OPENSIS_PROD_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' >/dev/null"
+ensure_vault_patch_or_put "kv/devops-easy-learning/opensis/prod/db" \
+  "vault kv put kv/devops-easy-learning/opensis/prod/db MYSQL_ROOT_PASSWORD='${OPENSIS_PROD_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}' >/dev/null" \
+  "vault kv patch kv/devops-easy-learning/opensis/prod/db MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/observability/dev/postgres" \
   "vault kv put kv/devops-easy-learning/observability/dev/postgres username='${OBSERVABILITY_DEV_DB_USER}' password='${OBSERVABILITY_DEV_DB_PASSWORD}' database='${OBSERVABILITY_DEV_DB_NAME}' >/dev/null"
 ensure_vault_path "kv/devops-easy-learning/observability/dev/ui" \
