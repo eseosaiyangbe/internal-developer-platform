@@ -17723,3 +17723,35 @@ Measured outcome:
   - `/install/index.php` -> `200`
 - one local workstation follow-up remains:
   - refresh `/etc/hosts` with `./scripts/setup-devops-local-hosts.sh` so `opensis.devops.local` resolves in the browser
+
+## 2026-05-01 - Recover Vault local admin userpass access after lockout
+
+Summary:
+- investigated why Vault `readonly` still worked but `admin` no longer accepted the documented `admin@123` password
+- confirmed this was not a Vault outage, disabled auth mount, or missing user record
+- verified that the `admin` user still existed and still carried the `local-admin` policy
+- found the actual failure mode in the live Vault logs: the `admin` account had been locked out by Vault's built-in user lockout protection after repeated failed login attempts
+- reset the documented password again, then cleared the lockout through Vault's `sys/locked-users` API, and finally re-validated successful `admin` login
+
+Commands:
+```bash
+jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json
+kubectl get pods -n vault
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json); kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault auth list"
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json); kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault list auth/userpass/users"
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json); kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault read auth/userpass/users/admin"
+kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=readonly password='admin@123'"
+kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=admin password='admin@123'"
+kubectl logs -n vault vault-0 --tail=200 | rg -n "userpass|admin|locked|permission denied|auth"
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json); kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault write auth/userpass/users/admin password='admin@123' policies='local-admin'"
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/devops-easy-learning/k3s-vault-init.json); curl -sS -o /tmp/vault-unlock.out -w '%{http_code}' -H "X-Vault-Token: $ROOT_TOKEN" -X POST http://vault.devops.local/v1/sys/locked-users/auth_userpass_ee1e2816/unlock/admin > /tmp/vault-unlock.code && echo HTTP:$(cat /tmp/vault-unlock.code) && cat /tmp/vault-unlock.out
+kubectl exec -n vault vault-0 -- sh -lc "vault login -method=userpass username=admin password='admin@123' -format=json" | jq -r '.auth.policies | join(",")'
+```
+
+Measured outcome:
+- `readonly` still authenticated successfully with `admin@123`
+- `admin` initially failed with `403 permission denied`
+- Vault logs showed `login attempts exceeded, user is locked out` for `auth/userpass/login/admin`
+- password reset write succeeded
+- lockout clear request to `sys/locked-users/.../unlock/admin` returned `HTTP 204`
+- `admin` login then succeeded again and returned policy set `default,local-admin`
