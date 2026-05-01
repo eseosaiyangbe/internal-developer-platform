@@ -17302,3 +17302,148 @@ kubectl get deploy -n swiftpay-dev
 kubectl get rs -n swiftpay-dev
 kubectl describe node colima | sed -n '/swiftpay-dev/,+10p'
 ```
+
+## 2026-05-01 - Audit requested versus live resource usage across the shared k3s dev cluster
+
+Summary:
+- performed the first shared-cluster requested-versus-live resource audit across `MemFlip`, `SwiftPay`, `FoodPulse`, `OpenSIS`, and `Obervability-Stack`
+- confirmed the key Kubernetes platform lesson: scheduling is controlled by `requests`, not by live `kubectl top` usage
+- documented the audit and first-round right-sizing policy in [K8S-DEV-RESOURCE-AUDIT.md](/Users/raymond/Documents/DevOps-Easy-Learning/K8S-DEV-RESOURCE-AUDIT.md)
+- identified `FoodPulse` as the strongest `dev` reservation outlier and `MemFlip` as the next clearest right-sizing candidate
+- applied safe `dev`-only request reductions and no-surge rollout strategies to `MemFlip` and `FoodPulse`
+- discovered a second `dev` operability issue in `FoodPulse`: `CloudNativePG` primary restarts were inheriting long graceful shutdown timers that made resource-only changes look stuck, so the `dev` overlay now shortens CNPG operational timers without touching the `prod` contract
+- verified that node allocation improved materially while preserving a green control-plane operator path
+
+Commands:
+```bash
+git status --short
+rg --files | rg 'RESOURCE|ROADMAP|PHASE7|JOURNEY-RUNBOOK|K8S'
+sed -n '1,220p' JOURNEY-RUNBOOK.md
+sed -n '1,220p' MemFlip/k8s/overlays/dev/kustomization.yaml
+sed -n '1,260p' FoodPulse/k8s/overlays/dev/kustomization.yaml
+rg -n "resources:|requests:|limits:|strategy:|maxSurge|maxUnavailable" MemFlip/k8s FoodPulse/k8s | sed -n '1,260p'
+sed -n '1,220p' SwiftPay/k8s/overlays/dev/dev-resource-requests-patch.yaml
+sed -n '1,220p' SwiftPay/k8s/overlays/dev/dev-rollout-strategy-patch.yaml
+sed -n '1,260p' SwiftPay/k8s/overlays/dev/kustomization.yaml
+kubectl top pods -n memflip-dev
+kubectl top pods -n foodpulse-dev
+kubectl get deploy,statefulset -n memflip-dev -o wide
+kubectl get deploy,statefulset -n foodpulse-dev -o wide
+kubectl get pods -n foodpulse-dev -o wide
+kubectl get cluster -n foodpulse-dev
+sed -n '1,240p' FoodPulse/k8s/base/postgres-cluster.yaml
+sed -n '1,260p' FoodPulse/k8s/base/redis.yaml
+sed -n '1,220p' MemFlip/k8s/base/backend.yaml
+sed -n '1,180p' MemFlip/k8s/base/frontend.yaml
+sed -n '1,220p' MemFlip/k8s/base/postgres.yaml
+sed -n '1,220p' MemFlip/k8s/base/redis.yaml
+sed -n '1,260p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,260p' Obervability-Stack/k8s/overlays/dev/kustomization.yaml
+rg -n "resource|requests|rollout|maxSurge|maxUnavailable" OpenSIS/k8s/overlays/dev Obervability-Stack/k8s/overlays/dev | sed -n '1,260p'
+kubectl describe node colima
+kubectl top pods -A
+kubectl get pods -A -o wide
+kubectl get hpa -A
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+function parseTop(output) {
+  const lines = output.trim().split('\n').slice(1);
+  const rows = [];
+  for (const line of lines) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 4) continue;
+    rows.push({
+      ns: parts[0],
+      pod: parts[1],
+      cpu: parts[2],
+      mem: parts[3],
+    });
+  }
+  return rows;
+}
+function cpuToMillicores(value) {
+  if (value.endsWith('m')) return Number(value.slice(0, -1));
+  return Number(value) * 1000;
+}
+function memToMi(value) {
+  if (value.endsWith('Ki')) return Number(value.slice(0, -2)) / 1024;
+  if (value.endsWith('Mi')) return Number(value.slice(0, -2));
+  if (value.endsWith('Gi')) return Number(value.slice(0, -2)) * 1024;
+  return Number(value);
+}
+const top = parseTop(execSync('kubectl top pods -A', { encoding: 'utf8' }));
+const requests = JSON.parse(execSync('kubectl get pods -A -o json', { encoding: 'utf8' }));
+const groups = [
+  ['MemFlip', /^memflip-dev$/],
+  ['SwiftPay', /^swiftpay-dev$/],
+  ['FoodPulse', /^foodpulse-dev$/],
+  ['OpenSIS', /^opensis-dev$/],
+  ['Obervability-Stack', /^platform-observability-dev$/],
+];
+for (const [label, regex] of groups) {
+  const livePods = top.filter((row) => regex.test(row.ns));
+  const liveCpu = livePods.reduce((sum, row) => sum + cpuToMillicores(row.cpu), 0);
+  const liveMem = livePods.reduce((sum, row) => sum + memToMi(row.mem), 0);
+  const pods = requests.items.filter((pod) => regex.test(pod.metadata.namespace));
+  let reqCpu = 0;
+  let reqMem = 0;
+  for (const pod of pods) {
+    for (const container of pod.spec.containers || []) {
+      const req = container.resources?.requests || {};
+      if (req.cpu) reqCpu += cpuToMillicores(req.cpu);
+      if (req.memory) reqMem += memToMi(req.memory);
+    }
+  }
+  const cpuRatio = liveCpu > 0 ? (reqCpu / liveCpu).toFixed(1) : 'n/a';
+  const memRatio = liveMem > 0 ? (reqMem / liveMem).toFixed(1) : 'n/a';
+  console.log([label, pods.length, reqCpu, liveCpu, cpuRatio, Math.round(reqMem), Math.round(liveMem), memRatio].join('\t'));
+}
+NODE
+kubectl kustomize MemFlip/k8s/overlays/dev >/tmp/memflip-dev-render.yaml
+kubectl kustomize FoodPulse/k8s/overlays/dev >/tmp/foodpulse-dev-render.yaml
+kubectl apply --dry-run=client -k MemFlip/k8s/overlays/dev >/tmp/memflip-dev-dryrun.txt
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/dev >/tmp/foodpulse-dev-dryrun.txt
+kubectl apply -k MemFlip/k8s/overlays/dev
+kubectl apply -k FoodPulse/k8s/overlays/dev
+kubectl rollout status deployment/memflip-backend -n memflip-dev --timeout=180s
+kubectl rollout status deployment/memflip-frontend -n memflip-dev --timeout=180s
+kubectl rollout status statefulset/memflip-postgres -n memflip-dev --timeout=180s
+kubectl rollout status statefulset/memflip-redis -n memflip-dev --timeout=180s
+kubectl rollout status deployment/foodpulse-api -n foodpulse-dev --timeout=180s
+kubectl rollout status deployment/foodpulse-ui -n foodpulse-dev --timeout=180s
+kubectl rollout status statefulset/foodpulse-redis -n foodpulse-dev --timeout=180s
+kubectl wait --for=condition=Ready pod -l cnpg.io/cluster=foodpulse-postgres -n foodpulse-dev --timeout=180s
+kubectl get pods -n memflip-dev -o wide
+kubectl describe deployment memflip-backend -n memflip-dev | tail -n 40
+kubectl get pods -n foodpulse-dev -o wide
+kubectl describe statefulset foodpulse-redis -n foodpulse-dev | tail -n 60
+kubectl get cluster foodpulse-postgres -n foodpulse-dev -o yaml | sed -n '1,220p'
+kubectl describe pod foodpulse-redis-1 -n foodpulse-dev | tail -n 80
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=foodpulse-redis -n foodpulse-dev --timeout=180s
+kubectl wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True cluster/foodpulse-postgres -n foodpulse-dev --timeout=300s
+kubectl get cluster foodpulse-postgres -n foodpulse-dev -o jsonpath='{.status.conditions[?(@.type=="Ready")].status} {.status.phase} {.status.phaseReason} {.status.readyInstances}'
+kubectl get pod foodpulse-postgres-1 -n foodpulse-dev -o jsonpath='{.metadata.deletionTimestamp} {.metadata.finalizers} {.spec.terminationGracePeriodSeconds} {.status.phase}'
+kubectl get events -n foodpulse-dev --sort-by=.lastTimestamp | tail -n 40
+kubectl describe pod foodpulse-postgres-1 -n foodpulse-dev | tail -n 80
+kubectl logs foodpulse-postgres-2 -n foodpulse-dev | tail -n 40
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/dev >/tmp/foodpulse-dev-dryrun-2.txt
+kubectl apply -k FoodPulse/k8s/overlays/dev
+kubectl get cluster foodpulse-postgres -n foodpulse-dev -o jsonpath='{.spec.stopDelay} {.spec.smartShutdownTimeout} {.spec.startDelay} {.spec.switchoverDelay}{"\n"}{.status.conditions[?(@.type=="Ready")].status} {.status.phase} {.status.readyInstances}{"\n"}'
+kubectl get pod foodpulse-postgres-1 -n foodpulse-dev -o jsonpath='{.metadata.deletionTimestamp} {.spec.terminationGracePeriodSeconds}{"\n"}'
+kubectl delete pod foodpulse-postgres-1 -n foodpulse-dev --grace-period=0 --force
+kubectl wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True cluster/foodpulse-postgres -n foodpulse-dev --timeout=300s
+kubectl get pods -n foodpulse-dev -o wide
+kubectl get cluster foodpulse-postgres -n foodpulse-dev -o jsonpath='{.status.conditions[?(@.type=="Ready")].status} {.status.phase} {.status.readyInstances} {.status.currentPrimary}{"\n"}'
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=foodpulse-api -n foodpulse-dev --timeout=180s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=foodpulse-ui -n foodpulse-dev --timeout=180s
+kubectl logs deployment/foodpulse-api -n foodpulse-dev --tail=40
+kubectl describe node colima | sed -n '/Allocated resources:/,/Events:/p'
+kubectl top pods -A
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Measured outcome:
+- node requests dropped from `3175m CPU / 6816Mi memory` to `2325m CPU / 5152Mi memory`
+- CPU reservation fell from `79%` to `58%`
+- memory reservation fell from `86%` to `65%`
+- operator verification remained green with `4 healthy / 0 down`

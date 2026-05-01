@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memflip-backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          resources:
+            requests:
+              cpu: "40m"
+              memory: "96Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memflip-frontend
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          resources:
+            requests:
+              cpu: "15m"
+              memory: "48Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: memflip-postgres
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgres
+          resources:
+            requests:
+              cpu: "40m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: memflip-redis
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
