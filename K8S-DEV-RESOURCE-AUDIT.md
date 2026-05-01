@@ -196,3 +196,58 @@ The full operator verification remained green:
 - smoke check: `30/30`
 - inventory check: `0` errors
 - workspace app snapshot: `4 healthy / 0 down`
+
+## OpenSIS Follow-Up Pass
+
+On `2026-05-01`, `OpenSIS` received a follow-up review using the same requested-versus-live method.
+
+### Important Difference
+
+Unlike `FoodPulse` and `MemFlip`, `OpenSIS` had already been through an earlier `dev`-overlay compaction pass.
+
+That meant the right answer was not “shrink everything again.”
+
+The live profile showed:
+
+- total requests:
+  - CPU: `50m`
+  - Memory: `624Mi`
+- live usage:
+  - CPU: `29m`
+  - Memory: `185Mi`
+- ratio:
+  - CPU: `1.7x`
+  - Memory: `3.4x`
+
+The `opensis-ui` container was already using more CPU than its existing request, so reducing it further would have been misleading and operationally unsafe.
+
+### OpenSIS Dev Adjustments
+
+- increased `opensis-ui` CPU request from `10m` to `25m`
+- reduced `opensis-db` memory request from `384Mi` to `320Mi`
+- reduced `opensis-session-redis` requests to:
+  - CPU: `10m`
+  - Memory: `24Mi`
+- added `maxSurge: 0` and `maxUnavailable: 1` for:
+  - `opensis-ui`
+  - `opensis-session-redis`
+
+### Result
+
+After the follow-up pass:
+
+- total requests:
+  - CPU: `45m`
+  - Memory: `600Mi`
+- live usage after stabilization:
+  - CPU: `15m`
+  - Memory: `187Mi`
+- ratio:
+  - CPU: `3.0x`
+  - Memory: `3.2x`
+
+This is a good example of production-minded right-sizing:
+
+- reduce waste where safe
+- correct under-requesting where it is misleading
+- preserve startup and secret-delivery stability

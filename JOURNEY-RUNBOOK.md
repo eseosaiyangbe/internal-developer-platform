@@ -17564,3 +17564,98 @@ Measured outcome:
 - node memory reservation fell from `65%` to `63%`
 - observability namespace requests dropped from `700m CPU / 1568Mi memory` to `395m CPU / 1424Mi memory`
 - operator verification remained green with `4 healthy / 0 down`
+
+## 2026-05-01 - Apply a second, more truthful dev-sizing pass to OpenSIS
+
+Summary:
+- reviewed `OpenSIS` with the same requested-versus-live method used for the other migrated workloads
+- confirmed that `OpenSIS` had already been compacted once, so the next pass needed to be more careful than the earlier app reductions
+- found that `opensis-ui` was slightly under-requesting CPU relative to its observed live use, while the MariaDB and session Redis components still had safe memory headroom
+- applied a balanced `dev` adjustment:
+  - increased UI CPU request to make it more truthful
+  - reduced DB and session Redis requests where headroom was clearly available
+  - added no-surge rollout posture for the stateless `OpenSIS` components
+- verified that `OpenSIS` remained healthy and the full operator path stayed green
+
+Commands:
+```bash
+kubectl top pods -n opensis-dev
+kubectl get deploy,statefulset -n opensis-dev -o wide
+sed -n '1,260p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,240p' OpenSIS/k8s/base/ui.yaml
+sed -n '1,240p' OpenSIS/k8s/base/db.yaml
+sed -n '1,220p' OpenSIS/k8s/base/redis.yaml
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+const ns='opensis-dev';
+const pods = JSON.parse(execSync(`kubectl get pods -n ${ns} -o json`, {encoding:'utf8'})).items;
+const topRows = new Map();
+for (const line of execSync(`kubectl top pods -n ${ns}`, {encoding:'utf8'}).trim().split('\n').slice(1)) {
+  const p=line.trim().split(/\s+/); if(p.length<3) continue; topRows.set(p[0], {cpu:p[1], mem:p[2]});
+}
+function cpuToM(v){ if(!v) return 0; if(v.endsWith('m')) return Number(v.slice(0,-1)); return Number(v)*1000; }
+function memToMi(v){ if(!v) return 0; if(v.endsWith('Ki')) return Number(v.slice(0,-2))/1024; if(v.endsWith('Mi')) return Number(v.slice(0,-2)); if(v.endsWith('Gi')) return Number(v.slice(0,-2))*1024; return Number(v); }
+let reqCpu=0, reqMem=0, liveCpu=0, liveMem=0;
+for (const pod of pods) {
+  for (const c of pod.spec.containers||[]) {
+    const r=c.resources?.requests||{};
+    if(r.cpu) reqCpu+=cpuToM(r.cpu);
+    if(r.memory) reqMem+=memToMi(r.memory);
+  }
+  const live=topRows.get(pod.metadata.name) || {cpu:'0m', mem:'0Mi'};
+  liveCpu += cpuToM(live.cpu);
+  liveMem += memToMi(live.mem);
+}
+console.log(JSON.stringify({reqCpuM:reqCpu, reqMemMi:reqMem, liveCpuM:liveCpu, liveMemMi:liveMem, cpuRatio:(reqCpu/liveCpu).toFixed(1), memRatio:(reqMem/liveMem).toFixed(1)}, null, 2));
+console.log('---');
+for (const pod of pods) {
+  let reqCpu=0, reqMem=0;
+  for (const c of pod.spec.containers||[]) {
+    const r=c.resources?.requests||{};
+    if(r.cpu) reqCpu+=cpuToM(r.cpu);
+    if(r.memory) reqMem+=memToMi(r.memory);
+  }
+  const live=topRows.get(pod.metadata.name) || {cpu:'0m', mem:'0Mi'};
+  const liveCpu=cpuToM(live.cpu), liveMem=memToMi(live.mem);
+  console.log([pod.metadata.name, reqCpu, liveCpu, liveCpu ? (reqCpu/liveCpu).toFixed(1) : 'n/a', reqMem, liveMem, liveMem ? (reqMem/liveMem).toFixed(1) : 'n/a'].join('\t'));
+}
+NODE
+kubectl kustomize OpenSIS/k8s/overlays/dev >/tmp/opensis-dev-render.yaml
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/dev >/tmp/opensis-dev-dryrun.txt
+kubectl apply -k OpenSIS/k8s/overlays/dev
+kubectl rollout status deployment/opensis-ui -n opensis-dev --timeout=240s
+kubectl rollout status deployment/opensis-session-redis -n opensis-dev --timeout=240s
+kubectl rollout status statefulset/opensis-db -n opensis-dev --timeout=300s
+kubectl get pods -n opensis-dev -o wide
+kubectl logs deployment/opensis-ui -n opensis-dev --tail=80
+kubectl top pods -n opensis-dev
+node - <<'NODE'
+const { execSync } = require('node:child_process');
+const ns='opensis-dev';
+const pods = JSON.parse(execSync(`kubectl get pods -n ${ns} -o json`, {encoding:'utf8'})).items;
+const topRows = new Map();
+for (const line of execSync(`kubectl top pods -n ${ns}`, {encoding:'utf8'}).trim().split('\n').slice(1)) {
+  const p=line.trim().split(/\s+/); if(p.length<3) continue; topRows.set(p[0], {cpu:p[1], mem:p[2]});
+}
+function cpuToM(v){ if(!v) return 0; if(v.endsWith('m')) return Number(v.slice(0,-1)); return Number(v)*1000; }
+function memToMi(v){ if(!v) return 0; if(v.endsWith('Ki')) return Number(v.slice(0,-2))/1024; if(v.endsWith('Mi')) return Number(v.slice(0,-2)); if(v.endsWith('Gi')) return Number(v.slice(0,-2))*1024; return Number(v); }
+let reqCpu=0, reqMem=0, liveCpu=0, liveMem=0;
+for (const pod of pods) {
+  for (const c of pod.spec.containers||[]) {
+    const r=c.resources?.requests||{};
+    if(r.cpu) reqCpu+=cpuToM(r.cpu);
+    if(r.memory) reqMem+=memToMi(r.memory);
+  }
+  const live=topRows.get(pod.metadata.name) || {cpu:'0m', mem:'0Mi'};
+  liveCpu += cpuToM(live.cpu);
+  liveMem += memToMi(live.mem);
+}
+console.log(JSON.stringify({reqCpuM:reqCpu, reqMemMi:reqMem, liveCpuM:liveCpu, liveMemMi:liveMem, cpuRatio:(reqCpu/liveCpu).toFixed(1), memRatio:(reqMem/liveMem).toFixed(1)}, null, 2));
+NODE
+./Obervability-Stack/scripts/devops-monitor.sh operator
+```
+
+Measured outcome:
+- OpenSIS requests changed from `50m CPU / 624Mi memory` to `45m CPU / 600Mi memory`
+- OpenSIS remained healthy through the rollout
+- operator verification remained green with `4 healthy / 0 down`
