@@ -13,8 +13,27 @@ Options:
 EOF
 }
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOSTNAME_OVERRIDE="memflip.devops.local"
+PORT_FORWARD_PID=""
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "ERROR: Required command not found: $1" >&2
+    exit 1
+  fi
+}
+
+cleanup() {
+  if [[ -n "${PORT_FORWARD_PID}" ]]; then
+    kill "${PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+    wait "${PORT_FORWARD_PID}" 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
+
+require_command kubectl
+require_command curl
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,12 +69,21 @@ kubectl get pods -n memflip-dev
 kubectl get svc -n memflip-dev
 kubectl get ingress -n memflip-dev
 
-echo "[memflip-k8s] Verifying frontend and backend health"
+echo "[memflip-k8s] Verifying ingress endpoints"
 curl -fsS -H "Host: ${HOSTNAME_OVERRIDE}" "http://${TRAEFIK_ADDR}/health" >/dev/null
 curl -fsS -H "Host: ${HOSTNAME_OVERRIDE}" "http://${TRAEFIK_ADDR}/api/health" >/dev/null
 
-echo "[memflip-k8s] Verifying backend metrics"
-kubectl exec -n memflip-dev deploy/memflip-backend -- sh -lc 'wget -qO- http://127.0.0.1:3001/metrics | head -n 5' >/dev/null
+echo "[memflip-k8s] Running end-to-end backend validation via port-forward"
+kubectl port-forward -n memflip-dev svc/memflip-backend 33001:3001 >/tmp/memflip-k8s-port-forward.log 2>&1 &
+PORT_FORWARD_PID="$!"
+for _ in {1..20}; do
+  if curl -fsS http://127.0.0.1:33001/health >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+curl -fsS http://127.0.0.1:33001/health >/dev/null
+curl -fsS http://127.0.0.1:33001/metrics | grep -q '^http_requests_total'
 
 echo "[memflip-k8s] Verifying PostgreSQL and Redis connectivity"
 kubectl exec -n memflip-dev statefulset/memflip-postgres -- sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
