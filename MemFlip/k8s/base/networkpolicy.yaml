@@ -34,6 +34,20 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: traefik
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - platform-observability-dev
+                  - platform-observability-prod
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - blackbox-exporter
   egress:
     - to:
         - podSelector:
@@ -92,8 +106,12 @@ spec:
                   - platform-observability-dev
                   - platform-observability-prod
           podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - prometheus
+                  - blackbox-exporter
       ports:
         - protocol: TCP
           port: 3001
