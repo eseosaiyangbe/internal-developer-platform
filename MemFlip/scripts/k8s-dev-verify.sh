@@ -94,6 +94,6 @@ curl -fsS http://127.0.0.1:33001/metrics | grep -q '^http_requests_total'
 
 echo "[memflip-k8s] Verifying PostgreSQL and Redis connectivity"
 kubectl exec -n memflip-dev statefulset/memflip-postgres -- sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
-kubectl exec -n memflip-dev statefulset/memflip-redis -- sh -lc 'redis-cli -a "$REDIS_PASSWORD" ping | grep -q PONG' >/dev/null
+kubectl exec -n memflip-dev statefulset/memflip-redis -- sh -lc 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG' >/dev/null
 
 echo "[memflip-k8s] Verification passed"
