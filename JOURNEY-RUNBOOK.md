@@ -17981,3 +17981,58 @@ Measured outcome:
 - all five owned `prod` overlays still passed:
   - `kubectl kustomize`
   - `kubectl apply --dry-run=client -k`
+
+## 2026-05-03 - Production hostname contract moved to eseosadevbox.com
+
+Purpose:
+- replace placeholder production ingress hostnames with the real public domain
+- align app browser and CORS configuration with the same hostname contract
+- keep the Cloudflare tunnel design Kubernetes-native by matching the ingress hosts directly
+
+Commands run:
+
+```bash
+rg -n "prod\\.example\\.com|controlplane\\.prod|www\\.swiftpay\\.prod|swiftpay\\.prod|grafana\\.prod|memflip\\.prod|foodpulse\\.prod|opensis\\.prod" MemFlip/k8s SwiftPay/k8s FoodPulse/k8s OpenSIS/k8s Obervability-Stack/k8s
+git status --short
+sed -n '1,220p' MemFlip/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' FoodPulse/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' OpenSIS/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' Obervability-Stack/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' SwiftPay/k8s/overlays/prod/ingress-traefik.yaml
+sed -n '1,220p' SwiftPay/k8s/overlays/prod/prod-config-patch.yaml
+rg -n "prod\\.example\\.com|controlplane\\.prod|www\\.swiftpay\\.prod|swiftpay\\.prod|grafana\\.prod|memflip\\.prod|foodpulse\\.prod|opensis\\.prod" README.md WORKSTATION-BOOTSTRAP.md PROD-OVERLAY-AUDIT.md PRODUCTION-TLS-CERT-MANAGER.md JOURNEY-RUNBOOK.md MemFlip SwiftPay FoodPulse OpenSIS Obervability-Stack -g '!**/node_modules/**' -g '!**/k8s-legacy*/*'
+sed -n '1,220p' PRODUCTION-TLS-CERT-MANAGER.md
+sed -n '280,330p' Obervability-Stack/docs/CONFIG_SYSTEM_GUIDE.md
+sed -n '60,90p' MemFlip/docs/local/12-phase7-k8s-dev.md
+kubectl kustomize MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:OK
+kubectl kustomize SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:OK
+kubectl kustomize FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:OK
+kubectl kustomize OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:OK
+kubectl kustomize Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:OK
+kubectl apply --dry-run=client -k MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:DRYRUN_OK
+kubectl apply --dry-run=client -k SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:DRYRUN_OK
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:DRYRUN_OK
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:DRYRUN_OK
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:DRYRUN_OK
+git diff --check
+```
+
+Measured outcome:
+- production ingress contracts now use the real public domain:
+  - `memflip.eseosadevbox.com`
+  - `swiftpay.eseosadevbox.com`
+  - `api.swiftpay.eseosadevbox.com`
+  - `opensis.eseosadevbox.com`
+  - `foodpulse.eseosadevbox.com`
+  - `portfolio.eseosadevbox.com`
+  - `grafana.eseosadevbox.com`
+- `SwiftPay` no longer carries the separate `www` production hostname
+- application-facing production config was aligned with the same browser origins:
+  - `MemFlip` frontend and CORS
+  - `SwiftPay` CORS origin
+  - `FoodPulse` allowed origin
+  - `Obervability-Stack` site and browser URLs
+- the active owned `prod` overlays no longer reference the placeholder `*.prod.example.com` hostnames
+- all five owned `prod` overlays still passed:
+  - `kubectl kustomize`
+  - `kubectl apply --dry-run=client -k`

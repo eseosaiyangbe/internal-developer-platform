@@ -34,10 +34,10 @@ patches:
     patch: |-
       - op: replace
         path: /data/FRONTEND_URL
-        value: https://memflip.prod.example.com
+        value: https://memflip.eseosadevbox.com
       - op: replace
         path: /data/CORS_ORIGIN
-        value: https://memflip.prod.example.com
+        value: https://memflip.eseosadevbox.com
   - target:
       kind: Ingress
       name: memflip
@@ -53,12 +53,12 @@ patches:
         value: letsencrypt-prod
       - op: replace
         path: /spec/rules/0/host
-        value: memflip.prod.example.com
+        value: memflip.eseosadevbox.com
       - op: add
         path: /spec/tls
         value:
           - hosts:
-              - memflip.prod.example.com
+              - memflip.eseosadevbox.com
             secretName: memflip-prod-tls
   - target:
       kind: Deployment

@@ -93,7 +93,7 @@ Added:
 - `prod` PDB for frontend
 - preferred pod anti-affinity for backend and frontend
 - hostname topology spread for backend and frontend
-- TLS placeholder secret for `memflip.prod.example.com`
+- TLS placeholder secret for `memflip.eseosadevbox.com`
 - explicit `web,websecure` Traefik entrypoint posture
 
 ### `SwiftPay`
@@ -101,9 +101,8 @@ Added:
 Added:
 
 - explicit `spec.tls` blocks for:
-  - `www.swiftpay.prod.example.com`
-  - `swiftpay.prod.example.com`
-  - `api.swiftpay.prod.example.com`
+  - `swiftpay.eseosadevbox.com`
+  - `api.swiftpay.eseosadevbox.com`
 - preferred pod anti-affinity for all replicated stateless services
 - hostname topology spread for all replicated stateless services
 
@@ -119,7 +118,7 @@ Added:
 - `prod` PDB for UI
 - preferred pod anti-affinity for API and UI
 - hostname topology spread for API and UI
-- TLS placeholder secret for `foodpulse.prod.example.com`
+- TLS placeholder secret for `foodpulse.eseosadevbox.com`
 - explicit `web,websecure` Traefik entrypoint posture
 
 ### `OpenSIS`
@@ -130,7 +129,7 @@ Added:
 - `prod` PDB for `opensis-ui`
 - preferred pod anti-affinity for `opensis-ui`
 - hostname topology spread for `opensis-ui`
-- TLS placeholder secret for `opensis.prod.example.com`
+- TLS placeholder secret for `opensis.eseosadevbox.com`
 
 This is intentionally narrower than the other apps because `OpenSIS` remains the most operationally sensitive workload and should not be over-generalized blindly.
 
@@ -150,8 +149,8 @@ Added:
   - `devops-monitor-ui`
   - `grafana`
 - TLS placeholder secrets for:
-  - `controlplane.prod.example.com`
-  - `grafana.prod.example.com`
+  - `portfolio.eseosadevbox.com`
+  - `grafana.eseosadevbox.com`
 - explicit `web,websecure` Traefik entrypoint posture
 
 ## Remaining Production Gaps

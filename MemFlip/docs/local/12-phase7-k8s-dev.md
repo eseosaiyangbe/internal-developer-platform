@@ -69,7 +69,7 @@ The current `dev` shape is:
 The current `prod` shape is:
 
 - `Namespace`: `memflip-prod`
-- `Ingress`: `memflip.prod.example.com`
+- `Ingress`: `memflip.eseosadevbox.com`
 - `SecretStore`: namespace-scoped Vault connector for External Secrets Operator
 - `ExternalSecret`: Vault-backed materialization of `memflip-app-secrets`
 - higher application replica counts and larger persistent volumes than `dev`
