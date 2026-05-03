@@ -8,6 +8,8 @@ resources:
   - vault-serviceaccount.yaml
   - vault-secret-store.yaml
   - vault-external-secret.yaml
+  - prod-hpa.yaml
+  - prod-pdb.yaml
   - ../../base
 
 labels:
@@ -39,9 +41,21 @@ patches:
       kind: Ingress
       name: memflip
     patch: |-
+      - op: add
+        path: /metadata/annotations
+        value: {}
+      - op: add
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
+        value: web,websecure
       - op: replace
         path: /spec/rules/0/host
         value: memflip.prod.example.com
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts:
+              - memflip.prod.example.com
+            secretName: memflip-prod-tls
   - target:
       kind: Deployment
       name: memflip-backend
