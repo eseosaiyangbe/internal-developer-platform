@@ -18145,3 +18145,50 @@ Measured outcome:
 - aligned the tunnel config and DNS route to the new flat hostname
 - after restarting `cloudflared`, external HTTPS validation succeeded for `https://swiftpay-api.eseosadevbox.com/health`
 - removed the need to rely on the failing nested hostname for the public API path
+
+## 2026-05-03 - Installed cloudflared as a persistent macOS service
+
+Purpose:
+- make the Cloudflare tunnel survive terminal closure and user login sessions on this workstation
+- correct the generated LaunchAgent so it runs the actual named tunnel instead of exiting immediately
+
+Commands run:
+
+```bash
+cloudflared service install --help
+cloudflared service install
+launchctl list | grep cloudflared || true
+ls -l ~/Library/LaunchAgents | grep cloudflared || true
+pgrep -fl "cloudflared tunnel" || true
+launchctl print gui/$(id -u)/com.cloudflare.cloudflared | sed -n '1,120p'
+ps -o pid,ppid,command -p 76874
+cat ~/Library/LaunchAgents/com.cloudflare.cloudflared.plist
+tail -n 100 ~/Library/Logs/com.cloudflare.cloudflared.err.log
+tail -n 100 ~/Library/Logs/com.cloudflare.cloudflared.out.log
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.cloudflare.cloudflared.plist 2>/dev/null || true
+pkill -f "cloudflared tunnel run eseosadevbox-k8s" || true
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cloudflare.cloudflared.plist
+launchctl kickstart -k gui/$(id -u)/com.cloudflare.cloudflared
+launchctl list | grep cloudflared || true
+ps -o pid,ppid,command -ax | grep '[c]loudflared tunnel run eseosadevbox-k8s'
+tail -n 40 ~/Library/Logs/com.cloudflare.cloudflared.err.log
+curl -Ik --max-time 20 https://memflip.eseosadevbox.com
+curl -I --max-time 20 -H 'Host: memflip.eseosadevbox.com' http://192.168.64.2
+kubectl get ingress -A -o wide
+cloudflared tunnel ingress validate
+curl -Ik --max-time 20 https://memflip.eseosadevbox.com
+curl -Ik --max-time 20 https://grafana.eseosadevbox.com
+cloudflared tunnel info eseosadevbox-k8s
+```
+
+Measured outcome:
+- `cloudflared service install` created a user LaunchAgent at `~/Library/LaunchAgents/com.cloudflare.cloudflared.plist`
+- the generated LaunchAgent initially ran bare `cloudflared`, which exited with code `1` and logged `Use \`cloudflared tunnel run\` to start tunnel ...`
+- the LaunchAgent was corrected to run `cloudflared tunnel run eseosadevbox-k8s`
+- after reloading the agent, `launchctl` showed `com.cloudflare.cloudflared` loaded and the active process was owned by `PID 1`, confirming service ownership
+- the tunnel re-registered successfully with active edge connections after the handoff
+- external validation succeeded again:
+  - `https://memflip.eseosadevbox.com` returned `HTTP 200`
+  - `https://grafana.eseosadevbox.com` returned a Cloudflare Access `302` redirect as expected
+- one transient `502` occurred during the service handoff window, but origin and ingress checks proved healthy and the public endpoint recovered immediately after the LaunchAgent settled
+- this persistence model is `user login` scoped on macOS; it survives terminal closure and starts automatically when the user logs in, but it is not a root boot daemon
