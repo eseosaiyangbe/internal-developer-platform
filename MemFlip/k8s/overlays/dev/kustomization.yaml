@@ -27,7 +27,38 @@ patches:
     patch: |-
       - op: replace
         path: /data/FRONTEND_URL
-        value: http://memflip.devops.local
+        value: https://memflip.eseosadevbox.com
       - op: replace
         path: /data/CORS_ORIGIN
-        value: http://memflip.devops.local
+        value: https://memflip.eseosadevbox.com,http://memflip.devops.local
+  - target:
+      kind: Ingress
+      name: memflip
+    patch: |-
+      - op: add
+        path: /spec/rules/-
+        value:
+          host: memflip.eseosadevbox.com
+          http:
+            paths:
+              - path: /api
+                pathType: Prefix
+                backend:
+                  service:
+                    name: memflip-backend
+                    port:
+                      number: 3001
+              - path: /debug
+                pathType: Prefix
+                backend:
+                  service:
+                    name: memflip-backend
+                    port:
+                      number: 3001
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: memflip-frontend
+                    port:
+                      number: 80

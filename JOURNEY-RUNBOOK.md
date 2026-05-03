@@ -18036,3 +18036,84 @@ Measured outcome:
 - all five owned `prod` overlays still passed:
   - `kubectl kustomize`
   - `kubectl apply --dry-run=client -k`
+
+## 2026-05-03 - Cloudflare Tunnel public ingress for the live k3s dev cluster
+
+Purpose:
+- authenticate `cloudflared` on the workstation
+- create a single Cloudflare Tunnel for the live `k3s` cluster
+- publish the public `eseosadevbox.com` hostnames against the Kubernetes ingress layer
+- keep the path Kubernetes-native by teaching the live dev ingresses the public hosts instead of using tunnel-side host-header overrides
+
+Commands run:
+
+```bash
+cloudflared --version
+ls -la ~/.cloudflared || true
+cloudflared tunnel list
+cloudflared tunnel login
+cloudflared tunnel create eseosadevbox-k8s
+cloudflared tunnel route dns eseosadevbox-k8s memflip.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s swiftpay.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s api.swiftpay.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s opensis.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s foodpulse.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s portfolio.eseosadevbox.com
+cloudflared tunnel route dns eseosadevbox-k8s grafana.eseosadevbox.com
+kubectl get ingress -A -o wide
+sed -n '1,220p' MemFlip/k8s/overlays/dev/kustomization.yaml
+sed -n '1,220p' FoodPulse/k8s/overlays/dev/kustomization.yaml
+sed -n '1,260p' OpenSIS/k8s/overlays/dev/kustomization.yaml
+sed -n '1,260p' Obervability-Stack/k8s/overlays/dev/kustomization.yaml
+sed -n '1,220p' SwiftPay/k8s/overlays/dev/dev-config-patch.yaml
+sed -n '1,220p' SwiftPay/k8s/overlays/dev/ingress-traefik.yaml
+sed -n '60,120p' FoodPulse/api/src/index.js
+kubectl kustomize MemFlip/k8s/overlays/dev >/dev/null && echo MemFlip:OK
+kubectl kustomize SwiftPay/k8s/overlays/dev >/dev/null && echo SwiftPay:OK
+kubectl kustomize FoodPulse/k8s/overlays/dev >/dev/null && echo FoodPulse:OK
+kubectl kustomize OpenSIS/k8s/overlays/dev >/dev/null && echo OpenSIS:OK
+kubectl kustomize Obervability-Stack/k8s/overlays/dev >/dev/null && echo Observability:OK
+kubectl apply -k MemFlip/k8s/overlays/dev
+kubectl apply -k SwiftPay/k8s/overlays/dev
+kubectl apply -k FoodPulse/k8s/overlays/dev
+kubectl apply -k OpenSIS/k8s/overlays/dev
+kubectl apply -k Obervability-Stack/k8s/overlays/dev
+cloudflared tunnel ingress validate
+cloudflared tunnel ingress rule https://portfolio.eseosadevbox.com
+cloudflared tunnel run eseosadevbox-k8s
+curl -Ik --max-time 20 https://memflip.eseosadevbox.com
+curl -Ik --max-time 20 https://swiftpay.eseosadevbox.com
+curl -Ik --max-time 20 https://api.swiftpay.eseosadevbox.com/health
+curl -Ik --max-time 20 https://foodpulse.eseosadevbox.com
+curl -Ik --max-time 20 https://opensis.eseosadevbox.com
+curl -Ik --max-time 20 https://portfolio.eseosadevbox.com
+curl -Ik --max-time 20 https://grafana.eseosadevbox.com
+curl -sSI -H 'Host: api.swiftpay.eseosadevbox.com' http://192.168.64.2/health
+```
+
+Measured outcome:
+- workstation authentication completed and `cert.pem` was saved under `~/.cloudflared`
+- a new tunnel was created:
+  - `eseosadevbox-k8s`
+  - UUID `de6a2c05-05f7-4785-808b-c806d1acec06`
+- public DNS routes were created for:
+  - `memflip.eseosadevbox.com`
+  - `swiftpay.eseosadevbox.com`
+  - `api.swiftpay.eseosadevbox.com`
+  - `opensis.eseosadevbox.com`
+  - `foodpulse.eseosadevbox.com`
+  - `portfolio.eseosadevbox.com`
+  - `grafana.eseosadevbox.com`
+- the live dev ingresses were updated to serve the public hostnames directly, so the tunnel does not rely on host-header overrides
+- `FoodPulse` API CORS handling was widened from single-origin parsing to comma-separated parsing so the public and local browser paths can coexist
+- tunnel config under `~/.cloudflared/config.yml` validated successfully
+- the tunnel connected successfully and registered active edge connections
+- external HTTPS validation succeeded for:
+  - `memflip.eseosadevbox.com`
+  - `swiftpay.eseosadevbox.com`
+  - `foodpulse.eseosadevbox.com`
+  - `opensis.eseosadevbox.com`
+  - `portfolio.eseosadevbox.com`
+  - `grafana.eseosadevbox.com`
+- `api.swiftpay.eseosadevbox.com` reached Traefik correctly inside the cluster, but failed TLS at the Cloudflare edge
+- the failure point was before origin routing, which indicates an edge-certificate limitation for the nested subdomain rather than a Kubernetes or tunnel routing error
