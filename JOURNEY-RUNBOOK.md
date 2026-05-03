@@ -17926,3 +17926,58 @@ Measured outcome:
 - both issuers successfully registered ACME accounts against the configured servers
 - the local production TLS control-plane path is now real, not just documented
 - this does not yet imply successful certificate issuance for app `prod` hosts, because HTTP-01 validation still requires real public DNS for those hostnames
+
+## 2026-05-03 - Production placement hardening across prod overlays
+
+Purpose:
+- add production-safe placement controls to the replicated stateless tiers
+- prefer better fault-domain separation without making smaller clusters unschedulable
+- keep the controls consistent across all five owned Kubernetes paths
+
+Commands run:
+
+```bash
+rg -n "affinity|topologySpreadConstraints|podAntiAffinity|nodeAffinity" MemFlip/k8s SwiftPay/k8s FoodPulse/k8s OpenSIS/k8s Obervability-Stack/k8s
+git status --short
+sed -n '1,220p' MemFlip/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' MemFlip/k8s/base/backend.yaml
+sed -n '1,220p' MemFlip/k8s/base/frontend.yaml
+sed -n '1,260p' SwiftPay/k8s/overlays/prod/kustomization.yaml
+sed -n '1,240p' SwiftPay/k8s/overlays/prod/prod-scale-patch.yaml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/api-gateway.yaml
+sed -n '1,260p' SwiftPay/k8s/base/deployments/frontend.yaml
+sed -n '1,260p' FoodPulse/k8s/overlays/prod/kustomization.yaml
+sed -n '1,220p' FoodPulse/k8s/base/api.yaml
+sed -n '1,220p' FoodPulse/k8s/base/ui.yaml
+sed -n '1,260p' OpenSIS/k8s/overlays/prod/kustomization.yaml
+sed -n '1,260p' OpenSIS/k8s/base/ui.yaml
+sed -n '1,260p' Obervability-Stack/k8s/overlays/prod/kustomization.yaml
+sed -n '1,260p' Obervability-Stack/k8s/base/ui.yaml
+sed -n '1,260p' Obervability-Stack/k8s/base/grafana.yaml
+kubectl kustomize MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:OK
+kubectl kustomize SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:OK
+kubectl kustomize FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:OK
+kubectl kustomize OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:OK
+kubectl kustomize Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:OK
+kubectl apply --dry-run=client -k MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:DRYRUN_OK
+kubectl apply --dry-run=client -k SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:DRYRUN_OK
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:DRYRUN_OK
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:DRYRUN_OK
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:DRYRUN_OK
+git diff --check
+```
+
+Measured outcome:
+- added a shared production placement pattern to replicated stateless tiers across:
+  - `MemFlip`
+  - `SwiftPay`
+  - `FoodPulse`
+  - `OpenSIS`
+  - `Obervability-Stack`
+- each replicated stateless tier now carries:
+  - preferred pod anti-affinity on `kubernetes.io/hostname`
+  - hostname topology spread with `whenUnsatisfiable: ScheduleAnyway`
+- this creates real production placement intent without making smaller clusters fail scheduling immediately
+- all five owned `prod` overlays still passed:
+  - `kubectl kustomize`
+  - `kubectl apply --dry-run=client -k`

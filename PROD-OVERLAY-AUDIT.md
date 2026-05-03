@@ -20,8 +20,10 @@ The repository now has a materially stronger `prod` posture than before this aud
 
 - all five owned `prod` overlays are Vault-first
 - all five owned `prod` overlays now carry explicit Traefik TLS placeholders
+- all five owned `prod` overlays now carry a shared cert-manager issuer contract
 - replicated stateless workloads outside `SwiftPay` now have explicit PodDisruptionBudgets
-- replicated stateless workloads outside `SwiftPay` now have explicit HPAs where that was missing
+- replicated stateless workloads now have explicit HPAs where that was missing
+- replicated stateless workloads now have explicit hostname anti-affinity and topology-spread intent
 - the observability control plane `prod` overlay now has an explicit two-replica posture for the UI and Grafana entry points
 
 That said, the workspace is still not at a final “production-complete” posture.
@@ -89,6 +91,8 @@ Added:
 - `prod` HPA for frontend
 - `prod` PDB for backend
 - `prod` PDB for frontend
+- preferred pod anti-affinity for backend and frontend
+- hostname topology spread for backend and frontend
 - TLS placeholder secret for `memflip.prod.example.com`
 - explicit `web,websecure` Traefik entrypoint posture
 
@@ -100,6 +104,8 @@ Added:
   - `www.swiftpay.prod.example.com`
   - `swiftpay.prod.example.com`
   - `api.swiftpay.prod.example.com`
+- preferred pod anti-affinity for all replicated stateless services
+- hostname topology spread for all replicated stateless services
 
 This keeps `SwiftPay` aligned with the same TLS-first production contract as the other apps.
 
@@ -111,6 +117,8 @@ Added:
 - `prod` HPA for UI
 - `prod` PDB for API
 - `prod` PDB for UI
+- preferred pod anti-affinity for API and UI
+- hostname topology spread for API and UI
 - TLS placeholder secret for `foodpulse.prod.example.com`
 - explicit `web,websecure` Traefik entrypoint posture
 
@@ -120,6 +128,8 @@ Added:
 
 - `prod` HPA for `opensis-ui`
 - `prod` PDB for `opensis-ui`
+- preferred pod anti-affinity for `opensis-ui`
+- hostname topology spread for `opensis-ui`
 - TLS placeholder secret for `opensis.prod.example.com`
 
 This is intentionally narrower than the other apps because `OpenSIS` remains the most operationally sensitive workload and should not be over-generalized blindly.
@@ -132,6 +142,10 @@ Added:
 - `prod` HPA for `grafana`
 - `prod` PDB for `devops-monitor-ui`
 - `prod` PDB for `grafana`
+- preferred pod anti-affinity for `devops-monitor-ui`
+- preferred pod anti-affinity for `grafana`
+- hostname topology spread for `devops-monitor-ui`
+- hostname topology spread for `grafana`
 - explicit `replicas: 2` posture for:
   - `devops-monitor-ui`
   - `grafana`
@@ -171,19 +185,20 @@ Examples:
 
 Those are acceptable as a portfolio direction signal, but they are not final production architecture for a serious multi-node platform.
 
-### 3. Anti-affinity and topology spread are still under-specified
+### 3. Placement posture is now explicit, but still hostname-scoped
 
-Replicas and PDBs are now present, but true production posture should also define:
+The repo now defines a clear placement baseline for replicated stateless tiers:
 
-- anti-affinity
-- topology spread constraints
-- zone or node-failure assumptions
+- preferred pod anti-affinity
+- hostname topology spread with `ScheduleAnyway`
 
-That matters especially for:
+That is the right production-safe default for portability because it avoids making smaller clusters unschedulable.
 
-- `SwiftPay`
-- `FoodPulse`
-- `Obervability-Stack`
+The remaining gap is that the repo still does not define stronger multi-zone or node-pool assumptions such as:
+
+- zone-aware topology spread
+- node-class targeting
+- stricter required anti-affinity for specific workloads
 
 ### 4. OpenSIS still deserves a narrower scaling posture than the other apps
 
@@ -200,6 +215,6 @@ So the current `prod` additions are appropriate, but future scaling or disruptio
 The clean next production-hardening slice should be:
 
 1. install and validate the shared cert-manager path in the target production-style clusters
-2. add anti-affinity and topology spread constraints to replicated `prod` workloads
+2. decide where hostname-scoped placement should be tightened into zone-aware placement
 3. tighten observability-state durability, especially for Grafana and Alertmanager
 4. decide whether the next roadmap step is formal Phase 7 closeout or a Phase 8 production-controls phase

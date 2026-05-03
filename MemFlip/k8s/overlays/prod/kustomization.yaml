@@ -27,6 +27,7 @@ images:
     newTag: prod
 
 patches:
+  - path: prod-placement-patch.yaml
   - target:
       kind: ConfigMap
       name: memflip-app-config
