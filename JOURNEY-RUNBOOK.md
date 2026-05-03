@@ -18117,3 +18117,31 @@ Measured outcome:
   - `grafana.eseosadevbox.com`
 - `api.swiftpay.eseosadevbox.com` reached Traefik correctly inside the cluster, but failed TLS at the Cloudflare edge
 - the failure point was before origin routing, which indicates an edge-certificate limitation for the nested subdomain rather than a Kubernetes or tunnel routing error
+
+## 2026-05-03 - Flattened SwiftPay API public hostname
+
+Purpose:
+- remove the nested public SwiftPay API hostname that failed at the Cloudflare TLS edge
+- replace it with a flat subdomain that fits the current public certificate model
+
+Commands run:
+
+```bash
+rg -n "api\\.swiftpay\\.eseosadevbox\\.com|api\\.swiftpay\\.devops\\.local|swiftpay-api\\.eseosadevbox\\.com" SwiftPay Obervability-Stack JOURNEY-RUNBOOK.md PROD-OVERLAY-AUDIT.md -g '!**/node_modules/**'
+cloudflared tunnel route dns --help
+sed -n '1,220p' ~/.cloudflared/config.yml
+kubectl apply -k SwiftPay/k8s/overlays/dev
+cloudflared tunnel route dns eseosadevbox-k8s swiftpay-api.eseosadevbox.com
+cloudflared tunnel ingress validate
+cloudflared tunnel ingress rule https://swiftpay-api.eseosadevbox.com
+curl -Ik --max-time 20 https://swiftpay-api.eseosadevbox.com/health
+curl -sSI -H 'Host: swiftpay-api.eseosadevbox.com' http://192.168.64.2/health
+```
+
+Measured outcome:
+- flattened the public SwiftPay API hostname to `swiftpay-api.eseosadevbox.com`
+- updated both the owned `dev` and `prod` Kubernetes ingress contracts to the new hostname
+- preserved the frontend public hostname as `swiftpay.eseosadevbox.com`
+- aligned the tunnel config and DNS route to the new flat hostname
+- after restarting `cloudflared`, external HTTPS validation succeeded for `https://swiftpay-api.eseosadevbox.com/health`
+- removed the need to rely on the failing nested hostname for the public API path

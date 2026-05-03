@@ -102,7 +102,7 @@ Added:
 
 - explicit `spec.tls` blocks for:
   - `swiftpay.eseosadevbox.com`
-  - `api.swiftpay.eseosadevbox.com`
+  - `swiftpay-api.eseosadevbox.com`
 - preferred pod anti-affinity for all replicated stateless services
 - hostname topology spread for all replicated stateless services
 
