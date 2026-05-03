@@ -17893,3 +17893,36 @@ Measured outcome:
   - `kubectl kustomize`
   - `kubectl apply --dry-run=client -k`
 - the cert-manager path is now explicit in the repo, but no live cert-manager installation was performed as part of this runbook step
+
+## 2026-05-03 - Live cert-manager install into local k3s
+
+Purpose:
+- install the shared production TLS control plane into the current local `k3s` cluster
+- register both shared Let's Encrypt `ClusterIssuer` objects
+- verify the live issuer state instead of assuming the Helm install succeeded
+
+Commands run:
+
+```bash
+rg -n "platform@example.com|letsencrypt|acme|cert-manager|admin@|@" PRODUCTION-TLS-CERT-MANAGER.md WORKSTATION-BOOTSTRAP.md k8s/platform/cert-manager scripts -g '!**/node_modules/**'
+kubectl get ns cert-manager >/dev/null 2>&1; echo $?
+kubectl config current-context && kubectl get nodes -o wide
+bash ./scripts/install-cert-manager.sh --email <redacted-acme-email>
+kubectl get pods -n cert-manager -o wide
+kubectl get clusterissuer letsencrypt-staging letsencrypt-prod -o wide
+kubectl describe clusterissuer letsencrypt-staging
+kubectl describe clusterissuer letsencrypt-prod
+```
+
+Measured outcome:
+- `cert-manager` was installed into the live `colima` `k3s` cluster
+- core cert-manager components came up healthy:
+  - `cert-manager`
+  - `cert-manager-cainjector`
+  - `cert-manager-webhook`
+- both shared issuers became `Ready=True`:
+  - `letsencrypt-staging`
+  - `letsencrypt-prod`
+- both issuers successfully registered ACME accounts against the configured servers
+- the local production TLS control-plane path is now real, not just documented
+- this does not yet imply successful certificate issuance for app `prod` hosts, because HTTP-01 validation still requires real public DNS for those hostnames
