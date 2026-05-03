@@ -20,6 +20,7 @@ The bootstrap scripts are designed to prepare a workstation for the main workflo
 - Docker Buildx
 - Kubernetes CLI tooling
 - local k3s runtime provisioning
+- optional cert-manager platform install for production-style TLS
 - Prometheus rule tooling (`promtool`)
 - Terraform
 - Node.js and npm
@@ -45,6 +46,7 @@ Notes:
 - it installs tools into user-space locations instead of relying on Homebrew
 - it uses Colima and Lima for the local Docker runtime
 - it provisions a local k3s cluster through Colima and installs Traefik as the ingress controller
+- cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - after bootstrap, the main Docker context should be `colima`
 
 ### Linux
@@ -61,6 +63,7 @@ Notes:
 - it installs most tools into user-space locations
 - it uses Docker Engine directly instead of Colima/Lima
 - it provisions a local k3s cluster with the official installer when passwordless sudo is available
+- cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - it detects `apt-get` and `dnf` for base package installation
 - if Docker is newly installed, you may need to log out and back in before the `docker` group membership applies cleanly
 
@@ -140,6 +143,20 @@ If you want to preview the generated host line before applying it:
 ```bash
 ./scripts/setup-devops-local-hosts.sh --print
 ```
+
+## Optional Production TLS Platform
+
+When you want to validate the production-style TLS path locally, install cert-manager and apply the shared ClusterIssuers:
+
+```bash
+./scripts/install-cert-manager.sh --email you@example.com
+```
+
+This is optional because it adds another platform dependency and is not required for the normal `dev` ingress path.
+
+Related reference:
+
+- [PRODUCTION-TLS-CERT-MANAGER.md](/Users/raymond/Documents/DevOps-Easy-Learning/PRODUCTION-TLS-CERT-MANAGER.md)
 
 ## Expected Runtime Direction
 

@@ -17850,3 +17850,46 @@ Measured outcome:
   - smoke check `30/30`
   - inventory validation `Errors: 0`
   - workspace snapshot `4 healthy / 0 down`
+
+## 2026-05-03 - Production TLS path scaffolding with cert-manager
+
+Purpose:
+- move the repo from TLS placeholders only to an explicit shared production TLS issuer path
+- keep the implementation production-minded without falsely claiming live certificate issuance
+- validate the repo-side changes cleanly before any cluster install step
+
+Commands run:
+
+```bash
+git status --short
+bash -n scripts/install-cert-manager.sh
+kubectl kustomize MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:OK
+kubectl kustomize SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:OK
+kubectl kustomize FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:OK
+kubectl kustomize OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:OK
+kubectl kustomize Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:OK
+sed -n '1,220p' PROD-OVERLAY-AUDIT.md
+sed -n '1,260p' PRODUCTION-TLS-CERT-MANAGER.md
+sed -n '1,240p' scripts/install-cert-manager.sh
+sed -n '1,260p' WORKSTATION-BOOTSTRAP.md
+kubectl apply --dry-run=client -k MemFlip/k8s/overlays/prod >/dev/null && echo MemFlip:DRYRUN_OK
+kubectl apply --dry-run=client -k SwiftPay/k8s/overlays/prod >/dev/null && echo SwiftPay:DRYRUN_OK
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/prod >/dev/null && echo FoodPulse:DRYRUN_OK
+kubectl apply --dry-run=client -k OpenSIS/k8s/overlays/prod >/dev/null && echo OpenSIS:DRYRUN_OK
+kubectl apply --dry-run=client -k Obervability-Stack/k8s/overlays/prod >/dev/null && echo Observability:DRYRUN_OK
+git diff --check
+kubectl kustomize k8s/platform/cert-manager
+```
+
+Measured outcome:
+- added a shared platform-owned cert-manager path under `k8s/platform/cert-manager`
+- added a guarded install helper at `scripts/install-cert-manager.sh` that requires explicit `--email`
+- production ingresses across all five owned overlays now declare:
+  - explicit `spec.tls`
+  - `cert-manager.io/cluster-issuer: letsencrypt-prod`
+  - Traefik `web,websecure` entrypoint posture
+- added `PRODUCTION-TLS-CERT-MANAGER.md` and updated `WORKSTATION-BOOTSTRAP.md`
+- all five owned `prod` overlays passed:
+  - `kubectl kustomize`
+  - `kubectl apply --dry-run=client -k`
+- the cert-manager path is now explicit in the repo, but no live cert-manager installation was performed as part of this runbook step

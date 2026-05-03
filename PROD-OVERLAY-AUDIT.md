@@ -144,15 +144,22 @@ Added:
 
 These are real remaining issues and should not be hidden by the improvements above.
 
-### 1. Certificate issuance is still contractual, not implemented
+### 1. Certificate issuance is now standardized in-repo, but not yet live-installed everywhere
 
-The new TLS blocks define the expected production secret names, but the repo does not yet implement the final certificate lifecycle.
+The repository now defines a shared production TLS path through:
 
-A later follow-up should decide whether production TLS is sourced by:
+- `cert-manager`
+- shared `ClusterIssuer` manifests
+- per-ingress `cert-manager.io/cluster-issuer` annotations
 
-- cert-manager
-- Traefik-native certificate integration
-- an external ingress/certificate platform
+That closes the architecture gap, but it does not by itself guarantee live certificate issuance in every cluster.
+
+A later follow-up should ensure the chosen path is actually installed and reconciled in each production environment, including:
+
+- cert-manager availability
+- issuer readiness
+- DNS ownership and propagation
+- renewal monitoring and alerting
 
 ### 2. Stateful durability is still mixed
 
@@ -192,7 +199,7 @@ So the current `prod` additions are appropriate, but future scaling or disruptio
 
 The clean next production-hardening slice should be:
 
-1. choose and document the production TLS issuer path
+1. install and validate the shared cert-manager path in the target production-style clusters
 2. add anti-affinity and topology spread constraints to replicated `prod` workloads
 3. tighten observability-state durability, especially for Grafana and Alertmanager
 4. decide whether the next roadmap step is formal Phase 7 closeout or a Phase 8 production-controls phase
