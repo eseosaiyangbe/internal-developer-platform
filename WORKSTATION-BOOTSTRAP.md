@@ -46,6 +46,7 @@ Notes:
 - it installs tools into user-space locations instead of relying on Homebrew
 - it uses Colima and Lima for the local Docker runtime
 - it provisions a local k3s cluster through Colima and installs Traefik as the ingress controller
+- the primary platform target is k3s; Docker Compose remains a stable foundation, not the main runtime-sizing driver
 - cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - after bootstrap, the main Docker context should be `colima`
 
@@ -63,6 +64,7 @@ Notes:
 - it installs most tools into user-space locations
 - it uses Docker Engine directly instead of Colima/Lima
 - it provisions a local k3s cluster with the official installer when passwordless sudo is available
+- the primary platform target is k3s; Docker Compose remains a stable foundation, not the main runtime-sizing driver
 - cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - it detects `apt-get` and `dnf` for base package installation
 - if Docker is newly installed, you may need to log out and back in before the `docker` group membership applies cleanly
@@ -111,6 +113,65 @@ To verify Docker can actually pull and run containers:
 docker pull hello-world
 docker run --rm hello-world
 ```
+
+## Runtime Sizing Policy
+
+This workspace is now Kubernetes-first.
+
+Compose remains a stable validation foundation, but local capacity planning should
+be driven by the shared k3s platform:
+
+- Vault
+- External Secrets
+- Traefik
+- cert-manager when enabled
+- Prometheus
+- Loki
+- Grafana
+- the control-plane UI
+- migrated application namespaces
+- local image builds and image imports
+
+### Recommended baseline
+
+Use this as the default cross-platform runtime target:
+
+- CPU: `6`
+- Memory: `12 GiB`
+- Disk: `100 GiB`
+
+### Minimum supported baseline
+
+This may still work for lighter validation, but it is no longer the preferred
+shape for the full Phase 7 platform:
+
+- CPU: `4`
+- Memory: `8 GiB`
+- Disk: `60 GiB`
+
+### Heavier demo profile
+
+Use this when you expect concurrent k3s activity, repeated rebuilds, or wider
+parallel demo activity:
+
+- CPU: `8`
+- Memory: `16 GiB`
+- Disk: `120 GiB`
+
+### Runtime contract variables
+
+The local runtime contract can now be expressed with environment variables:
+
+```bash
+export DEVOPS_EASY_LEARNING_RUNTIME_CPU=6
+export DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB=12
+export DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB=100
+```
+
+On macOS, `./scripts/ensure-k3s-runtime.sh` applies these values to Colima.
+
+On Linux, the same variables define the expected baseline for the Docker plus
+k3s host even though there is no Colima VM layer.
 
 ## Local Browser Hostnames
 

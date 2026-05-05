@@ -4,6 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devops-easy-learning"
 VAULT_INIT_FILE="${STATE_DIR}/k3s-vault-init.json"
+RUNTIME_CPU="${DEVOPS_EASY_LEARNING_RUNTIME_CPU:-6}"
+RUNTIME_MEMORY_GIB="${DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB:-12}"
+RUNTIME_DISK_GIB="${DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB:-100}"
 
 have_sudo() {
   command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1
@@ -84,7 +87,14 @@ ensure_macos_k3s() {
     return 1
   }
 
-  colima start --runtime docker --cpu 4 --memory 8 --disk 60 --kubernetes --network-address >/dev/null
+  echo "Ensuring macOS k3s runtime with ${RUNTIME_CPU} CPU, ${RUNTIME_MEMORY_GIB}GiB memory, ${RUNTIME_DISK_GIB}GiB disk..."
+  colima start \
+    --runtime docker \
+    --cpu "${RUNTIME_CPU}" \
+    --memory "${RUNTIME_MEMORY_GIB}" \
+    --disk "${RUNTIME_DISK_GIB}" \
+    --kubernetes \
+    --network-address >/dev/null
   tune_inotify_limits_colima
   kubectl config use-context colima >/dev/null 2>&1 || true
   kubectl get nodes >/dev/null
@@ -96,6 +106,8 @@ ensure_linux_k3s() {
     echo "kubectl is required for the Linux k3s runtime."
     return 1
   }
+
+  echo "Ensuring Linux k3s runtime against the recommended baseline of ${RUNTIME_CPU} CPU, ${RUNTIME_MEMORY_GIB}GiB memory, ${RUNTIME_DISK_GIB}GiB disk..."
 
   if ! command -v k3s >/dev/null 2>&1; then
     if ! have_sudo; then
@@ -151,6 +163,8 @@ main() {
   else
     echo "Traefik ingress address is not yet assigned."
   fi
+
+  echo "Recommended runtime baseline: ${RUNTIME_CPU} CPU, ${RUNTIME_MEMORY_GIB}GiB memory, ${RUNTIME_DISK_GIB}GiB disk"
 }
 
 main "$@"
