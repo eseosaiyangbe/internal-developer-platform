@@ -24,7 +24,7 @@ The child workload repositories have been refreshed and are no longer stale:
 - [Obervability-Stack](https://github.com/eseosaiyangbe/Obervability-Stack)
 
 This central repository is now moving from embedded workload directories to
-authoritative child repos. `MemFlip` is the first workload being cut over to the
+authoritative child repos. `MemFlip` and `SwiftPay` are already cut over to the
 sibling-checkout model, and the long-term target is:
 
 - one central `Internal Developer Platform` repo
@@ -194,11 +194,11 @@ Recommended workspace commands:
 If you need to override any resolved path explicitly, use:
 
 ```bash
-export IDP_OBSERVABILITY_STACK_DIR=/path/to/Obervability-Stack
-export IDP_SWIFTPAY_DIR=/path/to/SwiftPay
-export IDP_OPENSIS_DIR=/path/to/OpenSIS
-export IDP_FOODPULSE_DIR=/path/to/FoodPulse
-export IDP_MEMFLIP_DIR=/path/to/MemFlip
+export IDP_OBSERVABILITY_STACK_DIR=/path/to/observability-stack
+export IDP_SWIFTPAY_DIR=/path/to/swiftpay
+export IDP_OPENSIS_DIR=/path/to/opensis
+export IDP_FOODPULSE_DIR=/path/to/foodpulse
+export IDP_MEMFLIP_DIR=/path/to/memflip
 ```
 
 To inspect what the platform currently resolves, run:
@@ -240,15 +240,17 @@ Start the full workspace:
 ./scripts/workspace-start.sh
 ```
 
-If you want the underlying repo-by-repo commands instead of the wrapper:
+If you want the underlying repo-by-repo commands instead of the wrapper, the
+recommended form now assumes the sibling checkout layout created by
+`./scripts/bootstrap-sibling-repos.sh`:
 
 ```bash
-cd Obervability-Stack && docker compose up -d
-cd ../SwiftPay && docker compose up -d
-cd ../OpenSIS && ./scripts/compose-start.sh
-cd ../FoodPulse && cp .env.example .env && ./scripts/start.sh
-cd ../MemFlip && cp .env.example .env && docker compose up -d
-cd .. && ./Obervability-Stack/scripts/devops-monitor.sh operator
+cd ../observability-stack && docker compose up -d
+cd ../swiftpay && docker compose up -d
+cd ../opensis && ./scripts/compose-start.sh
+cd ../foodpulse && cp .env.example .env && ./scripts/start.sh
+cd ../memflip && cp .env.example .env && docker compose up -d
+cd ../observability-stack && ./scripts/devops-monitor.sh operator
 ```
 
 When the platform moves fully to sibling checkouts, the wrapper scripts remain

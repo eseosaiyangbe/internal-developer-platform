@@ -85,7 +85,7 @@ This directory contains all the shell scripts for managing the Monitoring in a B
 ```
 
 **Features:**
-- Validates SwiftPay observability aliases against the real `SwiftPay/docker-compose.yml`
+- Validates SwiftPay observability aliases against the authoritative child repo `docker-compose.yml`
 - Checks control-plane inventory and Prometheus scrape targets for SwiftPay
 - Confirms business recording rules, dashboard API queries, and the SwiftPay observability runbook stay aligned
 

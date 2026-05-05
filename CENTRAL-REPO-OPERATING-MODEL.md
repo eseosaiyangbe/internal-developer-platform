@@ -16,13 +16,12 @@ as the permanent home of every workload?
 Today the current platform workspace still contains local workload directories:
 
 - `Obervability-Stack`
-- `SwiftPay`
 - `FoodPulse`
 - `OpenSIS`
 
-`MemFlip` is now the first workload being cut over to the sibling-checkout
-model, so it should no longer be treated as a permanent embedded workload in the
-central repo.
+`MemFlip` and `SwiftPay` are now cut over to the sibling-checkout model, so
+they should no longer be treated as permanent embedded workloads in the central
+repo.
 
 At the same time, each workload now also has a refreshed authoritative child
 repository on GitHub.
@@ -151,9 +150,9 @@ Cons:
 The next clean transition is:
 
 1. keep the current platform workspace temporarily
-2. define a sibling-checkout bootstrap contract
-3. update central scripts and docs to support sibling repos
-4. then remove workload directories from the central repo deliberately
+2. keep resolving workloads through the sibling-checkout contract first
+3. remove the remaining embedded workload directories deliberately
+4. validate the operator flows after each cut
 
 ## GitOps Implication
 

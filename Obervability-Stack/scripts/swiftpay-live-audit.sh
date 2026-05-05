@@ -14,8 +14,32 @@ export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-SWIFTPAY_COMPOSE="$WORKSPACE_ROOT/SwiftPay/docker-compose.yml"
+resolve_swiftpay_dir() {
+  local override="${IDP_SWIFTPAY_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/SwiftPay" \
+    "${WORKSPACE_PARENT}/SwiftPay" \
+    "${WORKSPACE_PARENT}/swiftpay"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate SwiftPay. Set IDP_SWIFTPAY_DIR to the child repo path." >&2
+  exit 1
+}
+
+SWIFTPAY_DIR="$(resolve_swiftpay_dir)"
+
+SWIFTPAY_COMPOSE="$SWIFTPAY_DIR/docker-compose.yml"
 CONTROL_PLANE_HEALTH_URL="http://localhost:4000/api/apps/health"
 SWIFTPAY_BUSINESS_URL="http://localhost:4000/api/apps/swiftpay/business"
 SWIFTPAY_GATEWAY_HEALTH_URL="http://localhost:3007/health"

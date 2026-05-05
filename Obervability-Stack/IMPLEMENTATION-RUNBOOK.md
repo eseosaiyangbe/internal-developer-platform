@@ -82,7 +82,7 @@ Application compose files at the time of the original workspace discovery:
 FoodPulse/docker-compose.yml
 MemFlip/docker-compose.yml
 OpenSIS/docker-compose.yaml
-SwiftPay/docker-compose.yml
+swiftpay/docker-compose.yml
 ```
 
 Local ignored files created during that original embedded-workspace phase:
@@ -239,7 +239,7 @@ docker compose config >/tmp/foodpulse-compose.yml
 ```
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose config >/tmp/memflip-compose.yml
 ```
 
@@ -249,7 +249,7 @@ docker compose -f docker-compose.yaml config >/tmp/opensis-compose.yml
 ```
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose config >/tmp/swiftpay-compose.yml
 ```
 
@@ -260,13 +260,13 @@ Problem:
 Error:
 
 ```text
-env file .../MemFlip/.env not found
+env file .../memflip/.env not found
 ```
 
 Fix:
 
 ```bash
-cd MemFlip
+cd ../memflip
 cp env/env.example .env
 docker compose config >/tmp/memflip-compose.yml
 ```

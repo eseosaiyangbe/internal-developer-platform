@@ -36,7 +36,7 @@ SwiftPay is a payment-style application made of separate services:
 Start from the workspace root:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose up -d
 ```
 
@@ -120,7 +120,7 @@ curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=swift
 Start broad:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose logs --tail=80 api-gateway
 docker compose logs --tail=80 transaction-service
 docker compose logs --tail=80 wallet-service
@@ -148,7 +148,7 @@ Symptom:
 First checks:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose ps frontend api-gateway
 docker compose logs --tail=80 frontend
 curl -fsS http://localhost:3007/health | jq .
@@ -179,7 +179,7 @@ Symptom:
 First checks:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose ps api-gateway auth-service wallet-service transaction-service notification-service
 docker compose logs --tail=120 api-gateway
 docker compose logs --tail=80 postgres redis
@@ -211,7 +211,7 @@ Symptom:
 First checks:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose ps transaction-service rabbitmq wallet-service
 docker compose logs --tail=120 transaction-service
 docker compose logs --tail=80 rabbitmq
@@ -245,7 +245,7 @@ Symptom:
 First checks:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose ps wallet-service transaction-service postgres
 docker compose logs --tail=120 wallet-service
 docker compose logs --tail=120 transaction-service
@@ -302,7 +302,7 @@ kubectl get servicemonitor -A
 Local Docker Compose:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose restart api-gateway
 docker compose restart transaction-service
 docker compose restart wallet-service
@@ -323,7 +323,7 @@ Use restart as a recovery step only after you have captured enough logs to expla
 
 ## Kubernetes Readiness Notes
 
-SwiftPay already has Kubernetes manifests under `SwiftPay/k8s`.
+SwiftPay already has Kubernetes manifests in the authoritative child repo under `k8s/`.
 
 When we move this project to Kubernetes, this operator model should map like this:
 
@@ -352,8 +352,8 @@ Only the command surface changes.
 
 Use these when you need deeper app-specific detail:
 
-- `SwiftPay/docs/RUNBOOK.md`
-- `SwiftPay/docs/observability-runbook.md`
-- `SwiftPay/docs/send-money-runbook.md`
-- `SwiftPay/docs/troubleshooting-pending-transactions.md`
-- `SwiftPay/docs/transaction-processing-failure-diagnosis.md`
+- [SwiftPay `docs/RUNBOOK.md`](https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/RUNBOOK.md)
+- [SwiftPay `docs/observability-runbook.md`](https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/observability-runbook.md)
+- [SwiftPay `docs/send-money-runbook.md`](https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md)
+- [SwiftPay `docs/troubleshooting-pending-transactions.md`](https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/troubleshooting-pending-transactions.md)
+- [SwiftPay `docs/transaction-processing-failure-diagnosis.md`](https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/transaction-processing-failure-diagnosis.md)

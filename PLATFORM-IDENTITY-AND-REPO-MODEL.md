@@ -53,8 +53,6 @@ Today the workspace is still one Git repository rooted at:
 That root currently contains:
 
 - `Obervability-Stack`
-- `MemFlip`
-- `SwiftPay`
 - `FoodPulse`
 - `OpenSIS`
 - root scripts and platform docs
@@ -72,7 +70,8 @@ That means:
 
 - the GitHub child repositories now reflect the current authoritative workload
   state
-- the current platform workspace still contains local copies of most workloads
+- the current platform workspace still contains local copies of only the
+  remaining embedded workloads
 - the workspace is therefore in a transition period where repository boundaries
   are logically split, but the central workspace still carries the physical
   directories
@@ -247,19 +246,17 @@ the most cross-linked workload in the current workspace.
 
 ## Current Recommendation
 
-Do not delete workload directories from the current platform workspace yet.
+Do not remove all remaining workload directories at once.
 
 The correct next step is:
 
-- formalize the central repository operating model
-- define how the platform repo references the child repos
-- decide whether the final local topology should use:
-  - sibling checkouts
-  - Git submodules
-  - or a lightweight workspace bootstrap that clones each child repo beside the
-    platform repo
+- continue the workload cuts one app at a time
+- prefer sibling-checkout resolution before each removal
+- validate the control-plane and operator flows after each cut
+- keep the central repo focused on orchestration, not workload-local code
 
-The child repositories are now refreshed and usable. The remaining work is to
-move from duplicated local directories to a cleaner central orchestration model
-without breaking the platform while it is still undergoing late Phase 7 and
-GitOps work.
+The child repositories are now refreshed and usable. `MemFlip` and `SwiftPay`
+have already been cut to sibling ownership. The remaining work is to move the
+rest of the embedded workload directories out of the central repo without
+breaking the platform while it is still undergoing late Phase 7 and GitOps
+work.

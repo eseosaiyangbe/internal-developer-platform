@@ -336,7 +336,7 @@ groups:
         annotations:
           summary: "SwiftPay metrics scrape is down"
           description: "Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }} for more than 2 minutes"
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay pending transactions stuck
       - alert: SwiftPayPendingTransactionsStuck
@@ -350,7 +350,7 @@ groups:
         annotations:
           summary: "SwiftPay has pending transactions stuck"
           description: "{{ $value }} pending transaction signal detected. One or more SwiftPay transactions have been pending for more than 2 minutes."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay money stuck pending
       - alert: SwiftPayMoneyStuckPending
@@ -364,7 +364,7 @@ groups:
         annotations:
           summary: "SwiftPay money is stuck in pending state"
           description: "SwiftPay has ${{ $value }} stuck in pending transactions for more than 2 minutes."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay transaction queue depth high
       - alert: SwiftPayTransactionQueueDepthHigh
@@ -378,7 +378,7 @@ groups:
         annotations:
           summary: "SwiftPay transaction queue depth is high"
           description: "SwiftPay transaction queue has {{ $value }} messages for more than 2 minutes. The worker may be slow or down."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay transaction failure rate
       - alert: SwiftPayTransactionFailureRateHigh
@@ -392,7 +392,7 @@ groups:
         annotations:
           summary: "SwiftPay transaction failure rate is high"
           description: "SwiftPay transaction-service failure rate is {{ $value }} failed transactions per second over 5 minutes."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay wallet failure rate
       - alert: SwiftPayWalletFailureRateHigh
@@ -406,7 +406,7 @@ groups:
         annotations:
           summary: "SwiftPay wallet transfer failure rate is high"
           description: "SwiftPay wallet-service failed transfer rate is {{ $value }} failures per second over 5 minutes."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # SwiftPay wallet circuit breaker open
       - alert: SwiftPayWalletCircuitBreakerOpen
@@ -420,7 +420,7 @@ groups:
         annotations:
           summary: "SwiftPay wallet circuit breaker is open"
           description: "Transaction Service has opened the Wallet Service circuit breaker. Money movement may be blocked."
-          runbook_url: "file:///home/theinventor/Desktop/devops/devopseasylearning/SwiftPay/docs/send-money-runbook.md"
+          runbook_url: "https://github.com/eseosaiyangbe/SwiftPay/blob/main/docs/send-money-runbook.md"
 
       # High HTTP error rate
       - alert: HighHTTPErrorRate

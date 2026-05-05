@@ -18512,3 +18512,50 @@ Measured outcome:
   `24/24` checks against the sibling `MemFlip` repo
 - root documentation and the most visible embedded `Obervability-Stack`
   MemFlip references were updated to stop pointing at dead embedded paths
+
+## 2026-05-05 - Removed embedded SwiftPay from the central platform repo
+
+Purpose:
+- make the second workload split structurally real after the successful
+  `MemFlip` pilot
+- prove that the central platform repo can continue resolving a flagship
+  microservices workload from the authoritative sibling checkout without keeping
+  a duplicated embedded copy
+
+Commands run:
+
+```bash
+rg -n "SwiftPay|swiftpay" README.md PHASE7-K3S-DEV-CERTIFICATION.md WORKSPACE-SETUP-MATRIX.md PLATFORM-IDENTITY-AND-REPO-MODEL.md CENTRAL-REPO-OPERATING-MODEL.md KUBERNETES-MIGRATION-PLAN.md Obervability-Stack/scripts Obervability-Stack/docs Obervability-Stack/IMPLEMENTATION-RUNBOOK.md Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/k8s/base/config/alert_rules.yml
+sed -n '1,220p' Obervability-Stack/scripts/swiftpay-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/swiftpay-live-audit.sh
+sed -n '1,420p' Obervability-Stack/docs/SWIFTPAY_OPERATOR_RUNBOOK.md
+git rm -r SwiftPay
+rm -rf SwiftPay
+./scripts/workspace-layout.sh
+IDP_SWIFTPAY_DIR=/Users/raymond/Documents/swiftpay ./Obervability-Stack/scripts/swiftpay-audit.sh
+IDP_MEMFLIP_DIR=/Users/raymond/Documents/memflip ./Obervability-Stack/scripts/memflip-audit.sh
+cd /Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/ui-next && npm run type-check
+git diff --check
+```
+
+Measured outcome:
+- the embedded `SwiftPay` directory was removed from the central platform repo
+- `./scripts/workspace-layout.sh` now resolves `SwiftPay` automatically to:
+  - `/Users/raymond/Documents/swiftpay`
+- the control-plane SwiftPay audit scripts were updated to resolve `SwiftPay`
+  through:
+  - `IDP_SWIFTPAY_DIR`
+  - embedded workspace fallback
+  - sibling checkout fallback
+- `./Obervability-Stack/scripts/swiftpay-audit.sh` passed after the cut with
+  `55/55` checks against the sibling `swiftpay` repo
+- `./Obervability-Stack/scripts/memflip-audit.sh` still passed with `24/24`
+  after the shared inventory/runbook cleanup
+- the control-plane inventory now points both `SwiftPay` and `MemFlip` local
+  runbook commands at sibling child repos instead of dead embedded paths
+- stale local-file runbook URLs in the SwiftPay alert rules were replaced with
+  the authoritative GitHub child-repo documentation URL
+- `Obervability-Stack/ui-next` type-check still passed after the monitored app
+  inventory changes
+- `git diff --check` stayed clean, which confirms the repo-transition edits did
+  not introduce whitespace or patch corruption

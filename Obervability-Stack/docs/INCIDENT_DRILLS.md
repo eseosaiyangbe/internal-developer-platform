@@ -97,7 +97,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../SwiftPay
+cd ../swiftpay
 docker compose stop transaction-service
 ```
 
@@ -114,7 +114,7 @@ cd ../Obervability-Stack
 ./scripts/devops-monitor.sh swiftpay-live
 curl -fsS http://localhost:4000/api/apps/swiftpay/business | jq .
 
-cd ../SwiftPay
+cd ../swiftpay
 docker compose logs --tail=120 transaction-service
 docker compose logs --tail=80 rabbitmq
 ```
@@ -122,7 +122,7 @@ docker compose logs --tail=80 rabbitmq
 Recovery:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose start transaction-service
 
 cd ../Obervability-Stack
@@ -157,7 +157,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../SwiftPay
+cd ../swiftpay
 docker compose stop wallet-service
 ```
 
@@ -170,7 +170,7 @@ Expected detection:
 First checks:
 
 ```bash
-cd ../SwiftPay
+cd ../swiftpay
 docker compose logs --tail=120 wallet-service
 docker compose logs --tail=120 transaction-service
 
@@ -181,7 +181,7 @@ curl -fsS http://localhost:4000/api/apps/swiftpay/business | jq .
 Recovery:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose start wallet-service
 
 cd ../Obervability-Stack
@@ -216,7 +216,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../SwiftPay
+cd ../swiftpay
 docker compose stop rabbitmq
 ```
 
@@ -229,7 +229,7 @@ Expected detection:
 First checks:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose ps rabbitmq transaction-service
 docker compose logs --tail=120 rabbitmq
 docker compose logs --tail=120 transaction-service
@@ -238,7 +238,7 @@ docker compose logs --tail=120 transaction-service
 Recovery:
 
 ```bash
-cd SwiftPay
+cd ../swiftpay
 docker compose start rabbitmq
 docker compose restart transaction-service
 
@@ -276,7 +276,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../MemFlip
+cd ../memflip
 docker compose stop backend
 ```
 
@@ -289,7 +289,7 @@ Expected detection:
 First checks:
 
 ```bash
-cd ../MemFlip
+cd ../memflip
 docker compose ps frontend backend postgres redis
 docker compose logs --tail=120 backend
 docker compose logs --tail=80 frontend
@@ -298,7 +298,7 @@ docker compose logs --tail=80 frontend
 Recovery:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose start backend
 
 cd ../Obervability-Stack
@@ -339,7 +339,7 @@ curl -fsS http://localhost:3101/metrics | rg 'app_health_status|http_requests_to
 Optional failure trigger:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose stop backend
 ```
 
@@ -352,7 +352,7 @@ Expected detection:
 Recovery:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose start backend
 
 cd ../Obervability-Stack

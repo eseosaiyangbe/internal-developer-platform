@@ -34,7 +34,7 @@ The frontend proxy is important. Operators should usually test the app through `
 Start from the workspace root:
 
 ```bash
-cd MemFlip
+cd ../memflip
 cp .env.example .env
 docker compose up -d
 ```
@@ -51,7 +51,7 @@ cd ../Obervability-Stack
 Start with the standard platform workflow:
 
 ```bash
-cd Obervability-Stack
+cd ../observability-stack
 ./scripts/devops-monitor.sh operator
 ```
 
@@ -118,7 +118,7 @@ curl -fsS http://localhost:3101/metrics | rg 'app_health_status|http_requests_to
 Start broad:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose logs --tail=80 frontend
 docker compose logs --tail=80 backend
 docker compose logs --tail=80 postgres
@@ -145,7 +145,7 @@ Symptom:
 First checks:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose ps frontend backend
 docker compose logs --tail=100 frontend
 curl -fsS http://localhost:3101/health | jq .
@@ -178,7 +178,7 @@ Symptom:
 First checks:
 
 ```bash
-cd MemFlip
+cd ../memflip
 curl -fsS http://localhost:8080/api/health | jq .
 curl -fsS http://localhost:3101/health | jq .
 docker compose logs --tail=120 frontend
@@ -212,7 +212,7 @@ Symptom:
 First checks:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose ps backend postgres redis
 docker compose logs --tail=120 backend
 docker compose logs --tail=80 postgres
@@ -246,10 +246,10 @@ Symptom:
 First checks:
 
 ```bash
-cd Obervability-Stack
+cd ../observability-stack
 ./scripts/devops-monitor.sh memflip-live
 
-cd ../MemFlip
+cd ../memflip
 docker compose logs --tail=150 backend
 docker compose logs --tail=80 postgres
 ```
@@ -283,7 +283,7 @@ First checks:
 ```bash
 curl -fsS http://localhost:3101/metrics | head
 curl -fsS http://localhost:3101/metrics | rg 'app_health_status|http_requests_total|game_scores_total'
-cd Obervability-Stack
+cd ../observability-stack
 ./scripts/devops-monitor.sh memflip
 ```
 
@@ -307,7 +307,7 @@ kubectl port-forward -n humor-game deployment/backend 3101:3001
 Local Docker Compose:
 
 ```bash
-cd MemFlip
+cd ../memflip
 docker compose restart frontend
 docker compose restart backend
 docker compose restart postgres
@@ -328,7 +328,7 @@ kubectl rollout status deployment/backend -n humor-game
 
 ## Kubernetes Readiness Notes
 
-MemFlip has Kubernetes and GitOps manifests in the `MemFlip` child repo under
+MemFlip has Kubernetes and GitOps manifests in the authoritative child repo under
 `k8s` and `gitops-safe`.
 
 When we move this workspace to Kubernetes, this operator model should map like this:

@@ -5,13 +5,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-SWIFTPAY_COMPOSE="$WORKSPACE_ROOT/SwiftPay/docker-compose.yml"
+resolve_swiftpay_dir() {
+  local override="${IDP_SWIFTPAY_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/SwiftPay" \
+    "${WORKSPACE_PARENT}/SwiftPay" \
+    "${WORKSPACE_PARENT}/swiftpay"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate SwiftPay. Set IDP_SWIFTPAY_DIR to the child repo path." >&2
+  exit 1
+}
+
+SWIFTPAY_DIR="$(resolve_swiftpay_dir)"
+
+SWIFTPAY_COMPOSE="$SWIFTPAY_DIR/docker-compose.yml"
 MONITORED_APPS_FILE="$PROJECT_ROOT/ui-next/lib/monitored-apps.ts"
 PROMETHEUS_FILE="$PROJECT_ROOT/prometheus/prometheus.yml"
 RECORDING_RULES_FILE="$PROJECT_ROOT/prometheus/recording_rules.yml"
 BUSINESS_ROUTE_FILE="$PROJECT_ROOT/ui-next/app/api/apps/swiftpay/business/route.ts"
-RUNBOOK_FILE="$WORKSPACE_ROOT/SwiftPay/docs/observability-runbook.md"
+RUNBOOK_FILE="$SWIFTPAY_DIR/docs/observability-runbook.md"
 
 TOTAL_CHECKS=0
 PASSED_CHECKS=0
@@ -94,7 +118,7 @@ done
 
 assert_contains "$MONITORED_APPS_FILE" "http://localhost:8081" "SwiftPay inventory browser URL uses localhost:8081"
 assert_contains "$MONITORED_APPS_FILE" "http://localhost:3007/health" "SwiftPay inventory gateway health URL uses localhost:3007/health"
-assert_contains "$MONITORED_APPS_FILE" "cd SwiftPay && docker compose up -d" "SwiftPay inventory localStart points to repo compose startup"
+assert_contains "$MONITORED_APPS_FILE" "cd ../swiftpay && docker compose up -d" "SwiftPay inventory localStart points to sibling repo compose startup"
 
 echo
 header "Prometheus Scrape Contract"
