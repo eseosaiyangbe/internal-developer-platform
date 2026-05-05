@@ -18239,3 +18239,47 @@ Measured outcome:
   - all Sentinel sidecars agreed on `foodpulse-redis-0` as the master for `foodpulse-cache`
 - `./scripts/k8s-dev-deploy.sh --skip-build --skip-runtime --skip-secrets-platform` completed successfully
 - the control plane returned FoodPulse to `status: healthy` on `https://portfolio.eseosadevbox.com/api/apps/health`
+
+## 2026-05-05 - Prepared MemFlip pilot repository extraction
+
+Purpose:
+- begin the first workload extraction from the current platform workspace into
+  its own child repository
+- treat the current local `MemFlip/` directory as authoritative and stop relying
+  on the stale standalone GitHub child repo as a source of truth
+
+Commands run:
+
+```bash
+git ls-remote https://github.com/eseosaiyangbe/MemFlip.git
+git log --oneline -- MemFlip | head -n 20
+ls -la MemFlip
+find MemFlip -maxdepth 2 -type f | head -n 120
+TMPDIR=$(mktemp -d)
+git clone --depth 1 https://github.com/eseosaiyangbe/MemFlip.git "$TMPDIR/MemFlip-remote"
+diff -qr "$TMPDIR/MemFlip-remote" MemFlip | head -n 200
+sed -n '1,240p' PLATFORM-IDENTITY-AND-REPO-MODEL.md
+sed -n '1,220p' MemFlip/.env
+sed -n '1,220p' MemFlip/.env.example
+git ls-files MemFlip/.env MemFlip/.env.example
+git check-ignore -v MemFlip/.env MemFlip/.env.example || true
+```
+
+Measured outcome:
+- the standalone GitHub `MemFlip` repo was confirmed stale:
+  - remote `main` pointed to `c2ea881 Connect MemFlip to observability network`
+- the current local `MemFlip/` directory was confirmed as the authoritative
+  workload source:
+  - it includes the owned `k8s/base`, `k8s/overlays`, `k8s/argocd`,
+    `k8s-legacy-lab`, and modern `k8s-dev-*` operator scripts
+- the stale child repo still carried the older flat Kubernetes layout and older
+  monitoring and tunnel structure, which should not be merged back into the
+  active workload
+- the local root-level `MemFlip/.env` file was checked as part of the extraction
+  safety pass:
+  - it is ignored and not tracked by Git
+  - it will not be included in the extracted child repository history
+- the extraction decision was therefore set as:
+  - preserve history from the current platform workspace
+  - replace the stale child repository with the current authoritative
+    `MemFlip/` state
