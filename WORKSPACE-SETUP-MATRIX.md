@@ -41,7 +41,7 @@ The following aliases match the monitored app inventory in:
 
 | App ID | Expected Alias | Repo Status |
 |---|---|---|
-| `opensis` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker`, `opensis-apache-exporter` | matches `OpenSIS/docker-compose.yaml` |
+| `opensis` | `opensis-ui`, `opensis-mysqld-exporter`, `opensis-vault-checker`, `opensis-apache-exporter` | matches `opensis/docker-compose.yaml` |
 | `swiftpay` | `swiftpay-*` service aliases | matches `swiftpay/docker-compose.yml` |
 | `memflip` | `memflip-frontend`, `memflip-backend` | matches the `MemFlip` child repo compose contract |
 | `foodpulse` | `foodpulse-ui` | matches `foodpulse/docker-compose.yml` |

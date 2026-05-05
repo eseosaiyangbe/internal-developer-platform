@@ -1,9 +1,0 @@
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: opensis-ui-pdb
-spec:
-  minAvailable: 1
-  selector:
-    matchLabels:
-      app: opensis-ui

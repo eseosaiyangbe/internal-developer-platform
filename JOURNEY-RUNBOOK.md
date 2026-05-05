@@ -18601,3 +18601,50 @@ Measured outcome:
 - `Obervability-Stack/ui-next` type-check still passed after the monitored app
   inventory changes
 - `git diff --check` stayed clean after the FoodPulse cut
+
+## 2026-05-05 - Removed embedded OpenSIS from the central platform repo
+
+Purpose:
+- make the fourth workload split structurally real after the `MemFlip`,
+  `SwiftPay`, and `FoodPulse` cuts
+- prove that the central platform repo can continue driving the legacy-platform
+  workload from the authoritative sibling checkout without keeping an embedded
+  duplicate
+
+Commands run:
+
+```bash
+sed -n '1,220p' Obervability-Stack/scripts/opensis-audit.sh
+sed -n '1,220p' Obervability-Stack/scripts/opensis-live-audit.sh
+sed -n '1,220p' Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,260p' Obervability-Stack/docs/OPENSIS_OPERATOR_RUNBOOK.md
+sed -n '360,500p' Obervability-Stack/docs/INCIDENT_DRILLS.md
+git rm -r OpenSIS
+rm -rf OpenSIS
+./scripts/workspace-layout.sh
+IDP_OPENSIS_DIR=/Users/raymond/Documents/opensis ./Obervability-Stack/scripts/opensis-audit.sh
+cd /Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/ui-next && npm run type-check
+git diff --check
+```
+
+Measured outcome:
+- the embedded `OpenSIS` directory was removed from the central platform repo
+- `./scripts/workspace-layout.sh` now resolves `OpenSIS` automatically to:
+  - `/Users/raymond/Documents/opensis`
+- the control-plane OpenSIS audit scripts were updated to resolve `OpenSIS`
+  through:
+  - `IDP_OPENSIS_DIR`
+  - embedded workspace fallback
+  - sibling checkout fallback
+- `./Obervability-Stack/scripts/opensis-audit.sh` passed after the cut with
+  `26/26` checks against the sibling `opensis` repo
+- the control-plane inventory now points `OpenSIS` local and Kubernetes runbook
+  commands at the sibling child repo instead of a dead embedded path
+- the highest-signal OpenSIS operator docs were updated to use sibling paths
+  and child-repo documentation links
+- the OpenSIS audit was reconciled to the current child-repo contract, where
+  `--build-local` is now a compatibility flag because the default local path
+  already builds `opensis-ui` locally
+- `Obervability-Stack/ui-next` type-check still passed after the monitored app
+  inventory and runbook updates
+- `git diff --check` stayed clean after the OpenSIS cut

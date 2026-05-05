@@ -12,8 +12,34 @@ export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-OPENSIS_COMPOSE="$WORKSPACE_ROOT/OpenSIS/docker-compose.yaml"
+resolve_opensis_dir() {
+  if [ -n "${IDP_OPENSIS_DIR:-}" ] && [ -d "${IDP_OPENSIS_DIR}" ]; then
+    printf '%s\n' "${IDP_OPENSIS_DIR}"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_ROOT/OpenSIS" ]; then
+    printf '%s\n' "$WORKSPACE_ROOT/OpenSIS"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_PARENT/OpenSIS" ]; then
+    printf '%s\n' "$WORKSPACE_PARENT/OpenSIS"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_PARENT/opensis" ]; then
+    printf '%s\n' "$WORKSPACE_PARENT/opensis"
+    return
+  fi
+
+  printf '%s\n' "$WORKSPACE_PARENT/opensis"
+}
+
+OPENSIS_DIR="$(resolve_opensis_dir)"
+OPENSIS_COMPOSE="$OPENSIS_DIR/docker-compose.yaml"
 CONTROL_PLANE_HEALTH_URL="http://localhost:4000/api/apps/health"
 PROMETHEUS_QUERY_URL="http://localhost:9090/api/v1/query"
 OPENSIS_URL="http://localhost:8088"

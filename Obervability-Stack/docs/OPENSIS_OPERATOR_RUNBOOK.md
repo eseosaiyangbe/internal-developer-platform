@@ -41,14 +41,14 @@ Start from the workspace root.
 On most machines:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 ./scripts/compose-start.sh
 ```
 
 On Apple Silicon or when you need to build the UI locally:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 ./scripts/compose-start.sh --build-local
 ```
 
@@ -62,7 +62,7 @@ cd ../Obervability-Stack
 Optional edge services:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 ./scripts/compose-start.sh --edge
 ```
 
@@ -138,7 +138,7 @@ curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=probe
 Start broad:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose logs --tail=80 opensis-ui
 docker compose logs --tail=80 opensis-db
 docker compose logs --tail=80 vault
@@ -168,7 +168,7 @@ Symptom:
 First checks:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose ps opensis-ui opensis-db vault vault-agent-app
 docker compose logs --tail=120 opensis-ui
 docker compose logs --tail=80 opensis-db
@@ -204,7 +204,7 @@ Symptom:
 First checks:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose ps vault vault-bootstrap vault-seed vault-agent-app vault-agent-db
 docker compose logs --tail=120 vault
 docker compose logs --tail=120 vault-bootstrap
@@ -240,7 +240,7 @@ Symptom:
 First checks:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose ps opensis-db vault-agent-db
 docker compose logs --tail=120 opensis-db
 docker compose logs --tail=120 vault-agent-db
@@ -273,7 +273,7 @@ Symptom:
 First checks:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose logs --tail=120 opensis-db
 docker compose logs --tail=120 vault-seed vault-agent-db
 ```
@@ -330,7 +330,7 @@ kubectl exec -n opensis deploy/prometheus -- sh -lc 'wget -qO- "http://127.0.0.1
 Local Docker Compose:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose restart opensis-ui
 docker compose restart opensis-db
 docker compose restart vault-agent-app vault-agent-db
@@ -340,7 +340,7 @@ docker compose ps
 If the stack sequencing itself is broken, use the repo helper:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 ./scripts/compose-stop.sh
 ./scripts/compose-start.sh
 ```
@@ -363,7 +363,7 @@ For production-style OpenSIS, prefer GitOps/Argo reconciliation over manual live
 
 ## Kubernetes Readiness Notes
 
-OpenSIS has Kubernetes, Kustomize, Vault, observability, and GitOps assets under `OpenSIS/k8s`.
+OpenSIS has Kubernetes, Kustomize, Vault, observability, and GitOps assets in the authoritative child repo under `k8s`.
 
 When we move this workspace to Kubernetes, this operator model should map like this:
 
@@ -394,10 +394,10 @@ Only the command surface changes.
 
 Use these when you need deeper app-specific detail:
 
-- `OpenSIS/README.md`
-- `OpenSIS/docs/02-local-compose-guide.md`
-- `OpenSIS/docs/04-operations-runbook.md`
-- `OpenSIS/docs/05-troubleshooting-guide.md`
-- `OpenSIS/docs/06-architecture-reference.md`
-- `OpenSIS/TROUBLESHOOTING.md`
-- `OpenSIS/SECURITY_NOTES.md`
+- [OpenSIS README](https://github.com/eseosaiyangbe/OpenSIS/blob/main/README.md)
+- [OpenSIS local compose guide](https://github.com/eseosaiyangbe/OpenSIS/blob/main/docs/02-local-compose-guide.md)
+- [OpenSIS operations runbook](https://github.com/eseosaiyangbe/OpenSIS/blob/main/docs/04-operations-runbook.md)
+- [OpenSIS troubleshooting guide](https://github.com/eseosaiyangbe/OpenSIS/blob/main/docs/05-troubleshooting-guide.md)
+- [OpenSIS architecture reference](https://github.com/eseosaiyangbe/OpenSIS/blob/main/docs/06-architecture-reference.md)
+- [OpenSIS troubleshooting notes](https://github.com/eseosaiyangbe/OpenSIS/blob/main/TROUBLESHOOTING.md)
+- [OpenSIS security notes](https://github.com/eseosaiyangbe/OpenSIS/blob/main/SECURITY_NOTES.md)

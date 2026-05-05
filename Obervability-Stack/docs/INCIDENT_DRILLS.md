@@ -388,7 +388,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../OpenSIS
+cd ../opensis
 docker compose stop vault
 ```
 
@@ -401,7 +401,7 @@ Expected detection:
 First checks:
 
 ```bash
-cd ../OpenSIS
+cd ../opensis
 docker compose ps vault vault-agent-app vault-agent-db opensis-ui opensis-db
 docker compose logs --tail=120 vault
 docker compose logs --tail=120 vault-agent-app vault-agent-db
@@ -410,7 +410,7 @@ docker compose logs --tail=120 vault-agent-app vault-agent-db
 Recovery:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose start vault
 docker compose restart vault-agent-app vault-agent-db
 
@@ -446,7 +446,7 @@ cd Obervability-Stack
 Trigger:
 
 ```bash
-cd ../OpenSIS
+cd ../opensis
 docker compose stop opensis-db
 ```
 
@@ -459,7 +459,7 @@ Expected detection:
 First checks:
 
 ```bash
-cd ../OpenSIS
+cd ../opensis
 docker compose ps opensis-db opensis-ui vault-agent-db
 docker compose logs --tail=120 opensis-db
 docker compose logs --tail=120 opensis-ui
@@ -469,7 +469,7 @@ docker compose logs --tail=120 vault-agent-db
 Recovery:
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose start opensis-db
 docker compose restart opensis-ui
 

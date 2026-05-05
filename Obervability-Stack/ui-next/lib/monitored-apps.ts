@@ -115,9 +115,9 @@ export const monitoredApps: MonitoredApp[] = [
       latencyQuery: 'probe_duration_seconds{job="blackbox-http",app="opensis"}',
     },
     runbooks: {
-      localStart: 'cd OpenSIS && ./scripts/compose-start.sh',
-      kubernetesDeploy: 'cd OpenSIS && ./scripts/k8s-dev-deploy.sh',
-      kubernetesVerify: 'cd OpenSIS && ./scripts/k8s-dev-verify.sh',
+      localStart: 'cd ../opensis && ./scripts/compose-start.sh',
+      kubernetesDeploy: 'cd ../opensis && ./scripts/k8s-dev-deploy.sh',
+      kubernetesVerify: 'cd ../opensis && ./scripts/k8s-dev-verify.sh',
       healthCheck: 'curl -I http://localhost:8088',
     },
     tags: ['first-managed-app', 'php', 'mariadb', 'k3s-vault-first-slice'],

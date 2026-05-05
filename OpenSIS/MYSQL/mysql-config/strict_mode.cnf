@@ -1,3 +1,0 @@
-[mysqld]
-sql_mode=NO_ENGINE_SUBSTITUTION
-explicit_defaults_for_timestamp=1

@@ -11,7 +11,7 @@ Build one central observability stack from `Obervability-Stack` and use it to mo
 - `MemFlip`
 - `SwiftPay`
 
-The strategy is to make the observability platform healthy first, then onboard one app at a time. `OpenSIS` will be the first managed app.
+The strategy is to make the observability platform healthy first, then onboard one app at a time. `OpenSIS` was the first managed app and now lives as an authoritative child repo.
 
 ## Current Architecture
 
@@ -81,7 +81,7 @@ Application compose files at the time of the original workspace discovery:
 ```text
 foodpulse/docker-compose.yml
 MemFlip/docker-compose.yml
-OpenSIS/docker-compose.yaml
+opensis/docker-compose.yaml
 swiftpay/docker-compose.yml
 ```
 
@@ -244,7 +244,7 @@ docker compose config >/tmp/memflip-compose.yml
 ```
 
 ```bash
-cd OpenSIS
+cd ../opensis
 docker compose -f docker-compose.yaml config >/tmp/opensis-compose.yml
 ```
 

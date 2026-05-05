@@ -24,7 +24,7 @@ The child workload repositories have been refreshed and are no longer stale:
 - [Obervability-Stack](https://github.com/eseosaiyangbe/Obervability-Stack)
 
 This central repository is now moving from embedded workload directories to
-authoritative child repos. `MemFlip`, `SwiftPay`, and `FoodPulse` are already
+authoritative child repos. `MemFlip`, `SwiftPay`, `FoodPulse`, and `OpenSIS` are already
 cut over to the sibling-checkout model, and the long-term target is:
 
 - one central `Internal Developer Platform` repo

@@ -53,7 +53,6 @@ Today the workspace is still one Git repository rooted at:
 That root currently contains:
 
 - `Obervability-Stack`
-- `OpenSIS`
 - root scripts and platform docs
 - root Kubernetes platform assets
 
@@ -69,8 +68,8 @@ That means:
 
 - the GitHub child repositories now reflect the current authoritative workload
   state
-- the current platform workspace still contains local copies of only the
-  remaining embedded workloads
+- the current platform workspace now embeds only the platform control plane
+  repo tree
 - the workspace is therefore in a transition period where repository boundaries
   are logically split, but the central workspace still carries the physical
   directories
@@ -254,8 +253,8 @@ The correct next step is:
 - validate the control-plane and operator flows after each cut
 - keep the central repo focused on orchestration, not workload-local code
 
-The child repositories are now refreshed and usable. `MemFlip`, `SwiftPay`, and
-`FoodPulse` have already been cut to sibling ownership. The remaining work is
+The child repositories are now refreshed and usable. `MemFlip`, `SwiftPay`,
+`FoodPulse`, and `OpenSIS` have already been cut to sibling ownership. The remaining work is
 to move the rest of the embedded workload directories out of the central repo
 without breaking the platform while it is still undergoing late Phase 7 and
 GitOps work.

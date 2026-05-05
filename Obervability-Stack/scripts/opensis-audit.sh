@@ -5,13 +5,39 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-OPENSIS_COMPOSE="$WORKSPACE_ROOT/OpenSIS/docker-compose.yaml"
-OPENSIS_BUILDLOCAL_COMPOSE="$WORKSPACE_ROOT/OpenSIS/docker-compose.buildlocal.yaml"
-OPENSIS_ENV="$WORKSPACE_ROOT/OpenSIS/.env.example"
-OPENSIS_README="$WORKSPACE_ROOT/OpenSIS/README.md"
-OPENSIS_START_SCRIPT="$WORKSPACE_ROOT/OpenSIS/scripts/compose-start.sh"
-OPENSIS_PRECHECK="$WORKSPACE_ROOT/OpenSIS/scripts/precheck.sh"
+resolve_opensis_dir() {
+  if [ -n "${IDP_OPENSIS_DIR:-}" ] && [ -d "${IDP_OPENSIS_DIR}" ]; then
+    printf '%s\n' "${IDP_OPENSIS_DIR}"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_ROOT/OpenSIS" ]; then
+    printf '%s\n' "$WORKSPACE_ROOT/OpenSIS"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_PARENT/OpenSIS" ]; then
+    printf '%s\n' "$WORKSPACE_PARENT/OpenSIS"
+    return
+  fi
+
+  if [ -d "$WORKSPACE_PARENT/opensis" ]; then
+    printf '%s\n' "$WORKSPACE_PARENT/opensis"
+    return
+  fi
+
+  printf '%s\n' "$WORKSPACE_PARENT/opensis"
+}
+
+OPENSIS_DIR="$(resolve_opensis_dir)"
+OPENSIS_COMPOSE="$OPENSIS_DIR/docker-compose.yaml"
+OPENSIS_BUILDLOCAL_COMPOSE="$OPENSIS_DIR/docker-compose.buildlocal.yaml"
+OPENSIS_ENV="$OPENSIS_DIR/.env.example"
+OPENSIS_README="$OPENSIS_DIR/README.md"
+OPENSIS_START_SCRIPT="$OPENSIS_DIR/scripts/compose-start.sh"
+OPENSIS_PRECHECK="$OPENSIS_DIR/scripts/precheck.sh"
 MONITORED_APPS_FILE="$PROJECT_ROOT/ui-next/lib/monitored-apps.ts"
 PROMETHEUS_FILE="$PROJECT_ROOT/prometheus/prometheus.yml"
 
@@ -85,15 +111,15 @@ header "Compose And Inventory Alignment"
 assert_contains "$OPENSIS_COMPOSE" "opensis-ui" "OpenSIS compose exposes the observability alias"
 assert_contains "$OPENSIS_COMPOSE" "127.0.0.1:8088:80" "OpenSIS compose publishes the UI on localhost:8088"
 assert_contains "$OPENSIS_COMPOSE" "127.0.0.1:8200:8200" "OpenSIS compose publishes Vault on localhost:8200"
-assert_contains "$OPENSIS_BUILDLOCAL_COMPOSE" "image: opensis-ui:local" "OpenSIS build-local override uses a local image tag"
-assert_contains "$OPENSIS_BUILDLOCAL_COMPOSE" "dockerfile: Dockerfile" "OpenSIS build-local override points at the repo Dockerfile"
+assert_contains "$OPENSIS_BUILDLOCAL_COMPOSE" "image: opensis-ui:local" "OpenSIS build-local compatibility override uses a local image tag"
+assert_contains "$OPENSIS_BUILDLOCAL_COMPOSE" "dockerfile: Dockerfile" "OpenSIS build-local compatibility override points at the repo Dockerfile"
 assert_contains "$OPENSIS_START_SCRIPT" "--build-local" "OpenSIS startup helper supports the build-local path"
-assert_contains "$OPENSIS_START_SCRIPT" "docker-compose.buildlocal.yaml" "OpenSIS startup helper wires the build-local override file"
+assert_contains "$OPENSIS_START_SCRIPT" "compatibility flag" "OpenSIS startup helper documents the build-local compatibility behavior"
 assert_contains "$MONITORED_APPS_FILE" "http://localhost:8088" "Control plane inventory uses the OpenSIS browser URL"
-assert_contains "$MONITORED_APPS_FILE" "cd OpenSIS && ./scripts/compose-start.sh" "Control plane inventory points to the OpenSIS startup helper"
+assert_contains "$MONITORED_APPS_FILE" "cd ../opensis && ./scripts/compose-start.sh" "Control plane inventory points to the OpenSIS startup helper"
 assert_contains "$MONITORED_APPS_FILE" "curl -I http://localhost:8088" "Control plane inventory uses the OpenSIS health check"
 assert_contains "$OPENSIS_README" "http://localhost:8088" "OpenSIS README documents the local browser URL"
-assert_contains "$OPENSIS_README" "build-local" "OpenSIS README documents the build-local startup path"
+assert_contains "$OPENSIS_README" "The default local path now builds \`opensis-ui\` locally" "OpenSIS README documents the default portable local-build path"
 
 echo
 header "Prometheus Scrape Contract"
