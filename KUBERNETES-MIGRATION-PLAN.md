@@ -389,10 +389,11 @@ Mitigation:
 
 The clean next implementation order is:
 
-1. refresh the roadmap and migration docs so they reflect the completed `OpenSIS` slice
-2. tighten promotion and environment guidance around the now-live workload set
-3. keep Compose as the learning baseline while the owned `k3s` paths remain the production-style direction
-4. decide whether the next portfolio step is deeper production controls or a formal Phase 7 closeout
+1. refresh the roadmap and migration docs so they reflect the full now-live owned workload set and the live control plane
+2. activate GitOps so ArgoCD becomes the default reconciler for the owned Kubernetes paths instead of remaining a declared standard only
+3. tighten promotion and environment guidance around the now-live workload set
+4. keep Compose as the learning baseline while the owned `k3s` paths remain the production-style direction
+5. decide whether the remaining production-control work is the final Phase 7 closeout slice or the opening Phase 8 operational slice
 
 Current `OpenSIS` status:
 
@@ -417,3 +418,27 @@ This migration plan is successful when:
 - `dev` and `prod` are treated as first-class environments
 - each workload has a reasoned migration path instead of generic YAML aspirations
 - the platform story stays coherent before, during, and after the migration
+- ArgoCD is no longer only planned in the docs, but is either active as the default desired-state reconciler or explicitly scheduled as the immediate next execution slice
+
+## GitOps Status
+
+Current state:
+
+- the repo already contains owned ArgoCD application manifests across the migrated workloads and the shared control plane
+- Vault is already treated as the secret source of truth
+- Traefik is already the ingress standard
+- direct deploy scripts are still the primary execution path for the live local cluster
+
+Interpretation:
+
+- GitOps is architecturally chosen
+- GitOps is partially scaffolded
+- GitOps is not yet the default operating model
+
+Recommended sequencing:
+
+- do not treat GitOps as theoretical future work anymore
+- treat ArgoCD activation as the next deliberate platform slice after this roadmap reconciliation pass
+- the cleanest answer to “when are we adding GitOps?” is:
+  - immediately after the roadmap/status reconciliation
+  - before we declare the platform fully closed from a production-style maturity perspective

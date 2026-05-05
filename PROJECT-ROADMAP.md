@@ -82,13 +82,27 @@ The work is divided into seven phases.
 | 4. App integration and onboarding | Complete | Onboarding flows, app-specific audits, and dashboard operator guides now exist across the managed workloads |
 | 5. Operator workflows and incident drills | Complete | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and five executed drills are now in place |
 | 6. UX and demo polish | Complete | Control-plane story, demo center, comparison view, app handoff pages, and live demo validation now meet the Phase 6 standard |
-| 7. Production-style maturity and portfolio packaging | In progress | Phase 7 can now start from a stable, demo-ready control plane instead of compensating for UX gaps |
+| 7. Production-style maturity and portfolio packaging | In progress | Phase 7 is now in late-stage hardening: the owned k3s workload set, control plane, Vault-first secrets, public ingress, and runtime baseline are live; remaining work is closeout, GitOps activation, and production-control tightening |
 
 ## Current Focus
 
 We are currently in **Phase 7: production-style maturity and portfolio packaging**.
 
-Phase 6 is complete. Its completed intent was:
+Phase 6 is complete. Phase 7 is no longer just planning and early slicing. The current state is:
+
+- `MemFlip`, `SwiftPay`, `FoodPulse`, and `OpenSIS` are live on the owned `k3s` path
+- `Obervability-Stack` is live on the owned `k3s` path
+- Vault is the active secret source of truth for the owned overlays
+- public ingress is live through Cloudflare Tunnel
+- the local runtime contract is now Kubernetes-first and sized accordingly
+
+The remaining Phase 7 focus is:
+
+- formal roadmap and closeout reconciliation
+- GitOps activation so ArgoCD moves from declared standard to default reconciler
+- production-control tightening where the repo still carries placeholder or lab-safe posture
+
+Phase 6 completed intent was:
 
 - turn the integrated workspace into a teachable, portfolio-grade control plane
 - make the platform story visible before a presenter drills into individual apps
@@ -103,9 +117,16 @@ Phase 7 will be considered successful when:
 - the project has a credible production narrative beyond local Docker Compose
 - architecture, screenshots, and diagrams make the platform understandable without a live walkthrough
 - packaging materials show why this workspace is a serious platform engineering portfolio piece
-- Kubernetes migration guidance is concrete enough to become an implementation plan
-- four workload Kubernetes slices are real, documented, and reusable as migration templates
-- the observability stack has a clean `dev` and `prod` Kubernetes implementation plan with Vault, ArgoCD, Traefik, and PostgreSQL modeled explicitly
+- the owned Kubernetes workload set is complete across frontend/backend, microservices, resilience, and the legacy monolith path
+- the observability stack is live on the owned `k3s` path and has explicit `dev` and `prod` contracts
+- Vault, Traefik, and public ingress are real platform components rather than documentation-only direction
+- the roadmap and closeout docs reflect the actual implemented platform state
+
+GitOps note:
+
+- ArgoCD is already the declared GitOps standard and the repo already contains the owned ArgoCD application structure
+- Phase 7 does not need to wait for perfect GitOps promotion before the implementation story is credible
+- however, Phase 7 is not fully closed until we decide whether GitOps activation lands as the final Phase 7 slice or the opening Phase 8 execution slice
 
 Phase 6 completed when:
 
@@ -623,6 +644,13 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - start with simpler workloads, then move into stateful resilience, then platform migration
 - treat `dev` and `prod` as first-class environments for the control-plane slice, not as an afterthought
 
+#### 7.5 GitOps Activation
+
+- move ArgoCD from declared standard to active reconciler for the owned Kubernetes paths
+- stop relying on ad hoc `kubectl apply` as the primary day-two operating model
+- define the repo-to-cluster promotion path explicitly for `dev` and `prod`
+- make drift detection and desired-state ownership part of the default platform story
+
 ### Deliverables
 
 - portfolio-ready documentation
@@ -631,6 +659,7 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - real local `k3s` workload slices for `MemFlip`, `SwiftPay`, and `FoodPulse`
 - a live control-plane `k3s` `dev` slice plus an explicit `prod` contract
 - a live owned `OpenSIS` `k3s` `dev` slice plus an explicit `prod` contract
+- a clear decision on whether GitOps activation closes Phase 7 or opens Phase 8
 
 ### Success Criteria
 
@@ -638,6 +667,7 @@ Turn the project from a cool local lab into a serious engineering narrative.
 - at least one frontend/backend workload, one microservices workload, and one stateful resilience workload run credibly on the owned `k3s` path
 - the shared observability platform runs credibly on the owned `k3s` path for `dev`
 - the workload migration set is now complete across frontend/backend, microservices, stateful resilience, and the legacy monolith path
+- GitOps is either active on the owned paths or explicitly sequenced as the first formal Phase 8 operational slice
 
 ---
 
