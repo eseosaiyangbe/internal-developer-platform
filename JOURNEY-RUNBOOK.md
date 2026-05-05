@@ -18283,3 +18283,53 @@ Measured outcome:
   - preserve history from the current platform workspace
   - replace the stale child repository with the current authoritative
     `MemFlip/` state
+
+## 2026-05-05 - Refreshed remaining stale child repositories
+
+Purpose:
+- replace the remaining stale child GitHub repositories with authoritative
+  history-preserving extracts from the current platform workspace
+- establish the current local workload directories as the only source of truth
+  for child-repo refresh operations
+
+Commands run:
+
+```bash
+for repo in SwiftPay FoodPulse OpenSIS Obervability-Stack; do
+  printf '%s ' "$repo"
+  git ls-remote "https://github.com/eseosaiyangbe/${repo}.git" refs/heads/main | awk '{print $1}'
+done
+
+for dir in SwiftPay FoodPulse OpenSIS Obervability-Stack; do
+  echo "== $dir =="
+  git log --oneline -- "$dir" | head -n 5
+done
+
+git subtree split --prefix=SwiftPay -b codex/swiftpay-extract
+git subtree split --prefix=FoodPulse -b codex/foodpulse-extract
+git subtree split --prefix=OpenSIS -b codex/opensis-extract
+git subtree split --prefix=Obervability-Stack -b codex/observability-extract
+
+git ls-tree --name-only -r codex/swiftpay-extract | rg '^k8s/argocd/|^k8s/base/kustomization.yaml$|^scripts/k8s-dev-verify.sh$'
+git ls-tree --name-only -r codex/foodpulse-extract | rg '^k8s/argocd/|^k8s/base/kustomization.yaml$|^scripts/k8s-dev-verify.sh$'
+git ls-tree --name-only -r codex/opensis-extract | rg '^k8s/argocd/|^k8s/base/kustomization.yaml$|^scripts/k8s-dev-verify.sh$'
+git ls-tree --name-only -r codex/observability-extract | rg '^k8s/argocd/|^k8s/base/kustomization.yaml$|^scripts/k8s-dev-verify.sh$|^ui-next/package.json$'
+
+git push https://github.com/eseosaiyangbe/SwiftPay.git codex/swiftpay-extract:main --force
+git push https://github.com/eseosaiyangbe/FoodPulse.git codex/foodpulse-extract:main --force
+git push https://github.com/eseosaiyangbe/OpenSIS.git codex/opensis-extract:main --force
+git push https://github.com/eseosaiyangbe/Obervability-Stack.git codex/observability-extract:main --force
+```
+
+Measured outcome:
+- all remaining child repositories were treated as stale and replaced from the
+  current platform workspace rather than merged with their old remote contents
+- extracted authoritative branch heads were:
+  - `SwiftPay` -> `108353b2d1d0759f792adbc5621346bae2c537f2`
+  - `FoodPulse` -> `a9a1d4a36992e521607b28e4eed6a8dfaa9adb3f`
+  - `OpenSIS` -> `63d070222f18d5b041f47a55108fc010be56571e`
+  - `Obervability-Stack` -> `e2ba2aa02f6087cd97e09400e57b852ebba16523`
+- each extracted branch was checked for current owned Kubernetes and operator
+  paths before the remote refresh
+- the child-repo model is now materially aligned with the current platform
+  workspace instead of being a set of stale historical side repositories
