@@ -18192,3 +18192,50 @@ Measured outcome:
   - `https://grafana.eseosadevbox.com` returned a Cloudflare Access `302` redirect as expected
 - one transient `502` occurred during the service handoff window, but origin and ingress checks proved healthy and the public endpoint recovered immediately after the LaunchAgent settled
 - this persistence model is `user login` scoped on macOS; it survives terminal closure and starts automatically when the user logs in, but it is not a root boot daemon
+
+## 2026-05-05 - Hardened FoodPulse Redis and Sentinel restart convergence
+
+Purpose:
+- eliminate the manual Redis and Sentinel topology repair that was required after a full Colima and k3s node restart
+- make the owned FoodPulse Kubernetes slice converge back to the intended `redis-0` primary topology automatically
+
+Commands run:
+
+```bash
+rg -n "sentinel|redis|REPLICAOF|foodpulse-cache|startup dependency|cache health check|maxRetriesPerRequest" FoodPulse -S
+sed -n '1,220p' FoodPulse/k8s/base/redis.yaml
+sed -n '1,220p' FoodPulse/k8s/base/redis-start.sh
+sed -n '1,220p' FoodPulse/k8s/base/sentinel-start.sh
+sed -n '140,260p' FoodPulse/api/src/index.js
+kubectl describe pod foodpulse-api-d977bd544-ccnkv -n foodpulse-dev
+kubectl logs foodpulse-api-d977bd544-ccnkv -n foodpulse-dev --tail=200
+kubectl describe pod foodpulse-ui-55494ff779-49mt9 -n foodpulse-dev
+kubectl logs foodpulse-ui-55494ff779-49mt9 -n foodpulse-dev --tail=200
+kubectl exec -n foodpulse-dev deploy/foodpulse-api -- sh -lc 'node -e "const Redis=require(\"ioredis\"); const client=new Redis({sentinels:[{host:\"foodpulse-redis-0.foodpulse-redis-headless\",port:26379},{host:\"foodpulse-redis-1.foodpulse-redis-headless\",port:26379},{host:\"foodpulse-redis-2.foodpulse-redis-headless\",port:26379}],name:process.env.FOODPULSE_REDIS_MASTER_NAME,password:process.env.FOODPULSE_REDIS_PASSWORD,sentinelPassword:process.env.FOODPULSE_REDIS_SENTINEL_PASSWORD,lazyConnect:true,maxRetriesPerRequest:1,enableReadyCheck:false}); client.ping().then(v=>{console.log(v); client.disconnect(); process.exit(0)}).catch(err=>{console.error(err.message); client.disconnect(); process.exit(1)});"'
+kubectl exec -n foodpulse-dev foodpulse-redis-0 -c sentinel -- sh -lc 'redis-cli -p 26379 SENTINEL master foodpulse-cache'
+kubectl exec -n foodpulse-dev foodpulse-redis-0 -c redis -- sh -lc 'REDISCLI_AUTH=admin redis-cli REPLICAOF NO ONE'
+kubectl exec -n foodpulse-dev foodpulse-redis-1 -c redis -- sh -lc 'REDISCLI_AUTH=admin redis-cli REPLICAOF foodpulse-redis-0.foodpulse-redis-headless.foodpulse-dev.svc.cluster.local 6379'
+kubectl exec -n foodpulse-dev foodpulse-redis-2 -c redis -- sh -lc 'REDISCLI_AUTH=admin redis-cli REPLICAOF foodpulse-redis-0.foodpulse-redis-headless.foodpulse-dev.svc.cluster.local 6379'
+for pod in foodpulse-redis-0 foodpulse-redis-1 foodpulse-redis-2; do kubectl exec -n foodpulse-dev $pod -c sentinel -- sh -lc 'redis-cli -p 26379 SENTINEL reset foodpulse-cache' >/dev/null; done
+kubectl kustomize FoodPulse/k8s/overlays/dev >/dev/null
+kubectl apply --dry-run=client -k FoodPulse/k8s/overlays/dev >/dev/null
+bash -n FoodPulse/k8s/base/redis-start.sh FoodPulse/k8s/base/sentinel-start.sh
+cd FoodPulse && ./scripts/k8s-dev-deploy.sh --skip-build --skip-runtime --skip-secrets-platform
+curl -s https://portfolio.eseosadevbox.com/api/apps/health | jq '.apps[] | select(.appId=="foodpulse")'
+```
+
+Measured outcome:
+- root cause was confirmed as a restart convergence gap in the owned Kubernetes Redis tier:
+  - Redis role state could persist across restart
+  - Sentinel state was ephemeral and always restarted by monitoring `foodpulse-redis-0`
+  - after a node reboot, Redis could come back with `foodpulse-redis-1` acting as master while Sentinel still treated `foodpulse-redis-0` as the expected master
+- `redis-start.sh` now rewrites the runtime Redis config on every startup instead of only on first boot, which forces the StatefulSet back to the intended topology:
+  - `foodpulse-redis-0` as primary
+  - `foodpulse-redis-1` and `foodpulse-redis-2` as replicas
+- `sentinel-start.sh` now waits for the intended primary endpoint to become reachable before starting Sentinel monitoring, which prevents early false `s_down` and `o_down` decisions during cluster restart
+- after redeploying the owned FoodPulse slice, the live topology converged correctly without further manual failover repair:
+  - `foodpulse-redis-0` reported `role:master`
+  - `foodpulse-redis-1` and `foodpulse-redis-2` reported `role:slave` with `master_link_status:up`
+  - all Sentinel sidecars agreed on `foodpulse-redis-0` as the master for `foodpulse-cache`
+- `./scripts/k8s-dev-deploy.sh --skip-build --skip-runtime --skip-secrets-platform` completed successfully
+- the control plane returned FoodPulse to `status: healthy` on `https://portfolio.eseosadevbox.com/api/apps/health`
