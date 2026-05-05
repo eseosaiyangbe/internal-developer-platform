@@ -16,12 +16,11 @@ as the permanent home of every workload?
 Today the current platform workspace still contains local workload directories:
 
 - `Obervability-Stack`
-- `FoodPulse`
 - `OpenSIS`
 
-`MemFlip` and `SwiftPay` are now cut over to the sibling-checkout model, so
-they should no longer be treated as permanent embedded workloads in the central
-repo.
+`MemFlip`, `SwiftPay`, and `FoodPulse` are now cut over to the sibling-checkout
+model, so they should no longer be treated as permanent embedded workloads in
+the central repo.
 
 At the same time, each workload now also has a refreshed authoritative child
 repository on GitHub.

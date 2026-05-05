@@ -184,7 +184,7 @@ This directory contains all the shell scripts for managing the Monitoring in a B
 ```
 
 **Features:**
-- Validates FoodPulse observability alias, normalized host ports, and workspace-safe container names
+- Validates FoodPulse observability alias, normalized host ports, and sibling-safe container names
 - Confirms the control-plane inventory uses the normalized browser URL and startup path
 - Checks the control-plane blackbox target and the lab operator helper contract
 

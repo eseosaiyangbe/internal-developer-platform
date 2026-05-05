@@ -12,9 +12,33 @@ export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-FOODPULSE_COMPOSE="$WORKSPACE_ROOT/FoodPulse/docker-compose.yml"
-FOODPULSE_CLUSTER_STATUS="$WORKSPACE_ROOT/FoodPulse/scripts/cluster-status.sh"
+resolve_foodpulse_dir() {
+  local override="${IDP_FOODPULSE_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/FoodPulse" \
+    "${WORKSPACE_PARENT}/FoodPulse" \
+    "${WORKSPACE_PARENT}/foodpulse"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate FoodPulse. Set IDP_FOODPULSE_DIR to the child repo path." >&2
+  exit 1
+}
+
+FOODPULSE_DIR="$(resolve_foodpulse_dir)"
+
+FOODPULSE_COMPOSE="$FOODPULSE_DIR/docker-compose.yml"
+FOODPULSE_CLUSTER_STATUS="$FOODPULSE_DIR/scripts/cluster-status.sh"
 CONTROL_PLANE_HEALTH_URL="http://localhost:4000/api/apps/health"
 PROMETHEUS_QUERY_URL="http://localhost:9090/api/v1/query"
 FOODPULSE_URL="http://localhost:8090"

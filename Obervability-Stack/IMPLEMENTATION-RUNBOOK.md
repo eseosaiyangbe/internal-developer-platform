@@ -79,7 +79,7 @@ Obervability-Stack/UI-OWNERSHIP-ROADMAP.md
 Application compose files at the time of the original workspace discovery:
 
 ```text
-FoodPulse/docker-compose.yml
+foodpulse/docker-compose.yml
 MemFlip/docker-compose.yml
 OpenSIS/docker-compose.yaml
 swiftpay/docker-compose.yml
@@ -234,7 +234,7 @@ docker compose config >/tmp/obs-compose.yml
 ```
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose config >/tmp/foodpulse-compose.yml
 ```
 

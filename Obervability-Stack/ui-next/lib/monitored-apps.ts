@@ -272,9 +272,9 @@ export const monitoredApps: MonitoredApp[] = [
       latencyQuery: 'probe_duration_seconds{job="blackbox-http",app="foodpulse"}',
     },
     runbooks: {
-      localStart: 'cd FoodPulse && cp .env.example .env && ./scripts/start.sh',
-      kubernetesDeploy: 'cd FoodPulse && ./scripts/k8s-dev-deploy.sh',
-      kubernetesVerify: 'cd FoodPulse && ./scripts/k8s-dev-verify.sh',
+      localStart: 'cd ../foodpulse && cp .env.example .env && ./scripts/start.sh',
+      kubernetesDeploy: 'cd ../foodpulse && ./scripts/k8s-dev-deploy.sh',
+      kubernetesVerify: 'cd ../foodpulse && ./scripts/k8s-dev-verify.sh',
       healthCheck: 'curl -I http://localhost:8090',
     },
     tags: ['frontend', 'redis-sentinel', 'cnpg', 'k3s-third-slice'],

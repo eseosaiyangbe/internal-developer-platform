@@ -544,14 +544,14 @@ What this tests:
 Baseline:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 ```
 
 Trigger:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/redis-failover-drill.sh
 ```
 
@@ -566,7 +566,7 @@ Expected detection:
 Recovery:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 ```
 
@@ -599,14 +599,14 @@ What this tests:
 Baseline:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 ```
 
 Trigger:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/pg-failover-drill.sh
 ```
 
@@ -621,7 +621,7 @@ Expected detection:
 Recovery:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 ```
 
@@ -654,7 +654,7 @@ What this tests:
 Baseline:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 curl -fsSI http://localhost:8090
 ```
@@ -662,7 +662,7 @@ curl -fsSI http://localhost:8090
 Trigger:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose stop foodpulse-db-replica3
 ```
 

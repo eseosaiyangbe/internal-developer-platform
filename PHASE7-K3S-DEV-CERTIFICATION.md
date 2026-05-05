@@ -51,7 +51,7 @@ Confirm that the migrated Kubernetes development environment is:
 
 - [k8s-dev-verify.sh](/Users/raymond/Documents/memflip/scripts/k8s-dev-verify.sh)
 - [k8s-dev-verify.sh](/Users/raymond/Documents/swiftpay/scripts/k8s-dev-verify.sh)
-- [k8s-dev-verify.sh](/Users/raymond/Documents/DevOps-Easy-Learning/FoodPulse/scripts/k8s-dev-verify.sh)
+- [k8s-dev-verify.sh](/Users/raymond/Documents/foodpulse/scripts/k8s-dev-verify.sh)
 - [k8s-dev-verify.sh](/Users/raymond/Documents/DevOps-Easy-Learning/OpenSIS/scripts/k8s-dev-verify.sh)
 
 ### Secrets Platform

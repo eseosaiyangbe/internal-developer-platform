@@ -5,11 +5,35 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-FOODPULSE_COMPOSE="$WORKSPACE_ROOT/FoodPulse/docker-compose.yml"
-FOODPULSE_ENV="$WORKSPACE_ROOT/FoodPulse/.env.example"
-FOODPULSE_README="$WORKSPACE_ROOT/FoodPulse/README.md"
-FOODPULSE_CLUSTER_STATUS="$WORKSPACE_ROOT/FoodPulse/scripts/cluster-status.sh"
+resolve_foodpulse_dir() {
+  local override="${IDP_FOODPULSE_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/FoodPulse" \
+    "${WORKSPACE_PARENT}/FoodPulse" \
+    "${WORKSPACE_PARENT}/foodpulse"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate FoodPulse. Set IDP_FOODPULSE_DIR to the child repo path." >&2
+  exit 1
+}
+
+FOODPULSE_DIR="$(resolve_foodpulse_dir)"
+
+FOODPULSE_COMPOSE="$FOODPULSE_DIR/docker-compose.yml"
+FOODPULSE_ENV="$FOODPULSE_DIR/.env.example"
+FOODPULSE_README="$FOODPULSE_DIR/README.md"
+FOODPULSE_CLUSTER_STATUS="$FOODPULSE_DIR/scripts/cluster-status.sh"
 MONITORED_APPS_FILE="$PROJECT_ROOT/ui-next/lib/monitored-apps.ts"
 PROMETHEUS_FILE="$PROJECT_ROOT/prometheus/prometheus.yml"
 
@@ -81,7 +105,7 @@ header "Compose And Inventory Alignment"
 assert_contains "$FOODPULSE_COMPOSE" "foodpulse-ui" "FoodPulse compose exposes the observability alias"
 assert_contains "$FOODPULSE_COMPOSE" '127.0.0.1:${FOODPULSE_UI_HOST_PORT:-8090}:80' "FoodPulse UI host port defaults to 8090"
 assert_contains "$MONITORED_APPS_FILE" "http://localhost:8090" "Control plane inventory uses the FoodPulse browser URL"
-assert_contains "$MONITORED_APPS_FILE" "cp .env.example .env && ./scripts/start.sh" "Control plane inventory points at the FoodPulse startup path"
+assert_contains "$MONITORED_APPS_FILE" "cd ../foodpulse && cp .env.example .env && ./scripts/start.sh" "Control plane inventory points at the FoodPulse sibling startup path"
 assert_contains "$MONITORED_APPS_FILE" "curl -I http://localhost:8090" "Control plane inventory uses the FoodPulse browser health check"
 assert_contains "$FOODPULSE_README" "http://localhost:8090" "FoodPulse README documents the normalized browser URL"
 assert_contains "$FOODPULSE_README" 'central `Obervability-Stack`' "FoodPulse README documents central observability ownership"

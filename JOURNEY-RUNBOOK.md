@@ -18559,3 +18559,45 @@ Measured outcome:
   inventory changes
 - `git diff --check` stayed clean, which confirms the repo-transition edits did
   not introduce whitespace or patch corruption
+
+## 2026-05-05 - Removed embedded FoodPulse from the central platform repo
+
+Purpose:
+- make the third workload split structurally real after the `MemFlip` and
+  `SwiftPay` cuts
+- prove that the central platform repo can continue driving the resilience lab
+  from the authoritative sibling checkout without keeping an embedded duplicate
+
+Commands run:
+
+```bash
+rg -n "FoodPulse|foodpulse" README.md PHASE7-K3S-DEV-CERTIFICATION.md WORKSPACE-SETUP-MATRIX.md PLATFORM-IDENTITY-AND-REPO-MODEL.md CENTRAL-REPO-OPERATING-MODEL.md KUBERNETES-MIGRATION-PLAN.md Obervability-Stack/scripts Obervability-Stack/docs Obervability-Stack/IMPLEMENTATION-RUNBOOK.md Obervability-Stack/prometheus/alert_rules.yml Obervability-Stack/k8s/base/config/alert_rules.yml Obervability-Stack/ui-next/lib/monitored-apps.ts
+sed -n '1,220p' Obervability-Stack/scripts/foodpulse-audit.sh
+sed -n '1,260p' Obervability-Stack/scripts/foodpulse-live-audit.sh
+sed -n '1,460p' Obervability-Stack/docs/FOODPULSE_OPERATOR_RUNBOOK.md
+git rm -r FoodPulse
+rm -rf FoodPulse
+./scripts/workspace-layout.sh
+IDP_FOODPULSE_DIR=/Users/raymond/Documents/foodpulse ./Obervability-Stack/scripts/foodpulse-audit.sh
+cd /Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/ui-next && npm run type-check
+git diff --check
+```
+
+Measured outcome:
+- the embedded `FoodPulse` directory was removed from the central platform repo
+- `./scripts/workspace-layout.sh` now resolves `FoodPulse` automatically to:
+  - `/Users/raymond/Documents/foodpulse`
+- the control-plane FoodPulse audit scripts were updated to resolve `FoodPulse`
+  through:
+  - `IDP_FOODPULSE_DIR`
+  - embedded workspace fallback
+  - sibling checkout fallback
+- `./Obervability-Stack/scripts/foodpulse-audit.sh` passed after the cut with
+  `21/21` checks against the sibling `foodpulse` repo
+- the control-plane inventory now points `FoodPulse` local runbook commands at
+  the sibling child repo instead of a dead embedded path
+- the highest-signal FoodPulse operator docs were updated to use sibling paths
+  and child-repo documentation links
+- `Obervability-Stack/ui-next` type-check still passed after the monitored app
+  inventory changes
+- `git diff --check` stayed clean after the FoodPulse cut

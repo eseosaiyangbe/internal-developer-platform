@@ -44,7 +44,7 @@ The key operator idea is that the app can look fine while the HA topology is deg
 Start from the workspace root:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 cp .env.example .env
 ./scripts/start.sh
 ```
@@ -59,7 +59,7 @@ cd ../Obervability-Stack
 If you are upgrading from an older local FoodPulse stack, run this once before the first modern startup:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose down -v
 cp .env.example .env
 ./scripts/start.sh
@@ -91,7 +91,7 @@ The live audit proves:
 - the stats endpoint responds through the UI proxy
 - the control plane sees FoodPulse as healthy
 - Prometheus blackbox target health is present and up
-- `FoodPulse/scripts/cluster-status.sh` reports a healthy lab
+- [FoodPulse `scripts/cluster-status.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/cluster-status.sh) reports a healthy lab
 
 ## Minimum Manual Health Checks
 
@@ -102,7 +102,7 @@ curl -fsSI http://localhost:8090
 curl -fsS http://localhost:8090/api/getstats | jq .
 curl -fsS http://localhost:4000/api/apps/foodpulse/overview | jq .
 
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 ```
 
@@ -138,7 +138,7 @@ curl -fsS --get http://localhost:9090/api/v1/query --data-urlencode 'query=probe
 Start broad:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose logs --tail=80 foodpulse-ui
 docker compose logs --tail=80 foodpulse-api
 docker compose logs --tail=80 foodpulse-db foodpulse-db-replica1 foodpulse-db-replica2 foodpulse-db-replica3
@@ -170,7 +170,7 @@ Symptom:
 First checks:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose ps foodpulse-ui foodpulse-api
 docker compose logs --tail=120 foodpulse-ui
 docker compose logs --tail=120 foodpulse-api
@@ -205,7 +205,7 @@ Symptom:
 First checks:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 curl -fsS http://localhost:8090/api/getstats | jq .
 curl -fsS http://localhost:3102/api/getstats | jq .
 docker compose logs --tail=120 foodpulse-ui
@@ -240,7 +240,7 @@ Symptom:
 First checks:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/cluster-status.sh
 docker compose ps
 docker compose logs --tail=80 foodpulse-pg-haproxy foodpulse-redis-haproxy
@@ -273,7 +273,7 @@ Symptom:
 Safe lab drill:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/redis-failover-drill.sh
 ./scripts/cluster-status.sh
 ```
@@ -306,7 +306,7 @@ Symptom:
 Safe lab drill:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/pg-failover-drill.sh
 ./scripts/cluster-status.sh
 ```
@@ -366,7 +366,7 @@ kubectl get servicemonitor -A
 Local Docker Compose:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose restart foodpulse-ui
 docker compose restart foodpulse-api
 docker compose restart foodpulse-pg-haproxy foodpulse-redis-haproxy
@@ -377,7 +377,7 @@ docker compose ps
 Use the repo helper for a normal restart:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 ./scripts/stop.sh
 ./scripts/start.sh
 ./scripts/cluster-status.sh
@@ -386,7 +386,7 @@ cd FoodPulse
 Use a volume reset only when you intentionally want a clean lab state:
 
 ```bash
-cd FoodPulse
+cd ../foodpulse
 docker compose down -v
 cp .env.example .env
 ./scripts/start.sh
@@ -436,9 +436,9 @@ Only the command surface changes.
 
 Use these when you need deeper app-specific detail:
 
-- `FoodPulse/README.md`
-- `FoodPulse/scripts/cluster-status.sh`
-- `FoodPulse/scripts/redis-failover-drill.sh`
-- `FoodPulse/scripts/pg-failover-drill.sh`
-- `FoodPulse/scripts/start.sh`
-- `FoodPulse/scripts/stop.sh`
+- [FoodPulse `README.md`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/README.md)
+- [FoodPulse `scripts/cluster-status.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/cluster-status.sh)
+- [FoodPulse `scripts/redis-failover-drill.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/redis-failover-drill.sh)
+- [FoodPulse `scripts/pg-failover-drill.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/pg-failover-drill.sh)
+- [FoodPulse `scripts/start.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/start.sh)
+- [FoodPulse `scripts/stop.sh`](https://github.com/eseosaiyangbe/FoodPulse/blob/main/scripts/stop.sh)
