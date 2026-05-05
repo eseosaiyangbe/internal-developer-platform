@@ -11,6 +11,28 @@ This is not a collection of unrelated demo repos. It is a deliberately mixed env
 
 The center of that experience is `Obervability-Stack`, which acts as the operator control plane for health, probes, alerts, logs, runbooks, and incident evidence.
 
+## Repository Topology
+
+The platform is now in a controlled repository-transition state.
+
+The child workload repositories have been refreshed and are no longer stale:
+
+- [MemFlip](https://github.com/eseosaiyangbe/MemFlip)
+- [SwiftPay](https://github.com/eseosaiyangbe/SwiftPay)
+- [FoodPulse](https://github.com/eseosaiyangbe/FoodPulse)
+- [OpenSIS](https://github.com/eseosaiyangbe/OpenSIS)
+- [Obervability-Stack](https://github.com/eseosaiyangbe/Obervability-Stack)
+
+This central repository still contains those workload directories locally during
+the transition, but the long-term target is:
+
+- one central `Internal Developer Platform` repo
+- one authoritative repo per workload
+
+The operating model and transition rules are documented in
+[PLATFORM-IDENTITY-AND-REPO-MODEL.md](PLATFORM-IDENTITY-AND-REPO-MODEL.md) and
+[CENTRAL-REPO-OPERATING-MODEL.md](CENTRAL-REPO-OPERATING-MODEL.md).
+
 ## What This Repo Demonstrates
 
 Most portfolio projects show one application running well on a good day.
@@ -210,6 +232,7 @@ All monitored apps are currently healthy
 |---|---|
 | [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
 | [PLATFORM-IDENTITY-AND-REPO-MODEL.md](PLATFORM-IDENTITY-AND-REPO-MODEL.md) | canonical platform naming, target repository model, and extraction plan |
+| [CENTRAL-REPO-OPERATING-MODEL.md](CENTRAL-REPO-OPERATING-MODEL.md) | central-versus-child repo ownership and the recommended multi-repo operating model |
 | [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
 | [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
 | [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |

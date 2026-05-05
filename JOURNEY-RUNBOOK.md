@@ -18333,3 +18333,32 @@ Measured outcome:
   paths before the remote refresh
 - the child-repo model is now materially aligned with the current platform
   workspace instead of being a set of stale historical side repositories
+
+## 2026-05-05 - Defined the central repository operating model
+
+Purpose:
+- formalize how the central platform repository should behave now that the child
+  workload repositories are refreshed and authoritative
+- prevent the central workspace from drifting back into an accidental permanent
+  monorepo after the child-repo refresh
+
+Commands run:
+
+```bash
+sed -n '1,240p' PLATFORM-IDENTITY-AND-REPO-MODEL.md
+sed -n '1,220p' README.md
+rg -n "MemFlip|SwiftPay|FoodPulse|OpenSIS|Obervability-Stack|child repo|monorepo|current platform workspace" *.md -S
+git diff --check
+```
+
+Measured outcome:
+- the platform identity document now records the real transition state:
+  - child repositories are refreshed and authoritative
+  - the current platform workspace still carries local workload directories
+  - this is a controlled transition state, not the final operating model
+- a new operating-model document now defines the recommended enterprise shape:
+  - one central platform repo
+  - sibling workload checkouts as the preferred final local topology
+  - no long-term return to duplicated workload editing inside the central repo
+- the root README now points readers to the updated repository-topology and
+  operating-model documents so the platform story matches the current repo state

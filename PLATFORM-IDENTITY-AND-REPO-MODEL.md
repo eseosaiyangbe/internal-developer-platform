@@ -63,6 +63,24 @@ That root currently contains:
 This is functionally a monorepo, even though the workloads are logically separate
 systems.
 
+## Current Transition State
+
+As of `2026-05-05`, the stale child repositories were refreshed from the current
+platform workspace using history-preserving subtree extraction.
+
+That means:
+
+- the GitHub child repositories now reflect the current authoritative workload
+  state
+- the current platform workspace still contains local copies of those workloads
+- the workspace is therefore in a transition period where repository boundaries
+  are logically split, but the central workspace still carries the physical
+  directories
+
+Until the local directories are removed or detached from the central workspace,
+we should treat this as a controlled transitional state, not the final operating
+model.
+
 ## Target Repository Model
 
 Recommended target model:
@@ -108,6 +126,21 @@ Each application repo should own:
 - application-local docs
 - application-local ArgoCD application manifests if we keep workload ownership at
   the app boundary
+
+## Current Child Repository Index
+
+The current child repositories are:
+
+- `memflip`
+  - `https://github.com/eseosaiyangbe/MemFlip`
+- `swiftpay`
+  - `https://github.com/eseosaiyangbe/SwiftPay`
+- `foodpulse`
+  - `https://github.com/eseosaiyangbe/FoodPulse`
+- `opensis`
+  - `https://github.com/eseosaiyangbe/OpenSIS`
+- `observability-stack`
+  - `https://github.com/eseosaiyangbe/Obervability-Stack`
 
 ## GitOps Ownership Direction
 
@@ -214,12 +247,19 @@ the most cross-linked workload in the current workspace.
 
 ## Current Recommendation
 
-Do not split the repositories yet.
+Do not delete workload directories from the current platform workspace yet.
 
 The correct next step is:
 
-- finalize the target repository architecture
-- then perform a deliberate pilot extraction
+- formalize the central repository operating model
+- define how the platform repo references the child repos
+- decide whether the final local topology should use:
+  - sibling checkouts
+  - Git submodules
+  - or a lightweight workspace bootstrap that clones each child repo beside the
+    platform repo
 
-That preserves momentum and avoids breaking the platform while it is still
-undergoing late Phase 7 and GitOps work.
+The child repositories are now refreshed and usable. The remaining work is to
+move from duplicated local directories to a cleaner central orchestration model
+without breaking the platform while it is still undergoing late Phase 7 and
+GitOps work.
