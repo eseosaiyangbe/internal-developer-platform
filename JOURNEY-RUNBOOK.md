@@ -18362,3 +18362,40 @@ Measured outcome:
   - no long-term return to duplicated workload editing inside the central repo
 - the root README now points readers to the updated repository-topology and
   operating-model documents so the platform story matches the current repo state
+
+## 2026-05-05 - Added sibling-checkout compatibility to central workspace scripts
+
+Purpose:
+- make the central platform repo usable during the transition from embedded
+  workload directories to sibling workload checkouts
+- remove the hard-coded assumption that every workload must always live inside
+  the central repo
+
+Commands run:
+
+```bash
+rg -n "workspace-start\\.sh|workspace-stop\\.sh|../SwiftPay|../FoodPulse|../MemFlip|../OpenSIS|../Obervability-Stack" scripts README.md WORKSTATION-BOOTSTRAP.md -S
+bash -n scripts/workspace-lib.sh scripts/workspace-start.sh scripts/workspace-stop.sh scripts/workspace-layout.sh
+chmod +x scripts/workspace-layout.sh
+./scripts/workspace-layout.sh
+./scripts/workspace-start.sh --help
+./scripts/workspace-stop.sh --help
+git diff --check
+```
+
+Measured outcome:
+- a shared path resolver was added at `scripts/workspace-lib.sh`
+- the central wrapper scripts now support both:
+  - in-repo workload directories
+  - sibling workload checkouts beside the central platform repo
+- path overrides are now available through:
+  - `IDP_OBSERVABILITY_STACK_DIR`
+  - `IDP_SWIFTPAY_DIR`
+  - `IDP_OPENSIS_DIR`
+  - `IDP_FOODPULSE_DIR`
+  - `IDP_MEMFLIP_DIR`
+- a new inspection helper was added at `./scripts/workspace-layout.sh`
+- live path resolution currently still points to the in-repo workload directories,
+  which is the expected transition-state behavior before local directory removal
+- `workspace-start.sh` and `workspace-stop.sh` now describe the override model in
+  their help output

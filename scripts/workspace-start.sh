@@ -2,19 +2,26 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=./workspace-lib.sh
+source "${SCRIPT_DIR}/workspace-lib.sh"
 
 usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-start.sh [options]
 
-Start the full DevOps Easy Learning workspace in the recommended order.
+Start the full Internal Developer Platform workspace in the recommended order.
 
 Options:
   --rebuild          Force image rebuilds for local-build services before startup
   --skip-verify      Skip the final shared operator check
   --opensis-edge     Start OpenSIS with edge services enabled
   --opensis-pull     Start OpenSIS with the published UI image instead of the local build path
+  Environment overrides:
+    IDP_OBSERVABILITY_STACK_DIR
+    IDP_SWIFTPAY_DIR
+    IDP_OPENSIS_DIR
+    IDP_FOODPULSE_DIR
+    IDP_MEMFLIP_DIR
   -h, --help         Show this help message
 EOF
 }
@@ -76,7 +83,8 @@ ensure_env_file() {
 }
 
 repair_memflip_env_defaults() {
-  local env_file="${WORKSPACE_ROOT}/MemFlip/.env"
+  local memflip_dir="$1"
+  local env_file="${memflip_dir}/.env"
 
   if [[ ! -f "${env_file}" ]]; then
     return 0
@@ -84,14 +92,15 @@ repair_memflip_env_defaults() {
 
   if grep -q '^DB_PASSWORD=your_database_password_here$' "${env_file}" || grep -q '^REDIS_PASSWORD=your_redis_password_here$' "${env_file}"; then
     perl -0pi -e 's/^DB_PASSWORD=your_database_password_here$/DB_PASSWORD=gamepass123/mg; s/^REDIS_PASSWORD=your_redis_password_here$/REDIS_PASSWORD=gamepass123/mg' "${env_file}"
-    log "Repaired MemFlip placeholder credentials in MemFlip/.env"
+    log "Repaired MemFlip placeholder credentials in ${env_file}"
   fi
 }
 
 start_observability_stack() {
+  local observability_dir="$1"
   log "Starting Obervability-Stack"
   (
-    cd "${WORKSPACE_ROOT}/Obervability-Stack"
+    cd "${observability_dir}"
     if [[ "${FORCE_REBUILD}" == "1" ]]; then
       docker compose up -d --build
     else
@@ -101,9 +110,10 @@ start_observability_stack() {
 }
 
 start_swiftpay() {
+  local swiftpay_dir="$1"
   log "Starting SwiftPay"
   (
-    cd "${WORKSPACE_ROOT}/SwiftPay"
+    cd "${swiftpay_dir}"
     if [[ "${FORCE_REBUILD}" == "1" ]]; then
       docker compose up -d --build
     else
@@ -113,6 +123,7 @@ start_swiftpay() {
 }
 
 start_opensis() {
+  local opensis_dir="$1"
   local -a opensis_cmd=(./scripts/compose-start.sh)
   local arch
 
@@ -136,16 +147,17 @@ start_opensis() {
 
   log "Starting OpenSIS"
   (
-    cd "${WORKSPACE_ROOT}/OpenSIS"
+    cd "${opensis_dir}"
     "${opensis_cmd[@]}"
   )
 }
 
 start_foodpulse() {
+  local foodpulse_dir="$1"
   log "Starting FoodPulse"
-  ensure_env_file "${WORKSPACE_ROOT}/FoodPulse"
+  ensure_env_file "${foodpulse_dir}"
   (
-    cd "${WORKSPACE_ROOT}/FoodPulse"
+    cd "${foodpulse_dir}"
     if [[ "${FORCE_REBUILD}" == "1" ]]; then
       ./scripts/start.sh --build
     else
@@ -155,11 +167,12 @@ start_foodpulse() {
 }
 
 start_memflip() {
+  local memflip_dir="$1"
   log "Starting MemFlip"
-  ensure_env_file "${WORKSPACE_ROOT}/MemFlip"
-  repair_memflip_env_defaults
+  ensure_env_file "${memflip_dir}"
+  repair_memflip_env_defaults "${memflip_dir}"
   (
-    cd "${WORKSPACE_ROOT}/MemFlip"
+    cd "${memflip_dir}"
     if [[ "${FORCE_REBUILD}" == "1" ]]; then
       docker compose up -d --build
     else
@@ -169,6 +182,7 @@ start_memflip() {
 }
 
 wait_for_workspace_apps() {
+  local observability_dir="$1"
   local attempts=18
   local sleep_seconds=5
   local url="http://localhost:4000/api/apps/health"
@@ -203,16 +217,22 @@ wait_for_workspace_apps() {
 }
 
 run_final_verify() {
-  wait_for_workspace_apps
+  local observability_dir="$1"
+  wait_for_workspace_apps "${observability_dir}"
   log "Running shared operator verification"
   (
     cd "${WORKSPACE_ROOT}"
-    ./Obervability-Stack/scripts/devops-monitor.sh operator
+    "${observability_dir}/scripts/devops-monitor.sh" operator
   )
 }
 
 main() {
   local skip_verify=0
+  local observability_dir=""
+  local swiftpay_dir=""
+  local opensis_dir=""
+  local foodpulse_dir=""
+  local memflip_dir=""
   FORCE_REBUILD=0
   OPENSIS_EDGE=0
   OPENSIS_PULL_IMAGE=0
@@ -247,14 +267,20 @@ main() {
 
   ensure_docker_ready
 
-  start_observability_stack
-  start_swiftpay
-  start_opensis
-  start_foodpulse
-  start_memflip
+  observability_dir="$(resolve_observability_stack_dir)"
+  swiftpay_dir="$(resolve_swiftpay_dir)"
+  opensis_dir="$(resolve_opensis_dir)"
+  foodpulse_dir="$(resolve_foodpulse_dir)"
+  memflip_dir="$(resolve_memflip_dir)"
+
+  start_observability_stack "${observability_dir}"
+  start_swiftpay "${swiftpay_dir}"
+  start_opensis "${opensis_dir}"
+  start_foodpulse "${foodpulse_dir}"
+  start_memflip "${memflip_dir}"
 
   if [[ "${skip_verify}" -eq 0 ]]; then
-    run_final_verify
+    run_final_verify "${observability_dir}"
   else
     log "Skipped shared operator verification"
   fi

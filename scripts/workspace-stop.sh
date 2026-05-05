@@ -2,18 +2,25 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=./workspace-lib.sh
+source "${SCRIPT_DIR}/workspace-lib.sh"
 
 usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-stop.sh [options]
 
-Stop the full DevOps Easy Learning workspace in reverse order.
+Stop the full Internal Developer Platform workspace in reverse order.
 
 Options:
   --volumes         Remove named volumes where the repo-specific stop path supports it
   --opensis-edge    Include OpenSIS edge services in the stop path
   --opensis-pull    Stop OpenSIS using the published-image compose override
+  Environment overrides:
+    IDP_OBSERVABILITY_STACK_DIR
+    IDP_SWIFTPAY_DIR
+    IDP_OPENSIS_DIR
+    IDP_FOODPULSE_DIR
+    IDP_MEMFLIP_DIR
   -h, --help        Show this help message
 EOF
 }
@@ -38,9 +45,10 @@ ensure_docker_ready() {
 }
 
 stop_memflip() {
+  local memflip_dir="$1"
   log "Stopping MemFlip"
   (
-    cd "${WORKSPACE_ROOT}/MemFlip"
+    cd "${memflip_dir}"
     if [[ "${REMOVE_VOLUMES}" == "1" ]]; then
       docker compose down --remove-orphans -v
     else
@@ -50,9 +58,10 @@ stop_memflip() {
 }
 
 stop_foodpulse() {
+  local foodpulse_dir="$1"
   log "Stopping FoodPulse"
   (
-    cd "${WORKSPACE_ROOT}/FoodPulse"
+    cd "${foodpulse_dir}"
     if [[ "${REMOVE_VOLUMES}" == "1" ]]; then
       docker compose down --remove-orphans -v
     else
@@ -62,6 +71,7 @@ stop_foodpulse() {
 }
 
 stop_opensis() {
+  local opensis_dir="$1"
   local -a opensis_cmd=(./scripts/compose-stop.sh)
 
   if [[ "${OPENSIS_PULL_IMAGE}" == "1" ]]; then
@@ -78,15 +88,16 @@ stop_opensis() {
 
   log "Stopping OpenSIS"
   (
-    cd "${WORKSPACE_ROOT}/OpenSIS"
+    cd "${opensis_dir}"
     "${opensis_cmd[@]}"
   )
 }
 
 stop_swiftpay() {
+  local swiftpay_dir="$1"
   log "Stopping SwiftPay"
   (
-    cd "${WORKSPACE_ROOT}/SwiftPay"
+    cd "${swiftpay_dir}"
     if [[ "${REMOVE_VOLUMES}" == "1" ]]; then
       docker compose down -v
     else
@@ -96,9 +107,10 @@ stop_swiftpay() {
 }
 
 stop_observability_stack() {
+  local observability_dir="$1"
   log "Stopping Obervability-Stack"
   (
-    cd "${WORKSPACE_ROOT}/Obervability-Stack"
+    cd "${observability_dir}"
     if [[ "${REMOVE_VOLUMES}" == "1" ]]; then
       docker compose down -v
     else
@@ -111,6 +123,11 @@ main() {
   REMOVE_VOLUMES=0
   OPENSIS_EDGE=0
   OPENSIS_PULL_IMAGE=0
+  local observability_dir=""
+  local swiftpay_dir=""
+  local opensis_dir=""
+  local foodpulse_dir=""
+  local memflip_dir=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -138,11 +155,17 @@ main() {
 
   ensure_docker_ready
 
-  stop_memflip
-  stop_foodpulse
-  stop_opensis
-  stop_swiftpay
-  stop_observability_stack
+  observability_dir="$(resolve_observability_stack_dir)"
+  swiftpay_dir="$(resolve_swiftpay_dir)"
+  opensis_dir="$(resolve_opensis_dir)"
+  foodpulse_dir="$(resolve_foodpulse_dir)"
+  memflip_dir="$(resolve_memflip_dir)"
+
+  stop_memflip "${memflip_dir}"
+  stop_foodpulse "${foodpulse_dir}"
+  stop_opensis "${opensis_dir}"
+  stop_swiftpay "${swiftpay_dir}"
+  stop_observability_stack "${observability_dir}"
 
   log "Workspace stop complete"
 }

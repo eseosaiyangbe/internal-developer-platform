@@ -181,6 +181,28 @@ Recommended workspace commands:
 ```bash
 ./scripts/workspace-start.sh
 ./scripts/workspace-stop.sh
+./scripts/workspace-layout.sh
+```
+
+`workspace-start.sh` and `workspace-stop.sh` now support both:
+
+- the current in-repo workload directories
+- sibling workload checkouts beside this central platform repo
+
+If you need to override any resolved path explicitly, use:
+
+```bash
+export IDP_OBSERVABILITY_STACK_DIR=/path/to/Obervability-Stack
+export IDP_SWIFTPAY_DIR=/path/to/SwiftPay
+export IDP_OPENSIS_DIR=/path/to/OpenSIS
+export IDP_FOODPULSE_DIR=/path/to/FoodPulse
+export IDP_MEMFLIP_DIR=/path/to/MemFlip
+```
+
+To inspect what the platform currently resolves, run:
+
+```bash
+./scripts/workspace-layout.sh
 ```
 
 Force a rebuild only when you actually need one:
@@ -215,6 +237,10 @@ cd ../FoodPulse && cp .env.example .env && ./scripts/start.sh
 cd ../MemFlip && cp .env.example .env && docker compose up -d
 cd .. && ./Obervability-Stack/scripts/devops-monitor.sh operator
 ```
+
+When the platform moves fully to sibling checkouts, the wrapper scripts remain
+the preferred entrypoint because they already know how to resolve the workload
+repos without assuming they live inside this central repo forever.
 
 Apple Silicon note for `OpenSIS`: the wrapper automatically uses `./scripts/compose-start.sh --build-local`.
 

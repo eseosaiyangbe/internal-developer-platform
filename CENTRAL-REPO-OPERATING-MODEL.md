@@ -107,6 +107,13 @@ Cons:
 
 - central scripts must locate sibling repos intentionally
 
+Current status:
+
+- this support is now implemented in:
+  - `./scripts/workspace-start.sh`
+  - `./scripts/workspace-stop.sh`
+  - `./scripts/workspace-layout.sh`
+
 ### Option 2: Git submodules
 
 Not recommended as the first choice.

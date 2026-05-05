@@ -85,6 +85,42 @@ kubectl get nodes
 source ~/.profile
 ```
 
+## Repository Layout
+
+The platform is moving toward:
+
+```text
+<workspace-root>/
+  internal-developer-platform/
+  observability-stack/
+  memflip/
+  swiftpay/
+  foodpulse/
+  opensis/
+```
+
+During the transition, the central platform repo still carries local workload
+directories, but the central operator scripts now support both layouts:
+
+- in-repo workload directories
+- sibling workload checkouts
+
+To inspect the currently resolved layout:
+
+```bash
+./scripts/workspace-layout.sh
+```
+
+To override any repo path explicitly:
+
+```bash
+export IDP_OBSERVABILITY_STACK_DIR=/path/to/Obervability-Stack
+export IDP_SWIFTPAY_DIR=/path/to/SwiftPay
+export IDP_OPENSIS_DIR=/path/to/OpenSIS
+export IDP_FOODPULSE_DIR=/path/to/FoodPulse
+export IDP_MEMFLIP_DIR=/path/to/MemFlip
+```
+
 ## Verification
 
 Run these commands after bootstrap:
