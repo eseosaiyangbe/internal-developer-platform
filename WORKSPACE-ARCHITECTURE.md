@@ -1,8 +1,8 @@
-# DevOps Easy Learning Workspace Architecture
+# Internal Developer Platform Workspace Architecture
 
 ## Purpose
 
-This document explains how the workspace operates as one platform instead of five disconnected repos.
+This document explains how the workspace operates as one platform instead of five disconnected workloads.
 
 The key architectural idea is simple:
 

@@ -1,6 +1,6 @@
-# DevOps Easy Learning
+# Internal Developer Platform
 
-DevOps Easy Learning is a local-first platform engineering lab built to show how one control plane can operate very different workload styles without flattening their differences.
+Internal Developer Platform is a local-first platform engineering environment built to show how one control plane can operate very different workload styles without flattening their differences.
 
 This is not a collection of unrelated demo repos. It is a deliberately mixed environment where a shared control plane observes, compares, troubleshoots, and documents four distinct application stories:
 
@@ -209,6 +209,7 @@ All monitored apps are currently healthy
 | Doc | Purpose |
 |---|---|
 | [PROJECT-ROADMAP.md](PROJECT-ROADMAP.md) | roadmap, phase state, and success criteria |
+| [PLATFORM-IDENTITY-AND-REPO-MODEL.md](PLATFORM-IDENTITY-AND-REPO-MODEL.md) | canonical platform naming, target repository model, and extraction plan |
 | [PORTFOLIO-SNAPSHOT.md](PORTFOLIO-SNAPSHOT.md) | short-form portfolio narrative and suggested evidence pack |
 | [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md) | screenshot and diagram capture plan for the Phase 7 portfolio pack |
 | [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) | live screenshot and diagram capture inventory for the Phase 7 portfolio pack |

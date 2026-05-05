@@ -1,8 +1,8 @@
-# DevOps Easy Learning Workstation Bootstrap
+# Internal Developer Platform Workstation Bootstrap
 
 ## Purpose
 
-This guide is the starting point for setting up a fresh machine to work on this monorepo.
+This guide is the starting point for setting up a fresh machine to work on the current platform workspace.
 
 It exists so contributors do not have to reverse-engineer tool requirements from five different repos.
 

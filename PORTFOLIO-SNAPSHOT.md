@@ -1,4 +1,4 @@
-# DevOps Easy Learning Portfolio Snapshot
+# Internal Developer Platform Portfolio Snapshot
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Use it when someone needs to understand, in a few minutes, why this project is t
 
 ## One-Sentence Summary
 
-DevOps Easy Learning is a mixed-workload platform engineering lab where one control plane operates a microservices app, a legacy monolith, a resilience lab, and a lightweight onboarding app through shared observability, incident workflows, and Kubernetes-minded platform contracts.
+Internal Developer Platform is a mixed-workload platform engineering environment where one control plane operates a microservices app, a legacy monolith, a resilience lab, and a lightweight onboarding app through shared observability, incident workflows, and Kubernetes-minded platform contracts.
 
 ## What This Project Proves
 

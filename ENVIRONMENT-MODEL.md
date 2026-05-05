@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the root environment contract for DevOps Easy Learning.
+This document defines the root environment contract for Internal Developer Platform.
 
 The goal is to make `dev` and `prod` first-class concepts before the Kubernetes migration starts, rather than trying to retrofit environment discipline after infrastructure grows more complex.
 

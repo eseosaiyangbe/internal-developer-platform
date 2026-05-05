@@ -1,4 +1,4 @@
-# DevOps Easy Learning Demo Walkthrough
+# Internal Developer Platform Demo Walkthrough
 
 ## Purpose
 
