@@ -212,7 +212,7 @@ Recommendation:
 
 ### 3. Optional local reverse proxies remain a recurring risk
 
-Historically `MemFlip/docker-compose.override.yml` published:
+Historically the `MemFlip` child repo `docker-compose.override.yml` published:
 
 - `3000 -> 80`
 

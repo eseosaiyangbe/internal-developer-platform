@@ -43,9 +43,9 @@ The workspace now has:
 Assessment:
 
 - this directory exists as generated frontend build output
-- it is already ignored by [`MemFlip/.gitignore`](/Users/raymond/Documents/DevOps-Easy-Learning/MemFlip/.gitignore)
+- it is already ignored by [`MemFlip/.gitignore`](https://github.com/eseosaiyangbe/MemFlip/blob/main/.gitignore)
 - it is not part of the committed source of truth for the monorepo
-- the runtime contract is the frontend source tree plus the Docker build in [`MemFlip/frontend/Dockerfile`](/Users/raymond/Documents/DevOps-Easy-Learning/MemFlip/frontend/Dockerfile)
+- the runtime contract is the frontend source tree plus the Docker build in [`MemFlip/frontend/Dockerfile`](https://github.com/eseosaiyangbe/MemFlip/blob/main/frontend/Dockerfile)
 
 Decision:
 

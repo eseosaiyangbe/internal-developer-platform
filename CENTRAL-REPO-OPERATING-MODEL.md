@@ -16,10 +16,13 @@ as the permanent home of every workload?
 Today the current platform workspace still contains local workload directories:
 
 - `Obervability-Stack`
-- `MemFlip`
 - `SwiftPay`
 - `FoodPulse`
 - `OpenSIS`
+
+`MemFlip` is now the first workload being cut over to the sibling-checkout
+model, so it should no longer be treated as a permanent embedded workload in the
+central repo.
 
 At the same time, each workload now also has a refreshed authoritative child
 repository on GitHub.

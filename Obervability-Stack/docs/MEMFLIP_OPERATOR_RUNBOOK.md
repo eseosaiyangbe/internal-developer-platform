@@ -328,7 +328,8 @@ kubectl rollout status deployment/backend -n humor-game
 
 ## Kubernetes Readiness Notes
 
-MemFlip has Kubernetes and GitOps manifests under `MemFlip/k8s` and `MemFlip/gitops-safe`.
+MemFlip has Kubernetes and GitOps manifests in the `MemFlip` child repo under
+`k8s` and `gitops-safe`.
 
 When we move this workspace to Kubernetes, this operator model should map like this:
 
@@ -358,9 +359,9 @@ Only the command surface changes.
 
 Use these when you need deeper app-specific detail:
 
-- `MemFlip/README.md`
-- `MemFlip/docs/local/README.md`
-- `MemFlip/docs/local/02-compose.md`
-- `MemFlip/docs/local/08-troubleshooting.md`
-- `MemFlip/docs/troubleshooting.md`
-- `MemFlip/docs/monitoring-troubleshooting.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/README.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/README.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/02-compose.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/08-troubleshooting.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/troubleshooting.md`
+- `https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/monitoring-troubleshooting.md`

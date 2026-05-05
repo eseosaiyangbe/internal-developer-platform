@@ -12,8 +12,32 @@ export PATH="$HOME/.local/bin:$HOME/.docker/cli-plugins:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-MEMFLIP_COMPOSE="$WORKSPACE_ROOT/MemFlip/docker-compose.yml"
+resolve_memflip_dir() {
+  local override="${IDP_MEMFLIP_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/MemFlip" \
+    "${WORKSPACE_PARENT}/MemFlip" \
+    "${WORKSPACE_PARENT}/memflip"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate MemFlip. Set IDP_MEMFLIP_DIR to the child repo path." >&2
+  exit 1
+}
+
+MEMFLIP_DIR="$(resolve_memflip_dir)"
+
+MEMFLIP_COMPOSE="$MEMFLIP_DIR/docker-compose.yml"
 CONTROL_PLANE_HEALTH_URL="http://localhost:4000/api/apps/health"
 MEMFLIP_FRONTEND_HEALTH_URL="http://localhost:8080/api/health"
 MEMFLIP_BACKEND_HEALTH_URL="http://localhost:3101/health"

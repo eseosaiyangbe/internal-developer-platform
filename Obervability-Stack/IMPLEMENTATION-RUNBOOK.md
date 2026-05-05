@@ -76,7 +76,7 @@ Obervability-Stack/IMPLEMENTATION-RUNBOOK.md
 Obervability-Stack/UI-OWNERSHIP-ROADMAP.md
 ```
 
-Application compose files:
+Application compose files at the time of the original workspace discovery:
 
 ```text
 FoodPulse/docker-compose.yml
@@ -85,14 +85,19 @@ OpenSIS/docker-compose.yaml
 SwiftPay/docker-compose.yml
 ```
 
-Local ignored files created:
+Local ignored files created during that original embedded-workspace phase:
 
 ```text
 Obervability-Stack/.env
 MemFlip/.env
 ```
 
-These `.env` files are intentionally local and should not be committed.
+These `.env` files were intentionally local and should not be committed.
+
+Note:
+
+- `MemFlip` now lives as an authoritative child repo and may be checked out as a
+  sibling repo instead of an embedded directory inside the central platform repo
 
 ## Step 1: Workspace Discovery
 

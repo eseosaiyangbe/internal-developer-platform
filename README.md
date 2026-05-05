@@ -23,8 +23,9 @@ The child workload repositories have been refreshed and are no longer stale:
 - [OpenSIS](https://github.com/eseosaiyangbe/OpenSIS)
 - [Obervability-Stack](https://github.com/eseosaiyangbe/Obervability-Stack)
 
-This central repository still contains those workload directories locally during
-the transition, but the long-term target is:
+This central repository is now moving from embedded workload directories to
+authoritative child repos. `MemFlip` is the first workload being cut over to the
+sibling-checkout model, and the long-term target is:
 
 - one central `Internal Developer Platform` repo
 - one authoritative repo per workload
@@ -282,7 +283,7 @@ All monitored apps are currently healthy
 | [Obervability-Stack/k8s/README.md](Obervability-Stack/k8s/README.md) | owned Kubernetes path for the shared observability control plane |
 | [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
 | [OPENSIS-K8S-ASSESSMENT.md](OPENSIS-K8S-ASSESSMENT.md) | assessment of the existing OpenSIS Kubernetes tree against the current workspace standards |
-| [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md) | first concrete k3s-based Kubernetes implementation slice for MemFlip in `dev` |
+| [MemFlip k3s dev doc](https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/12-phase7-k8s-dev.md) | first concrete k3s-based Kubernetes implementation slice for MemFlip in `dev` |
 | [WORKSPACE-SETUP-MATRIX.md](WORKSPACE-SETUP-MATRIX.md) | startup commands, ports, health checks, and aliases |
 | [WORKSTATION-BOOTSTRAP.md](WORKSTATION-BOOTSTRAP.md) | macOS/Linux tool installation guide |
 | [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | production-grade metrics standards for platform and apps |

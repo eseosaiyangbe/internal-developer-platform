@@ -5,11 +5,35 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")"
+WORKSPACE_PARENT="$(dirname "$WORKSPACE_ROOT")"
 
-MEMFLIP_COMPOSE="$WORKSPACE_ROOT/MemFlip/docker-compose.yml"
-MEMFLIP_ENV="$WORKSPACE_ROOT/MemFlip/.env.example"
-MEMFLIP_README="$WORKSPACE_ROOT/MemFlip/README.md"
-MEMFLIP_SERVER="$WORKSPACE_ROOT/MemFlip/backend/server.js"
+resolve_memflip_dir() {
+  local override="${IDP_MEMFLIP_DIR:-}"
+  local candidate
+
+  for candidate in \
+    "${override}" \
+    "${WORKSPACE_ROOT}/MemFlip" \
+    "${WORKSPACE_PARENT}/MemFlip" \
+    "${WORKSPACE_PARENT}/memflip"
+  do
+    [[ -n "${candidate}" ]] || continue
+    if [[ -f "${candidate}/docker-compose.yml" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "Unable to locate MemFlip. Set IDP_MEMFLIP_DIR to the child repo path." >&2
+  exit 1
+}
+
+MEMFLIP_DIR="$(resolve_memflip_dir)"
+
+MEMFLIP_COMPOSE="$MEMFLIP_DIR/docker-compose.yml"
+MEMFLIP_ENV="$MEMFLIP_DIR/.env.example"
+MEMFLIP_README="$MEMFLIP_DIR/README.md"
+MEMFLIP_SERVER="$MEMFLIP_DIR/backend/server.js"
 MONITORED_APPS_FILE="$PROJECT_ROOT/ui-next/lib/monitored-apps.ts"
 PROMETHEUS_FILE="$PROJECT_ROOT/prometheus/prometheus.yml"
 
@@ -93,7 +117,7 @@ assert_contains "$MEMFLIP_ENV" 'BACKEND_HOST_PORT=3101' "MemFlip env contract do
 assert_contains "$MEMFLIP_ENV" 'FRONTEND_HOST_PORT=8080' "MemFlip env contract documents frontend host port 8080"
 assert_contains "$MONITORED_APPS_FILE" "http://localhost:8080" "MemFlip inventory browser URL uses localhost:8080"
 assert_contains "$MONITORED_APPS_FILE" "curl -fsS http://localhost:8080/api/health" "MemFlip inventory health check uses the proxied frontend path"
-assert_contains "$MONITORED_APPS_FILE" "cd MemFlip && docker compose up -d" "MemFlip inventory localStart points to repo compose startup"
+assert_contains "$MONITORED_APPS_FILE" "docker compose up -d" "MemFlip inventory localStart points to repo compose startup"
 assert_contains "$MEMFLIP_README" "curl http://localhost:8080/api/health" "MemFlip README uses the proxied local health path"
 
 echo

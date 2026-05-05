@@ -260,7 +260,7 @@ the first migration should reduce ambiguity, not compound it. `MemFlip` is the c
 Current implementation path:
 
 - [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)
-- [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md)
+- [MemFlip k3s dev doc](https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/12-phase7-k8s-dev.md)
 
 Current status:
 

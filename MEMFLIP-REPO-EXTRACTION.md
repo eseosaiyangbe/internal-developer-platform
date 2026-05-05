@@ -38,6 +38,8 @@ The extraction strategy is:
 
 ### Transition Note
 
-This pilot does not yet remove `MemFlip/` from the current platform workspace.
-The workspace remains the central coordination repo until the broader
-multi-repository migration is completed.
+`MemFlip` is the first workload targeted for physical removal from the current
+platform workspace after the sibling-checkout model was proven.
+
+The workspace remains the central coordination repo while the broader
+multi-repository migration continues.

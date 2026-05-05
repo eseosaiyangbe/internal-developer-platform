@@ -142,8 +142,8 @@ Mitigation:
 
 The first concrete implementation of that sequence now lives at:
 
-- `MemFlip/k8s/phase7/`
-- [MemFlip/docs/local/12-phase7-k8s-dev.md](MemFlip/docs/local/12-phase7-k8s-dev.md)
+- `https://github.com/eseosaiyangbe/MemFlip/tree/main/k8s`
+- [MemFlip k3s dev doc](https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/12-phase7-k8s-dev.md)
 
 ## What Success Looks Like
 

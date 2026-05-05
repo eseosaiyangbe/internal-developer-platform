@@ -18474,3 +18474,41 @@ Follow-up correction:
   - `/Users/raymond/Documents/foodpulse/.env` exists
   - `/Users/raymond/Documents/memflip/.env` exists
   - `cd /Users/raymond/Documents/opensis && docker compose config` succeeds
+
+## 2026-05-05 - Removed embedded MemFlip from the central platform repo
+
+Purpose:
+- make the first workload split structurally real instead of only logically or
+  remotely true
+- prove that the central platform repo can operate without an embedded `MemFlip`
+  directory once sibling checkout support is in place
+
+Commands run:
+
+```bash
+sed -n '1,220p' Obervability-Stack/scripts/memflip-live-audit.sh
+sed -n '1,220p' Obervability-Stack/scripts/memflip-audit.sh
+rg -n "MemFlip/" README.md KUBERNETES-MIGRATION-PLAN.md PHASE7-K3S-DEV-CERTIFICATION.md MEMFLIP-K8S-CANDIDATE.md PLATFORM-IDENTITY-AND-REPO-MODEL.md CENTRAL-REPO-OPERATING-MODEL.md WORKSTATION-BOOTSTRAP.md PROJECT-ROADMAP.md WORKSPACE-HYGIENE-CHECKLIST.md PORT-ALLOCATION-MATRIX.md WORKSPACE-SETUP-MATRIX.md Obervability-Stack -S
+git rm -r MemFlip
+rm -rf MemFlip
+./scripts/workspace-layout.sh
+test -d /Users/raymond/Documents/DevOps-Easy-Learning/MemFlip && echo present || echo removed
+IDP_MEMFLIP_DIR=/Users/raymond/Documents/memflip ./Obervability-Stack/scripts/memflip-audit.sh
+```
+
+Measured outcome:
+- the embedded `MemFlip` directory was removed from the central platform repo
+- `./scripts/workspace-layout.sh` now resolves `MemFlip` automatically to:
+  - `/Users/raymond/Documents/memflip`
+- the first structural cut is therefore real on disk:
+  - central repo no longer carries the `MemFlip` workload tree
+  - the child repo and sibling checkout are now the active local source of truth
+- the central control-plane MemFlip audit scripts were updated to resolve
+  `MemFlip` through:
+  - `IDP_MEMFLIP_DIR`
+  - embedded workspace fallback
+  - sibling checkout fallback
+- `./Obervability-Stack/scripts/memflip-audit.sh` passed after the cut with
+  `24/24` checks against the sibling `MemFlip` repo
+- root documentation and the most visible embedded `Obervability-Stack`
+  MemFlip references were updated to stop pointing at dead embedded paths

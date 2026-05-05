@@ -72,7 +72,7 @@ That means:
 
 - the GitHub child repositories now reflect the current authoritative workload
   state
-- the current platform workspace still contains local copies of those workloads
+- the current platform workspace still contains local copies of most workloads
 - the workspace is therefore in a transition period where repository boundaries
   are logically split, but the central workspace still carries the physical
   directories

@@ -29,8 +29,8 @@ workspace_repo_candidates() {
   fi
 
   printf '%s/%s\n' "${WORKSPACE_ROOT}" "${repo_name}"
-  printf '%s/%s\n' "${WORKSPACE_PARENT}" "${repo_name}"
   printf '%s/%s\n' "${WORKSPACE_PARENT}" "${canonical_dir_name}"
+  printf '%s/%s\n' "${WORKSPACE_PARENT}" "${repo_name}"
 }
 
 resolve_repo_dir() {
