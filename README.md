@@ -179,6 +179,7 @@ Then the browser entrypoints are:
 Recommended workspace commands:
 
 ```bash
+./scripts/bootstrap-sibling-repos.sh
 ./scripts/workspace-start.sh
 ./scripts/workspace-stop.sh
 ./scripts/workspace-layout.sh
@@ -204,6 +205,17 @@ To inspect what the platform currently resolves, run:
 ```bash
 ./scripts/workspace-layout.sh
 ```
+
+To create the recommended lowercase sibling checkout layout beside this central
+repo, run:
+
+```bash
+./scripts/bootstrap-sibling-repos.sh
+```
+
+When a child repo includes `.env.example`, the sibling bootstrap also seeds a
+local `.env` automatically so first-run Compose paths do not depend on leftover
+files from the old embedded workspace layout.
 
 Force a rebuild only when you actually need one:
 

@@ -111,6 +111,17 @@ To inspect the currently resolved layout:
 ./scripts/workspace-layout.sh
 ```
 
+To create the recommended sibling checkout layout beside the central platform
+repo:
+
+```bash
+./scripts/bootstrap-sibling-repos.sh
+```
+
+If a child repo provides `.env.example`, the bootstrap will also create a local
+`.env` automatically. This prevents fresh sibling checkouts from inheriting
+hidden assumptions from the older embedded workspace layout.
+
 To override any repo path explicitly:
 
 ```bash

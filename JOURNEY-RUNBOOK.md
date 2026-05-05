@@ -18399,3 +18399,78 @@ Measured outcome:
   which is the expected transition-state behavior before local directory removal
 - `workspace-start.sh` and `workspace-stop.sh` now describe the override model in
   their help output
+
+## 2026-05-05 - Created sibling workload checkouts beside the platform repo
+
+Purpose:
+- make the preferred multi-repo topology real on disk without removing the
+  existing in-repo workload directories yet
+- validate that the central platform repo can resolve and target sibling child
+  repos through the new path-resolution layer
+
+Commands run:
+
+```bash
+pwd
+ls -la ..
+for repo in MemFlip SwiftPay FoodPulse OpenSIS Obervability-Stack; do
+  printf '%s -> ' "$repo"
+  git ls-remote "https://github.com/eseosaiyangbe/${repo}.git" HEAD | awk '{print $1}'
+done
+
+bash -n scripts/bootstrap-sibling-repos.sh
+chmod +x scripts/bootstrap-sibling-repos.sh
+./scripts/bootstrap-sibling-repos.sh --print-exports
+./scripts/bootstrap-sibling-repos.sh
+
+IDP_OBSERVABILITY_STACK_DIR=/Users/raymond/Documents/observability-stack \
+IDP_SWIFTPAY_DIR=/Users/raymond/Documents/swiftpay \
+IDP_OPENSIS_DIR=/Users/raymond/Documents/opensis \
+IDP_FOODPULSE_DIR=/Users/raymond/Documents/foodpulse \
+IDP_MEMFLIP_DIR=/Users/raymond/Documents/memflip \
+./scripts/workspace-layout.sh
+
+for dir in observability-stack swiftpay opensis foodpulse memflip; do
+  printf '%s -> ' "$dir"
+  test -d "/Users/raymond/Documents/$dir/.git" && git -C "/Users/raymond/Documents/$dir" rev-parse --short HEAD
+done
+```
+
+Measured outcome:
+- the recommended lowercase sibling layout now exists beside the central repo:
+  - `/Users/raymond/Documents/observability-stack`
+  - `/Users/raymond/Documents/swiftpay`
+  - `/Users/raymond/Documents/opensis`
+  - `/Users/raymond/Documents/foodpulse`
+  - `/Users/raymond/Documents/memflip`
+- the sibling checkout bootstrap helper now creates or refreshes those repos
+- the cloned sibling heads matched the refreshed child repos:
+  - `observability-stack` -> `e2ba2aa`
+  - `swiftpay` -> `108353b`
+  - `opensis` -> `63d0702`
+  - `foodpulse` -> `a9a1d4a`
+  - `memflip` -> `eea1e90`
+- the override-driven layout check proved that the central repo can now target
+  the sibling repos instead of the embedded workload directories when the
+  `IDP_*_DIR` variables are set
+
+Follow-up correction:
+
+- the first sibling-driven `workspace-start.sh` run proved the central repo was
+  traversing sibling repos correctly by building and starting services from:
+  - `/Users/raymond/Documents/observability-stack`
+  - `/Users/raymond/Documents/swiftpay`
+  - `/Users/raymond/Documents/opensis`
+- that run also exposed a real transition gap:
+  - fresh sibling checkouts did not inherit legacy local `.env` files
+  - `OpenSIS` Compose emitted blank-variable warnings because `.env` was absent
+- the platform layer was then corrected:
+  - `scripts/bootstrap-sibling-repos.sh` now seeds `.env` from `.env.example`
+    when available
+  - `scripts/workspace-start.sh` now calls `ensure_env_file` for `OpenSIS`
+- post-fix validation confirmed:
+  - `/Users/raymond/Documents/swiftpay/.env` exists
+  - `/Users/raymond/Documents/opensis/.env` exists
+  - `/Users/raymond/Documents/foodpulse/.env` exists
+  - `/Users/raymond/Documents/memflip/.env` exists
+  - `cd /Users/raymond/Documents/opensis && docker compose config` succeeds

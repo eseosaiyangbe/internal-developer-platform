@@ -10,10 +10,19 @@ workspace_repo_override_var() {
   printf 'IDP_%s_DIR' "$(printf '%s' "${repo_key}" | tr '[:lower:]-' '[:upper:]_')"
 }
 
+workspace_repo_canonical_dir_name() {
+  local repo_key="$1"
+  printf '%s\n' "${repo_key//_/-}"
+}
+
 workspace_repo_candidates() {
   local repo_name="$1"
-  local override_var="$2"
+  local repo_key="$2"
+  local override_var="$3"
   local override_value="${!override_var:-}"
+  local canonical_dir_name
+
+  canonical_dir_name="$(workspace_repo_canonical_dir_name "${repo_key}")"
 
   if [[ -n "${override_value}" ]]; then
     printf '%s\n' "${override_value}"
@@ -21,6 +30,7 @@ workspace_repo_candidates() {
 
   printf '%s/%s\n' "${WORKSPACE_ROOT}" "${repo_name}"
   printf '%s/%s\n' "${WORKSPACE_PARENT}" "${repo_name}"
+  printf '%s/%s\n' "${WORKSPACE_PARENT}" "${canonical_dir_name}"
 }
 
 resolve_repo_dir() {
@@ -38,7 +48,7 @@ resolve_repo_dir() {
       printf '%s\n' "${candidate}"
       return 0
     fi
-  done < <(workspace_repo_candidates "${repo_name}" "${override_var}")
+  done < <(workspace_repo_candidates "${repo_name}" "${repo_key}" "${override_var}")
 
   printf 'Unable to locate %s. Checked current-platform and sibling paths for %s. Override with %s.\n' \
     "${repo_name}" "${marker_path}" "${override_var}" >&2

@@ -146,6 +146,7 @@ start_opensis() {
   fi
 
   log "Starting OpenSIS"
+  ensure_env_file "${opensis_dir}"
   (
     cd "${opensis_dir}"
     "${opensis_cmd[@]}"

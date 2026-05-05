@@ -110,6 +110,7 @@ Cons:
 Current status:
 
 - this support is now implemented in:
+  - `./scripts/bootstrap-sibling-repos.sh`
   - `./scripts/workspace-start.sh`
   - `./scripts/workspace-stop.sh`
   - `./scripts/workspace-layout.sh`
