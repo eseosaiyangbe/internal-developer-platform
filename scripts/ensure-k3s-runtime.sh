@@ -2,11 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devops-easy-learning"
-VAULT_INIT_FILE="${STATE_DIR}/k3s-vault-init.json"
-RUNTIME_CPU="${DEVOPS_EASY_LEARNING_RUNTIME_CPU:-6}"
-RUNTIME_MEMORY_GIB="${DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB:-12}"
-RUNTIME_DISK_GIB="${DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB:-100}"
+source "${SCRIPT_DIR}/platform-identity.sh"
+
+VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
+RUNTIME_CPU="$(idp_runtime_value "IDP_RUNTIME_CPU" "DEVOPS_EASY_LEARNING_RUNTIME_CPU" "6")"
+RUNTIME_MEMORY_GIB="$(idp_runtime_value "IDP_RUNTIME_MEMORY_GIB" "DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB" "12")"
+RUNTIME_DISK_GIB="$(idp_runtime_value "IDP_RUNTIME_DISK_GIB" "DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB" "100")"
+SYSCTL_FILE="/etc/sysctl.d/90-${IDP_PLATFORM_SLUG}-k3s.conf"
+LEGACY_SYSCTL_FILE="/etc/sysctl.d/90-${IDP_LEGACY_PLATFORM_SLUG}-k3s.conf"
 
 have_sudo() {
   command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1
@@ -15,20 +18,26 @@ have_sudo() {
 tune_inotify_limits_linux() {
   have_sudo || return 0
 
-  sudo tee /etc/sysctl.d/90-devops-easy-learning-k3s.conf >/dev/null <<'EOF'
+  sudo tee "${SYSCTL_FILE}" >/dev/null <<'EOF'
 fs.inotify.max_user_instances = 1024
 fs.inotify.max_user_watches = 1048576
 fs.inotify.max_queued_events = 32768
 EOF
+  if [[ "${LEGACY_SYSCTL_FILE}" != "${SYSCTL_FILE}" ]]; then
+    sudo rm -f "${LEGACY_SYSCTL_FILE}"
+  fi
   sudo sysctl --system >/dev/null
 }
 
 tune_inotify_limits_colima() {
-  colima ssh -- sudo tee /etc/sysctl.d/90-devops-easy-learning-k3s.conf >/dev/null <<'EOF'
+  colima ssh -- sudo tee "${SYSCTL_FILE}" >/dev/null <<'EOF'
 fs.inotify.max_user_instances = 1024
 fs.inotify.max_user_watches = 1048576
 fs.inotify.max_queued_events = 32768
 EOF
+  if [[ "${LEGACY_SYSCTL_FILE}" != "${SYSCTL_FILE}" ]]; then
+    colima ssh -- sudo rm -f "${LEGACY_SYSCTL_FILE}"
+  fi
   colima ssh -- sudo sysctl --system >/dev/null
 }
 
@@ -134,6 +143,9 @@ ensure_linux_k3s() {
 main() {
   local ingress_address
 
+  idp_migrate_legacy_state_dir_if_needed
+  idp_ensure_state_dir
+
   case "${OSTYPE:-}" in
     darwin*)
       ensure_macos_k3s
@@ -165,6 +177,7 @@ main() {
   fi
 
   echo "Recommended runtime baseline: ${RUNTIME_CPU} CPU, ${RUNTIME_MEMORY_GIB}GiB memory, ${RUNTIME_DISK_GIB}GiB disk"
+  echo "Platform state directory: ${IDP_STATE_DIR}"
 }
 
 main "$@"

@@ -17,11 +17,19 @@ EOF
 }
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devops-easy-learning"
-VAULT_INIT_FILE="${STATE_DIR}/k3s-vault-init.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/platform-identity.sh"
+
+STATE_DIR="${IDP_STATE_DIR}"
+VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 VALUES_FILE="${ROOT_DIR}/scripts/vault-k3s-values.yaml"
 ROTATE_SECRETS=0
 SKIP_HELM=0
+PLATFORM_SLUGS=()
+
+while IFS= read -r slug; do
+  PLATFORM_SLUGS+=("${slug}")
+done < <(idp_platform_slugs)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -96,13 +104,49 @@ ensure_vault_patch_or_put() {
   vault_exec_with_token "${put_command}" >/dev/null
 }
 
+policy_rules_for_workspace_path() {
+  local relative_path="$1"
+  local slug
+  for slug in "${PLATFORM_SLUGS[@]}"; do
+    printf 'path "kv/data/%s/%s/*" { capabilities = ["read"] }\n' "${slug}" "${relative_path}"
+  done
+}
+
+ensure_workspace_secret_put() {
+  local relative_path="$1"
+  local kv_args="$2"
+  local slug
+  local full_path
+
+  for slug in "${PLATFORM_SLUGS[@]}"; do
+    full_path="kv/${slug}/${relative_path}"
+    ensure_vault_path "${full_path}" \
+      "vault kv put ${full_path} ${kv_args} >/dev/null"
+  done
+}
+
+ensure_workspace_secret_patch_or_put() {
+  local relative_path="$1"
+  local put_args="$2"
+  local patch_args="$3"
+  local slug
+  local full_path
+
+  for slug in "${PLATFORM_SLUGS[@]}"; do
+    full_path="kv/${slug}/${relative_path}"
+    ensure_vault_patch_or_put "${full_path}" \
+      "vault kv put ${full_path} ${put_args} >/dev/null" \
+      "vault kv patch ${full_path} ${patch_args} >/dev/null"
+  done
+}
+
 require_command kubectl
 require_command helm
 require_command jq
 require_command openssl
 
-mkdir -p "$STATE_DIR"
-chmod 700 "$STATE_DIR"
+idp_migrate_legacy_state_dir_if_needed
+idp_ensure_state_dir
 
 if [[ "$SKIP_HELM" -eq 0 ]]; then
   echo "[vault-bootstrap] Installing or upgrading Vault"
@@ -166,16 +210,16 @@ vault_exec_with_token "vault secrets enable -path=kv kv-v2 >/dev/null 2>&1 || tr
 vault_exec_with_token "vault auth enable kubernetes >/dev/null 2>&1 || true"
 vault_exec_with_token 'vault write auth/kubernetes/config kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT" >/dev/null'
 
-write_policy "memflip-dev" 'path "kv/data/devops-easy-learning/memflip/dev/*" { capabilities = ["read"] }'
-write_policy "memflip-prod" 'path "kv/data/devops-easy-learning/memflip/prod/*" { capabilities = ["read"] }'
-write_policy "swiftpay-dev" 'path "kv/data/devops-easy-learning/swiftpay/dev/*" { capabilities = ["read"] }'
-write_policy "swiftpay-prod" 'path "kv/data/devops-easy-learning/swiftpay/prod/*" { capabilities = ["read"] }'
-write_policy "foodpulse-dev" 'path "kv/data/devops-easy-learning/foodpulse/dev/*" { capabilities = ["read"] }'
-write_policy "foodpulse-prod" 'path "kv/data/devops-easy-learning/foodpulse/prod/*" { capabilities = ["read"] }'
-write_policy "opensis-dev" 'path "kv/data/devops-easy-learning/opensis/dev/*" { capabilities = ["read"] }'
-write_policy "opensis-prod" 'path "kv/data/devops-easy-learning/opensis/prod/*" { capabilities = ["read"] }'
-write_policy "observability-dev" 'path "kv/data/devops-easy-learning/observability/dev/*" { capabilities = ["read"] }'
-write_policy "observability-prod" 'path "kv/data/devops-easy-learning/observability/prod/*" { capabilities = ["read"] }'
+write_policy "memflip-dev" "$(policy_rules_for_workspace_path "memflip/dev")"
+write_policy "memflip-prod" "$(policy_rules_for_workspace_path "memflip/prod")"
+write_policy "swiftpay-dev" "$(policy_rules_for_workspace_path "swiftpay/dev")"
+write_policy "swiftpay-prod" "$(policy_rules_for_workspace_path "swiftpay/prod")"
+write_policy "foodpulse-dev" "$(policy_rules_for_workspace_path "foodpulse/dev")"
+write_policy "foodpulse-prod" "$(policy_rules_for_workspace_path "foodpulse/prod")"
+write_policy "opensis-dev" "$(policy_rules_for_workspace_path "opensis/dev")"
+write_policy "opensis-prod" "$(policy_rules_for_workspace_path "opensis/prod")"
+write_policy "observability-dev" "$(policy_rules_for_workspace_path "observability/dev")"
+write_policy "observability-prod" "$(policy_rules_for_workspace_path "observability/prod")"
 
 echo "[vault-bootstrap] Configuring Vault Kubernetes roles"
 vault_exec_with_token "vault write auth/kubernetes/role/memflip-dev bound_service_account_names=memflip-vault-reader bound_service_account_namespaces=memflip-dev audience=vault token_policies=memflip-dev ttl=1h >/dev/null"
@@ -254,58 +298,58 @@ OBSERVABILITY_PROD_NEXTAUTH_SECRET="$(openssl rand -base64 32 | tr -d '\n')"
 OBSERVABILITY_PROD_GRAFANA_ADMIN_USER="admin"
 OBSERVABILITY_PROD_GRAFANA_ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 
-ensure_vault_path "kv/devops-easy-learning/memflip/dev/app" \
-  "vault kv put kv/devops-easy-learning/memflip/dev/app DB_PASSWORD='${MEMFLIP_DEV_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_DEV_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_DEV_JWT_SECRET}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/memflip/prod/app" \
-  "vault kv put kv/devops-easy-learning/memflip/prod/app DB_PASSWORD='${MEMFLIP_PROD_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_PROD_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_PROD_JWT_SECRET}' >/dev/null"
+ensure_workspace_secret_put "memflip/dev/app" \
+  "DB_PASSWORD='${MEMFLIP_DEV_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_DEV_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_DEV_JWT_SECRET}'"
+ensure_workspace_secret_put "memflip/prod/app" \
+  "DB_PASSWORD='${MEMFLIP_PROD_DB_PASSWORD}' REDIS_PASSWORD='${MEMFLIP_PROD_REDIS_PASSWORD}' JWT_SECRET='${MEMFLIP_PROD_JWT_SECRET}'"
 
-ensure_vault_path "kv/devops-easy-learning/swiftpay/dev/postgres" \
-  "vault kv put kv/devops-easy-learning/swiftpay/dev/postgres DB_USER='${SWIFTPAY_DEV_DB_USER}' DB_PASSWORD='${SWIFTPAY_DEV_DB_PASSWORD}' DB_HOST='${SWIFTPAY_DEV_DB_HOST}' DB_PORT='${SWIFTPAY_DEV_DB_PORT}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/dev/redis" \
-  "vault kv put kv/devops-easy-learning/swiftpay/dev/redis REDIS_URL='${SWIFTPAY_DEV_REDIS_URL}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/dev/rabbitmq" \
-  "vault kv put kv/devops-easy-learning/swiftpay/dev/rabbitmq RABBITMQ_USER='${SWIFTPAY_DEV_RABBITMQ_USER}' RABBITMQ_PASSWORD='${SWIFTPAY_DEV_RABBITMQ_PASSWORD}' RABBITMQ_URL='${SWIFTPAY_DEV_RABBITMQ_URL}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/dev/app" \
-  "vault kv put kv/devops-easy-learning/swiftpay/dev/app JWT_SECRET='${SWIFTPAY_DEV_JWT_SECRET}' >/dev/null"
+ensure_workspace_secret_put "swiftpay/dev/postgres" \
+  "DB_USER='${SWIFTPAY_DEV_DB_USER}' DB_PASSWORD='${SWIFTPAY_DEV_DB_PASSWORD}' DB_HOST='${SWIFTPAY_DEV_DB_HOST}' DB_PORT='${SWIFTPAY_DEV_DB_PORT}'"
+ensure_workspace_secret_put "swiftpay/dev/redis" \
+  "REDIS_URL='${SWIFTPAY_DEV_REDIS_URL}'"
+ensure_workspace_secret_put "swiftpay/dev/rabbitmq" \
+  "RABBITMQ_USER='${SWIFTPAY_DEV_RABBITMQ_USER}' RABBITMQ_PASSWORD='${SWIFTPAY_DEV_RABBITMQ_PASSWORD}' RABBITMQ_URL='${SWIFTPAY_DEV_RABBITMQ_URL}'"
+ensure_workspace_secret_put "swiftpay/dev/app" \
+  "JWT_SECRET='${SWIFTPAY_DEV_JWT_SECRET}'"
 
-ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/postgres" \
-  "vault kv put kv/devops-easy-learning/swiftpay/prod/postgres DB_USER='${SWIFTPAY_PROD_DB_USER}' DB_PASSWORD='${SWIFTPAY_PROD_DB_PASSWORD}' DB_HOST='${SWIFTPAY_PROD_DB_HOST}' DB_PORT='${SWIFTPAY_PROD_DB_PORT}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/redis" \
-  "vault kv put kv/devops-easy-learning/swiftpay/prod/redis REDIS_URL='${SWIFTPAY_PROD_REDIS_URL}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/rabbitmq" \
-  "vault kv put kv/devops-easy-learning/swiftpay/prod/rabbitmq RABBITMQ_USER='${SWIFTPAY_PROD_RABBITMQ_USER}' RABBITMQ_PASSWORD='${SWIFTPAY_PROD_RABBITMQ_PASSWORD}' RABBITMQ_URL='${SWIFTPAY_PROD_RABBITMQ_URL}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/swiftpay/prod/app" \
-  "vault kv put kv/devops-easy-learning/swiftpay/prod/app JWT_SECRET='${SWIFTPAY_PROD_JWT_SECRET}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/foodpulse/dev/postgres" \
-  "vault kv put kv/devops-easy-learning/foodpulse/dev/postgres username='${FOODPULSE_DEV_DB_USER}' password='${FOODPULSE_DEV_DB_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/foodpulse/dev/app" \
-  "vault kv put kv/devops-easy-learning/foodpulse/dev/app FOODPULSE_DB_PASSWORD='${FOODPULSE_DEV_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_DEV_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/postgres" \
-  "vault kv put kv/devops-easy-learning/foodpulse/prod/postgres username='${FOODPULSE_PROD_DB_USER}' password='${FOODPULSE_PROD_DB_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/foodpulse/prod/app" \
-  "vault kv put kv/devops-easy-learning/foodpulse/prod/app FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/opensis/dev/app" \
-  "vault kv put kv/devops-easy-learning/opensis/dev/app DB_HOST='${OPENSIS_DEV_DB_HOST}' DB_PORT='${OPENSIS_DEV_DB_PORT}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' >/dev/null"
-ensure_vault_patch_or_put "kv/devops-easy-learning/opensis/dev/db" \
-  "vault kv put kv/devops-easy-learning/opensis/dev/db MYSQL_ROOT_PASSWORD='${OPENSIS_DEV_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}' >/dev/null" \
-  "vault kv patch kv/devops-easy-learning/opensis/dev/db MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/opensis/prod/app" \
-  "vault kv put kv/devops-easy-learning/opensis/prod/app DB_HOST='${OPENSIS_PROD_DB_HOST}' DB_PORT='${OPENSIS_PROD_DB_PORT}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' >/dev/null"
-ensure_vault_patch_or_put "kv/devops-easy-learning/opensis/prod/db" \
-  "vault kv put kv/devops-easy-learning/opensis/prod/db MYSQL_ROOT_PASSWORD='${OPENSIS_PROD_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}' >/dev/null" \
-  "vault kv patch kv/devops-easy-learning/opensis/prod/db MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/dev/postgres" \
-  "vault kv put kv/devops-easy-learning/observability/dev/postgres username='${OBSERVABILITY_DEV_DB_USER}' password='${OBSERVABILITY_DEV_DB_PASSWORD}' database='${OBSERVABILITY_DEV_DB_NAME}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/dev/ui" \
-  "vault kv put kv/devops-easy-learning/observability/dev/ui NEXTAUTH_SECRET='${OBSERVABILITY_DEV_NEXTAUTH_SECRET}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/dev/grafana" \
-  "vault kv put kv/devops-easy-learning/observability/dev/grafana admin_user='${OBSERVABILITY_DEV_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/prod/postgres" \
-  "vault kv put kv/devops-easy-learning/observability/prod/postgres username='${OBSERVABILITY_PROD_DB_USER}' password='${OBSERVABILITY_PROD_DB_PASSWORD}' database='${OBSERVABILITY_PROD_DB_NAME}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/prod/ui" \
-  "vault kv put kv/devops-easy-learning/observability/prod/ui NEXTAUTH_SECRET='${OBSERVABILITY_PROD_NEXTAUTH_SECRET}' >/dev/null"
-ensure_vault_path "kv/devops-easy-learning/observability/prod/grafana" \
-  "vault kv put kv/devops-easy-learning/observability/prod/grafana admin_user='${OBSERVABILITY_PROD_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_PROD_GRAFANA_ADMIN_PASSWORD}' >/dev/null"
+ensure_workspace_secret_put "swiftpay/prod/postgres" \
+  "DB_USER='${SWIFTPAY_PROD_DB_USER}' DB_PASSWORD='${SWIFTPAY_PROD_DB_PASSWORD}' DB_HOST='${SWIFTPAY_PROD_DB_HOST}' DB_PORT='${SWIFTPAY_PROD_DB_PORT}'"
+ensure_workspace_secret_put "swiftpay/prod/redis" \
+  "REDIS_URL='${SWIFTPAY_PROD_REDIS_URL}'"
+ensure_workspace_secret_put "swiftpay/prod/rabbitmq" \
+  "RABBITMQ_USER='${SWIFTPAY_PROD_RABBITMQ_USER}' RABBITMQ_PASSWORD='${SWIFTPAY_PROD_RABBITMQ_PASSWORD}' RABBITMQ_URL='${SWIFTPAY_PROD_RABBITMQ_URL}'"
+ensure_workspace_secret_put "swiftpay/prod/app" \
+  "JWT_SECRET='${SWIFTPAY_PROD_JWT_SECRET}'"
+ensure_workspace_secret_put "foodpulse/dev/postgres" \
+  "username='${FOODPULSE_DEV_DB_USER}' password='${FOODPULSE_DEV_DB_PASSWORD}'"
+ensure_workspace_secret_put "foodpulse/dev/app" \
+  "FOODPULSE_DB_PASSWORD='${FOODPULSE_DEV_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_DEV_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD}'"
+ensure_workspace_secret_put "foodpulse/prod/postgres" \
+  "username='${FOODPULSE_PROD_DB_USER}' password='${FOODPULSE_PROD_DB_PASSWORD}'"
+ensure_workspace_secret_put "foodpulse/prod/app" \
+  "FOODPULSE_DB_PASSWORD='${FOODPULSE_PROD_DB_PASSWORD}' FOODPULSE_REDIS_PASSWORD='${FOODPULSE_PROD_REDIS_PASSWORD}' FOODPULSE_REDIS_SENTINEL_PASSWORD='${FOODPULSE_PROD_REDIS_SENTINEL_PASSWORD}'"
+ensure_workspace_secret_put "opensis/dev/app" \
+  "DB_HOST='${OPENSIS_DEV_DB_HOST}' DB_PORT='${OPENSIS_DEV_DB_PORT}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}'"
+ensure_workspace_secret_patch_or_put "opensis/dev/db" \
+  "MYSQL_ROOT_PASSWORD='${OPENSIS_DEV_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_DEV_DB_NAME}' MYSQL_USER='${OPENSIS_DEV_DB_USER}' MYSQL_PASSWORD='${OPENSIS_DEV_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}'" \
+  "MYSQL_EXPORTER_USER='${OPENSIS_DEV_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD}'"
+ensure_workspace_secret_put "opensis/prod/app" \
+  "DB_HOST='${OPENSIS_PROD_DB_HOST}' DB_PORT='${OPENSIS_PROD_DB_PORT}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}'"
+ensure_workspace_secret_patch_or_put "opensis/prod/db" \
+  "MYSQL_ROOT_PASSWORD='${OPENSIS_PROD_DB_ROOT_PASSWORD}' MYSQL_DATABASE='${OPENSIS_PROD_DB_NAME}' MYSQL_USER='${OPENSIS_PROD_DB_USER}' MYSQL_PASSWORD='${OPENSIS_PROD_DB_PASSWORD}' MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}'" \
+  "MYSQL_EXPORTER_USER='${OPENSIS_PROD_MYSQL_EXPORTER_USER}' MYSQL_EXPORTER_PASSWORD='${OPENSIS_PROD_MYSQL_EXPORTER_PASSWORD}'"
+ensure_workspace_secret_put "observability/dev/postgres" \
+  "username='${OBSERVABILITY_DEV_DB_USER}' password='${OBSERVABILITY_DEV_DB_PASSWORD}' database='${OBSERVABILITY_DEV_DB_NAME}'"
+ensure_workspace_secret_put "observability/dev/ui" \
+  "NEXTAUTH_SECRET='${OBSERVABILITY_DEV_NEXTAUTH_SECRET}'"
+ensure_workspace_secret_put "observability/dev/grafana" \
+  "admin_user='${OBSERVABILITY_DEV_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD}'"
+ensure_workspace_secret_put "observability/prod/postgres" \
+  "username='${OBSERVABILITY_PROD_DB_USER}' password='${OBSERVABILITY_PROD_DB_PASSWORD}' database='${OBSERVABILITY_PROD_DB_NAME}'"
+ensure_workspace_secret_put "observability/prod/ui" \
+  "NEXTAUTH_SECRET='${OBSERVABILITY_PROD_NEXTAUTH_SECRET}'"
+ensure_workspace_secret_put "observability/prod/grafana" \
+  "admin_user='${OBSERVABILITY_PROD_GRAFANA_ADMIN_USER}' admin_password='${OBSERVABILITY_PROD_GRAFANA_ADMIN_PASSWORD}'"
 
 echo "[vault-bootstrap] Vault and External Secrets platform is ready"
 echo "[vault-bootstrap] Init material stored at ${VAULT_INIT_FILE}"

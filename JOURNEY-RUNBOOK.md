@@ -18724,3 +18724,47 @@ Measured outcome:
 - remaining `devops-easy-learning` references are now primarily intentional
   runtime identifiers or historical runbook records, not the active central repo
   identity
+
+## 2026-05-05 - Added runtime identifier compatibility for internal-developer-platform
+
+Purpose:
+- move the live platform toward the new `internal-developer-platform` identity
+  without breaking the running workloads that still depend on legacy
+  `devops-easy-learning` Vault and local-state paths
+- introduce new runtime environment variable names while preserving the older
+  compatibility contract
+- reconcile the live k3s runtime once so the new state directory, Vault slug,
+  and sysctl naming all become real on the machine
+
+Commands run:
+
+```bash
+ls -ld ~/.config/devops-easy-learning ~/.config/internal-developer-platform 2>/dev/null || true
+find ~/.config/devops-easy-learning -maxdepth 2 -type f 2>/dev/null | sort
+colima ssh -- sh -lc 'ls -1 /etc/sysctl.d | grep -E "devops-easy-learning|internal-developer-platform" || true'
+mkdir -p ~/.config/internal-developer-platform && cp -Rn ~/.config/devops-easy-learning/. ~/.config/internal-developer-platform/ && chmod 700 ~/.config/internal-developer-platform && find ~/.config/internal-developer-platform -maxdepth 2 -type f | sort
+./scripts/ensure-k3s-runtime.sh
+colima ssh -- sh -lc 'ls -1 /etc/sysctl.d | grep -E "devops-easy-learning|internal-developer-platform" || true'
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/internal-developer-platform/k3s-vault-init.json) && kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault kv get -format=json kv/internal-developer-platform/memflip/dev/app" | jq -r '.data.data | keys | join(",")'
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/internal-developer-platform/k3s-vault-init.json) && kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault kv get -format=json kv/devops-easy-learning/memflip/dev/app" | jq -r '.data.data | keys | join(",")'
+ROOT_TOKEN=$(jq -r '.root_token' ~/.config/internal-developer-platform/k3s-vault-init.json) && kubectl exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='$ROOT_TOKEN'; vault policy read memflip-dev"
+```
+
+Measured outcome:
+- the new local state directory now exists at:
+  - `~/.config/internal-developer-platform`
+- the live k3s runtime now reports the new state directory from
+  `./scripts/ensure-k3s-runtime.sh`
+- the old Colima sysctl file was replaced with:
+  - `/etc/sysctl.d/90-internal-developer-platform-k3s.conf`
+- Vault now serves mirrored secrets from both:
+  - `kv/internal-developer-platform/...`
+  - `kv/devops-easy-learning/...`
+- compatibility policies such as `memflip-dev` now allow reads from both the new
+  and legacy KV prefixes
+- the runtime variable contract now prefers:
+  - `IDP_RUNTIME_CPU`
+  - `IDP_RUNTIME_MEMORY_GIB`
+  - `IDP_RUNTIME_DISK_GIB`
+- the legacy `DEVOPS_EASY_LEARNING_RUNTIME_*` variables still work as fallback
+  compatibility inputs

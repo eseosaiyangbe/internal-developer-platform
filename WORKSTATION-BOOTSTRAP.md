@@ -210,6 +210,14 @@ parallel demo activity:
 The local runtime contract can now be expressed with environment variables:
 
 ```bash
+export IDP_RUNTIME_CPU=6
+export IDP_RUNTIME_MEMORY_GIB=12
+export IDP_RUNTIME_DISK_GIB=100
+```
+
+Legacy compatibility remains in place for:
+
+```bash
 export DEVOPS_EASY_LEARNING_RUNTIME_CPU=6
 export DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB=12
 export DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB=100

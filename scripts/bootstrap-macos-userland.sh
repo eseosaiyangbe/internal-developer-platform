@@ -305,10 +305,10 @@ Next shell setup:
   source ~/.zprofile
 
 Container runtime:
-  export DEVOPS_EASY_LEARNING_RUNTIME_CPU=6
-  export DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB=12
-  export DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB=100
-  colima start --runtime docker --cpu "$DEVOPS_EASY_LEARNING_RUNTIME_CPU" --memory "$DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB" --disk "$DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB" --kubernetes --network-address
+  export IDP_RUNTIME_CPU=6
+  export IDP_RUNTIME_MEMORY_GIB=12
+  export IDP_RUNTIME_DISK_GIB=100
+  colima start --runtime docker --cpu "$IDP_RUNTIME_CPU" --memory "$IDP_RUNTIME_MEMORY_GIB" --disk "$IDP_RUNTIME_DISK_GIB" --kubernetes --network-address
   docker context use colima
 
 Verification:
