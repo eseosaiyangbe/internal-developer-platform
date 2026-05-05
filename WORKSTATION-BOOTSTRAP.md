@@ -99,10 +99,10 @@ The platform is moving toward:
   opensis/
 ```
 
-During the transition, the central platform repo still carries local workload
-directories, but the central operator scripts now support both layouts:
+During the transition, the central platform repo no longer needs embedded
+workload directories, and the central operator scripts support:
 
-- in-repo workload directories
+- a central platform repo with no embedded workload repos
 - sibling workload checkouts
 
 To inspect the currently resolved layout:
@@ -125,11 +125,11 @@ hidden assumptions from the older embedded workspace layout.
 To override any repo path explicitly:
 
 ```bash
-export IDP_OBSERVABILITY_STACK_DIR=/path/to/Obervability-Stack
-export IDP_SWIFTPAY_DIR=/path/to/SwiftPay
-export IDP_OPENSIS_DIR=/path/to/OpenSIS
-export IDP_FOODPULSE_DIR=/path/to/FoodPulse
-export IDP_MEMFLIP_DIR=/path/to/MemFlip
+export IDP_OBSERVABILITY_STACK_DIR=/path/to/observability-stack
+export IDP_SWIFTPAY_DIR=/path/to/swiftpay
+export IDP_OPENSIS_DIR=/path/to/opensis
+export IDP_FOODPULSE_DIR=/path/to/foodpulse
+export IDP_MEMFLIP_DIR=/path/to/memflip
 ```
 
 ## Verification

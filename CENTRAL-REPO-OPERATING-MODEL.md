@@ -13,19 +13,18 @@ as the permanent home of every workload?
 
 ## Current State
 
-Today the current platform workspace still contains local workload directories:
+Today the current platform workspace no longer needs embedded workload
+directories.
 
-- `Obervability-Stack`
-
-`MemFlip`, `SwiftPay`, `FoodPulse`, and `OpenSIS` are now cut over to the sibling-checkout
-model, so they should no longer be treated as permanent embedded workloads in
-the central repo.
+`MemFlip`, `SwiftPay`, `FoodPulse`, `OpenSIS`, and `Obervability-Stack` should
+all be treated as sibling authoritative child repos rather than permanent
+embedded workloads in the central repo.
 
 At the same time, each workload now also has a refreshed authoritative child
 repository on GitHub.
 
-That means the central workspace is still physically monorepo-shaped, but the
-source-of-truth model is shifting toward:
+That means the central workspace is now a platform-coordination repo above the
+child workloads, and the source-of-truth model is:
 
 - one central platform repo
 - one authoritative repo per workload
@@ -147,10 +146,11 @@ Cons:
 
 The next clean transition is:
 
-1. keep the current platform workspace temporarily
-2. keep resolving workloads through the sibling-checkout contract first
-3. remove the remaining embedded workload directories deliberately
-4. validate the operator flows after each cut
+1. keep the sibling-checkout contract as the default local topology
+2. finish central-platform documentation reconciliation
+3. move GitOps root orchestration fully to child-repo-aware references
+4. decide whether the central repo itself should be renamed from `DevOps-Easy-Learning`
+   to `internal-developer-platform`
 
 ## GitOps Implication
 

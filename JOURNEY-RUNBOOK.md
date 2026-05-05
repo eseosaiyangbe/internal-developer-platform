@@ -18648,3 +18648,42 @@ Measured outcome:
 - `Obervability-Stack/ui-next` type-check still passed after the monitored app
   inventory and runbook updates
 - `git diff --check` stayed clean after the OpenSIS cut
+
+## 2026-05-05 - Removed embedded Obervability-Stack from the central platform repo
+
+Purpose:
+- complete the final physical workload cut so the central repo becomes a true
+  platform-coordination repo instead of a shrinking monorepo shell
+- ensure the authoritative `observability-stack` child repo publishes the
+  correct GitHub runbook URLs, ArgoCD repo coordinates, and sibling-layout
+  operator commands before the embedded control-plane tree disappears locally
+
+Commands run:
+
+```bash
+cd /Users/raymond/Documents/observability-stack && git status --short
+rg -n "DevOps-Easy-Learning/blob/main/Obervability-Stack|repoURL: https://github.com/eseosaiyangbe/DevOps-Easy-Learning.git|path: Obervability-Stack/k8s/" /Users/raymond/Documents/observability-stack -g '!node_modules' -g '!dist' -g '!build'
+cd /Users/raymond/Documents/observability-stack && git add -A && git commit -m "Align observability repo with child-repo layout"
+cd /Users/raymond/Documents/observability-stack && git push origin main
+git rm -r Obervability-Stack
+rm -rf /Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack
+./scripts/workspace-layout.sh
+cd /Users/raymond/Documents/observability-stack && ./scripts/devops-monitor.sh --help
+git diff --check
+```
+
+Measured outcome:
+- the embedded `Obervability-Stack` directory was removed from the central
+  platform repo
+- `./scripts/workspace-layout.sh` now resolves `Observability` automatically to:
+  - `/Users/raymond/Documents/observability-stack`
+- the authoritative `observability-stack` child repo was updated and pushed in
+  commit:
+  - `bfa1e2f Align observability repo with child-repo layout`
+- the child repo now publishes:
+  - correct GitHub runbook URLs against `eseosaiyangbe/Obervability-Stack`
+  - corrected ArgoCD `repoURL` and `path` values for the observability overlays
+  - sibling-layout operator commands in the highest-signal UI handoff pages
+- the central repo now has no embedded workload directories left
+- the remaining transition work is platform finalization rather than more
+  workload extraction

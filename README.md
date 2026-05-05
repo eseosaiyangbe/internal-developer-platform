@@ -23,9 +23,10 @@ The child workload repositories have been refreshed and are no longer stale:
 - [OpenSIS](https://github.com/eseosaiyangbe/OpenSIS)
 - [Obervability-Stack](https://github.com/eseosaiyangbe/Obervability-Stack)
 
-This central repository is now moving from embedded workload directories to
-authoritative child repos. `MemFlip`, `SwiftPay`, `FoodPulse`, and `OpenSIS` are already
-cut over to the sibling-checkout model, and the long-term target is:
+This central repository now operates as the coordination layer above
+authoritative child repos. `MemFlip`, `SwiftPay`, `FoodPulse`, `OpenSIS`, and
+`Obervability-Stack` are all cut over to the sibling-checkout model, and the
+long-term target is:
 
 - one central `Internal Developer Platform` repo
 - one authoritative repo per workload
@@ -100,7 +101,7 @@ If you want to run it instead of just review it:
 
 1. bootstrap the workstation with the platform script for your OS
 2. start the repos in the workspace order shown below
-3. run `./Obervability-Stack/scripts/devops-monitor.sh operator`
+3. run `../observability-stack/scripts/devops-monitor.sh operator`
 4. use [DEMO-WALKTHROUGH.md](DEMO-WALKTHROUGH.md) as the guided live path
 
 ## Visual Highlights
@@ -186,10 +187,8 @@ Recommended workspace commands:
 ./scripts/workspace-layout.sh
 ```
 
-`workspace-start.sh` and `workspace-stop.sh` now support both:
-
-- the current in-repo workload directories
-- sibling workload checkouts beside this central platform repo
+`workspace-start.sh` and `workspace-stop.sh` now support the sibling-checkout
+platform layout directly.
 
 If you need to override any resolved path explicitly, use:
 
@@ -226,7 +225,7 @@ Force a rebuild only when you actually need one:
 
 What `./scripts/workspace-start.sh` does:
 
-1. Start `Obervability-Stack`
+1. Start `observability-stack`
 2. Start `SwiftPay`
 3. Start `OpenSIS`
 4. Start `FoodPulse`
@@ -253,9 +252,9 @@ cd ../memflip && cp .env.example .env && docker compose up -d
 cd ../observability-stack && ./scripts/devops-monitor.sh operator
 ```
 
-When the platform moves fully to sibling checkouts, the wrapper scripts remain
-the preferred entrypoint because they already know how to resolve the workload
-repos without assuming they live inside this central repo forever.
+The wrapper scripts remain the preferred entrypoint because they already know
+how to resolve the sibling workload repos without assuming they live inside
+this central repo.
 
 Apple Silicon note for `OpenSIS`: the wrapper automatically uses `./scripts/compose-start.sh --build-local`.
 
@@ -282,7 +281,7 @@ All monitored apps are currently healthy
 | [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md) | root `dev` and `prod` environment expectations |
 | [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md) | phased migration framing from local Compose to Kubernetes |
 | [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md) | deeper Kubernetes plan for the shared observability control plane |
-| [Obervability-Stack/k8s/README.md](Obervability-Stack/k8s/README.md) | owned Kubernetes path for the shared observability control plane |
+| [observability-stack k8s README](https://github.com/eseosaiyangbe/Obervability-Stack/blob/main/k8s/README.md) | owned Kubernetes path for the shared observability control plane |
 | [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md) | rationale for using MemFlip as the first workload migration candidate |
 | [OPENSIS-K8S-ASSESSMENT.md](OPENSIS-K8S-ASSESSMENT.md) | assessment of the existing OpenSIS Kubernetes tree against the current workspace standards |
 | [MemFlip k3s dev doc](https://github.com/eseosaiyangbe/MemFlip/blob/main/docs/local/12-phase7-k8s-dev.md) | first concrete k3s-based Kubernetes implementation slice for MemFlip in `dev` |
@@ -291,7 +290,7 @@ All monitored apps are currently healthy
 | [METRICS-STRATEGY.md](METRICS-STRATEGY.md) | production-grade metrics standards for platform and apps |
 | [INCIDENT-RESPONSE.md](INCIDENT-RESPONSE.md) | incident investigations, root causes, and follow-ups |
 | [JOURNEY-RUNBOOK.md](JOURNEY-RUNBOOK.md) | command-by-command build and operations record |
-| [Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md](Obervability-Stack/docs/OPERATOR_HEALTH_WORKFLOW.md) | standard first-response workflow |
+| [observability-stack operator health workflow](https://github.com/eseosaiyangbe/Obervability-Stack/blob/main/docs/OPERATOR_HEALTH_WORKFLOW.md) | standard first-response workflow |
 
 ## Demo And Operator Entry Points
 
@@ -302,11 +301,11 @@ Demo walkthrough:
 Primary operator commands:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh operator
-./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
-./Obervability-Stack/scripts/devops-monitor.sh opensis-live
-./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
-./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+../observability-stack/scripts/devops-monitor.sh operator
+../observability-stack/scripts/devops-monitor.sh swiftpay-live
+../observability-stack/scripts/devops-monitor.sh opensis-live
+../observability-stack/scripts/devops-monitor.sh foodpulse-live
+../observability-stack/scripts/devops-monitor.sh memflip-live
 ```
 
 ## Evidence Already In The Repo
@@ -349,5 +348,5 @@ The current Phase 7 documentation spine is:
 - [ENVIRONMENT-MODEL.md](ENVIRONMENT-MODEL.md)
 - [KUBERNETES-MIGRATION-PLAN.md](KUBERNETES-MIGRATION-PLAN.md)
 - [CONTROL-PLANE-K8S-PLAN.md](CONTROL-PLANE-K8S-PLAN.md)
-- [Obervability-Stack/k8s/README.md](Obervability-Stack/k8s/README.md)
+- [observability-stack k8s README](https://github.com/eseosaiyangbe/Obervability-Stack/blob/main/k8s/README.md)
 - [MEMFLIP-K8S-CANDIDATE.md](MEMFLIP-K8S-CANDIDATE.md)

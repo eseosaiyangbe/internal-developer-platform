@@ -52,7 +52,6 @@ Today the workspace is still one Git repository rooted at:
 
 That root currently contains:
 
-- `Obervability-Stack`
 - root scripts and platform docs
 - root Kubernetes platform assets
 
@@ -68,15 +67,14 @@ That means:
 
 - the GitHub child repositories now reflect the current authoritative workload
   state
-- the current platform workspace now embeds only the platform control plane
-  repo tree
+- the current platform workspace no longer needs embedded workload repo trees
 - the workspace is therefore in a transition period where repository boundaries
   are logically split, but the central workspace still carries the physical
   directories
 
-Until the local directories are removed or detached from the central workspace,
-we should treat this as a controlled transitional state, not the final operating
-model.
+The workload directories have now been removed from the central workspace, so
+the remaining transition work is around documentation, GitOps ownership, and
+final repo naming rather than physical workload extraction.
 
 ## Target Repository Model
 

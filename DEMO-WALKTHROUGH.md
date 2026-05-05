@@ -22,7 +22,7 @@ Run this first:
 
 ```bash
 git status --short
-./Obervability-Stack/scripts/devops-monitor.sh operator
+../observability-stack/scripts/devops-monitor.sh operator
 ```
 
 Expected result:
@@ -36,8 +36,8 @@ All monitored apps are currently healthy.
 If the operator check fails, do not start the demo yet. Use the standard health workflow first:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh health
-./Obervability-Stack/scripts/devops-monitor.sh inventory
+../observability-stack/scripts/devops-monitor.sh health
+../observability-stack/scripts/devops-monitor.sh inventory
 ```
 
 ## Story Arc
@@ -86,7 +86,7 @@ Use this quick framing:
 Run:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh operator
+../observability-stack/scripts/devops-monitor.sh operator
 ```
 
 Say:
@@ -109,25 +109,25 @@ Pick one based on the audience.
 For microservices:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh swiftpay-live
+../observability-stack/scripts/devops-monitor.sh swiftpay-live
 ```
 
 For legacy/platform wrapping:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh opensis-live
+../observability-stack/scripts/devops-monitor.sh opensis-live
 ```
 
 For failover/resilience:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh foodpulse-live
+../observability-stack/scripts/devops-monitor.sh foodpulse-live
 ```
 
 For simple onboarding:
 
 ```bash
-./Obervability-Stack/scripts/devops-monitor.sh memflip-live
+../observability-stack/scripts/devops-monitor.sh memflip-live
 ```
 
 Say:
@@ -141,7 +141,7 @@ The generic dashboard tells us where to look. The live audit proves the app-spec
 Open:
 
 ```text
-Obervability-Stack/docs/INCIDENT_DRILLS.md
+https://github.com/eseosaiyangbe/Obervability-Stack/blob/main/docs/INCIDENT_DRILLS.md
 ```
 
 Show the executed drill log:
@@ -221,18 +221,18 @@ Use this only when you have time and the baseline is healthy.
 The safest live drill is the control-plane probe drift drill:
 
 ```bash
-cd Obervability-Stack
+cd ../observability-stack
 docker compose stop blackbox-exporter
 cd ..
-./Obervability-Stack/scripts/devops-monitor.sh operator
+../observability-stack/scripts/devops-monitor.sh operator
 curl -fsSI http://localhost:8080/api/health
 curl -fsSI http://localhost:8081
 curl -fsSI http://localhost:8088
 curl -fsSI http://localhost:8090
-cd Obervability-Stack
+cd ../observability-stack
 docker compose start blackbox-exporter
 cd ..
-./Obervability-Stack/scripts/devops-monitor.sh operator
+../observability-stack/scripts/devops-monitor.sh operator
 ```
 
 Teaching point:
@@ -247,9 +247,9 @@ If you only have five minutes:
 
 1. Open `http://localhost:4000/demo`.
 2. Confirm the live demo readiness state.
-3. Run `./Obervability-Stack/scripts/devops-monitor.sh operator`.
+3. Run `../observability-stack/scripts/devops-monitor.sh operator`.
 4. Explain the four workload roles from the Demo Center.
-5. Show `Obervability-Stack/docs/INCIDENT_DRILLS.md`.
+5. Show `https://github.com/eseosaiyangbe/Obervability-Stack/blob/main/docs/INCIDENT_DRILLS.md`.
 6. Open `JOURNEY-RUNBOOK.md` to one drill.
 7. Close with the Kubernetes-ready direction.
 

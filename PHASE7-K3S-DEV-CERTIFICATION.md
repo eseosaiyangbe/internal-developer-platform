@@ -44,8 +44,8 @@ Confirm that the migrated Kubernetes development environment is:
 
 ### Control Plane
 
-- [k8s-dev-verify.sh](/Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/scripts/k8s-dev-verify.sh)
-- [devops-monitor.sh](/Users/raymond/Documents/DevOps-Easy-Learning/Obervability-Stack/scripts/devops-monitor.sh) `operator`
+- [k8s-dev-verify.sh](/Users/raymond/Documents/observability-stack/scripts/k8s-dev-verify.sh)
+- [devops-monitor.sh](/Users/raymond/Documents/observability-stack/scripts/devops-monitor.sh) `operator`
 
 ### Workloads
 
