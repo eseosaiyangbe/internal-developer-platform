@@ -149,8 +149,8 @@ The next clean transition is:
 1. keep the sibling-checkout contract as the default local topology
 2. finish central-platform documentation reconciliation
 3. move GitOps root orchestration fully to child-repo-aware references
-4. decide whether the central repo itself should be renamed from `DevOps-Easy-Learning`
-   to `internal-developer-platform`
+4. complete the remaining runtime-identifier review now that the central repo
+   has been renamed to `internal-developer-platform`
 
 ## GitOps Implication
 

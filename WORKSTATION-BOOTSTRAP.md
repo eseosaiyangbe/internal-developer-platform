@@ -264,7 +264,7 @@ This is optional because it adds another platform dependency and is not required
 
 Related reference:
 
-- [PRODUCTION-TLS-CERT-MANAGER.md](/Users/raymond/Documents/DevOps-Easy-Learning/PRODUCTION-TLS-CERT-MANAGER.md)
+- [PRODUCTION-TLS-CERT-MANAGER.md](/Users/raymond/Documents/internal-developer-platform/PRODUCTION-TLS-CERT-MANAGER.md)
 
 ## Expected Runtime Direction
 
@@ -318,8 +318,8 @@ This guide keeps the machine bootstrap aligned with the workspace roadmap and ru
 
 ## Related Files
 
-- [bootstrap-macos-userland.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/bootstrap-macos-userland.sh)
-- [bootstrap-linux-userland.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/bootstrap-linux-userland.sh)
-- [ensure-k3s-runtime.sh](/Users/raymond/Documents/DevOps-Easy-Learning/scripts/ensure-k3s-runtime.sh)
-- [PROJECT-ROADMAP.md](/Users/raymond/Documents/DevOps-Easy-Learning/PROJECT-ROADMAP.md)
-- [JOURNEY-RUNBOOK.md](/Users/raymond/Documents/DevOps-Easy-Learning/JOURNEY-RUNBOOK.md)
+- [bootstrap-macos-userland.sh](/Users/raymond/Documents/internal-developer-platform/scripts/bootstrap-macos-userland.sh)
+- [bootstrap-linux-userland.sh](/Users/raymond/Documents/internal-developer-platform/scripts/bootstrap-linux-userland.sh)
+- [ensure-k3s-runtime.sh](/Users/raymond/Documents/internal-developer-platform/scripts/ensure-k3s-runtime.sh)
+- [PROJECT-ROADMAP.md](/Users/raymond/Documents/internal-developer-platform/PROJECT-ROADMAP.md)
+- [JOURNEY-RUNBOOK.md](/Users/raymond/Documents/internal-developer-platform/JOURNEY-RUNBOOK.md)

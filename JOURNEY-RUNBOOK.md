@@ -18687,3 +18687,40 @@ Measured outcome:
 - the central repo now has no embedded workload directories left
 - the remaining transition work is platform finalization rather than more
   workload extraction
+
+## 2026-05-05 - Renamed the central platform repo to internal-developer-platform
+
+Purpose:
+- complete the visible platform-identity transition after the workload split
+- align the GitHub central repo name, local Git remote, and local workspace root
+  path with the canonical `Internal Developer Platform` naming
+- separate simple identity cleanup from the riskier runtime-identifier migration
+  that still affects Vault paths, local state directories, and bootstrap
+  contracts
+
+Commands run:
+
+```bash
+git remote -v
+git remote set-url origin https://github.com/eseosaiyangbe/internal-developer-platform.git
+git remote -v
+mv /Users/raymond/Documents/DevOps-Easy-Learning /Users/raymond/Documents/internal-developer-platform
+cd /Users/raymond/Documents/internal-developer-platform && git remote -v
+cd /Users/raymond/Documents/internal-developer-platform && git status --short
+cd /Users/raymond/Documents/internal-developer-platform && ./scripts/workspace-layout.sh
+test -d /Users/raymond/Documents/DevOps-Easy-Learning && echo old_path_exists || echo old_path_removed
+```
+
+Measured outcome:
+- the GitHub central repo now resolves at:
+  - `https://github.com/eseosaiyangbe/internal-developer-platform`
+- the local Git `origin` now points at the renamed GitHub repo
+- the local central workspace root is now:
+  - `/Users/raymond/Documents/internal-developer-platform`
+- `./scripts/workspace-layout.sh` still resolves all sibling child repos
+  correctly after the move
+- the old root path `/Users/raymond/Documents/DevOps-Easy-Learning` no longer
+  exists
+- remaining `devops-easy-learning` references are now primarily intentional
+  runtime identifiers or historical runbook records, not the active central repo
+  identity

@@ -46,9 +46,9 @@ because it already provides:
 
 ## Current Repository Reality
 
-Today the workspace is still one Git repository rooted at:
+Today the central platform workspace is rooted at:
 
-`/Users/raymond/Documents/DevOps-Easy-Learning`
+`/Users/raymond/Documents/internal-developer-platform`
 
 That root currently contains:
 
@@ -234,7 +234,7 @@ the most cross-linked workload in the current workspace.
 
 ### Phase 5: Platform Repo Finalization
 
-- convert the current monorepo into the central platform repo
+- finalize the central platform repo after workload extraction
 - update Git remotes and documentation
 - update ArgoCD and GitOps references
 - decide whether runtime identifiers should also be migrated from
@@ -242,12 +242,13 @@ the most cross-linked workload in the current workspace.
 
 ## Current Recommendation
 
-Do not remove all remaining workload directories at once.
+The repository split is complete and the central repo rename is now complete.
 
 The correct next step is:
 
-- continue the workload cuts one app at a time
-- prefer sibling-checkout resolution before each removal
+- reconcile remaining root documentation and GitOps references
+- decide which live runtime identifiers should migrate in a dedicated follow-up
+  change
 - validate the control-plane and operator flows after each cut
 - keep the central repo focused on orchestration, not workload-local code
 
