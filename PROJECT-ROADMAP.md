@@ -102,6 +102,11 @@ The remaining Phase 7 focus is:
 - GitOps activation so ArgoCD moves from declared standard to default reconciler
 - production-control tightening where the repo still carries placeholder or lab-safe posture
 
+Execution checklist:
+
+- use [PHASE7-REMAINING-WORK-CHECKLIST.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/PHASE7-REMAINING-WORK-CHECKLIST.md) as the concrete closeout plan for the remaining Phase 7 work
+- use [GITOPS-ACTIVATION.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/GITOPS-ACTIVATION.md) as the repeatable ArgoCD activation and retry procedure
+
 Phase 6 completed intent was:
 
 - turn the integrated workspace into a teachable, portfolio-grade control plane
@@ -125,6 +130,7 @@ Phase 7 will be considered successful when:
 GitOps note:
 
 - ArgoCD is already the declared GitOps standard and the repo already contains the owned ArgoCD application structure
+- the root GitOps orchestration layer and activation script now exist in the central repo, but the first live activation attempt on `2026-05-07` was rolled back after node-runtime instability prevented a trustworthy controller bring-up
 - Phase 7 does not need to wait for perfect GitOps promotion before the implementation story is credible
 - however, Phase 7 is not fully closed until we decide whether GitOps activation lands as the final Phase 7 slice or the opening Phase 8 execution slice
 

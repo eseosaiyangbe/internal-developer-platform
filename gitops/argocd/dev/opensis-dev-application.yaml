@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensis-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: internal-developer-platform
+    environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: internal-developer-platform-dev
+  source:
+    repoURL: https://github.com/eseosaiyangbe/OpenSIS.git
+    targetRevision: main
+    path: k8s/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opensis-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

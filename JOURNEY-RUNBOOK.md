@@ -18193,6 +18193,26 @@ Measured outcome:
 - one transient `502` occurred during the service handoff window, but origin and ingress checks proved healthy and the public endpoint recovered immediately after the LaunchAgent settled
 - this persistence model is `user login` scoped on macOS; it survives terminal closure and starts automatically when the user logs in, but it is not a root boot daemon
 
+## 2026-05-06 - Recovered Cloudflare Access observability routes after post-login 404 and 502 failures
+
+Purpose:
+- recover observability service URLs that still failed after successful Cloudflare Access login
+- correct the real source of truth for the `eseosadevbox-k8s` tunnel routes
+- make the recovery path repeatable instead of relying on trial-and-error between the browser, tunnel, and Kubernetes ingress
+
+Summary:
+- the failure was not in Kubernetes, Traefik, or the `ui-next` service links
+- Playwright reproduction showed `prometheus.eseosadevbox.com` authenticated and then landed on `HTTP ERROR 404`
+- direct Traefik validation with the correct host header still returned `200`, proving the service was healthy behind the ingress
+- the authoritative tunnel configuration was remote in Cloudflare with `source: cloudflare`, so local `~/.cloudflared/config.yml` was not the effective public routing source
+- the remote tunnel config was missing the observability published routes and did not set `httpHostHeader` for the protected hostnames
+- after updating the remote tunnel config to include all observability hostnames with explicit `httpHostHeader` values, Playwright verified successful recovery:
+  - `prometheus.eseosadevbox.com` landed on the real Prometheus UI
+  - `grafana.eseosadevbox.com` landed on the Grafana login page
+
+Operator note:
+- follow the dedicated step-by-step runbook in [CLOUDFLARE-OBSERVABILITY-ACCESS-RECOVERY.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/CLOUDFLARE-OBSERVABILITY-ACCESS-RECOVERY.md) for future incidents of this class
+
 ## 2026-05-05 - Hardened FoodPulse Redis and Sentinel restart convergence
 
 Purpose:
@@ -18768,3 +18788,73 @@ Measured outcome:
   - `IDP_RUNTIME_DISK_GIB`
 - the legacy `DEVOPS_EASY_LEARNING_RUNTIME_*` variables still work as fallback
   compatibility inputs
+
+## 2026-05-07 - GitOps activation artifacts prepared, live ArgoCD bootstrap attempted, then rolled back cleanly
+
+Purpose:
+- move ArgoCD from declared standard to real activation work in the live `k3s`
+  platform
+- establish the central-repo GitOps ownership layer so environment composition
+  lives in the platform repo while workload overlays remain in the child repos
+- make the activation sequence repeatable and safe to retry after cluster
+  stabilization
+
+Why this exact path:
+- the child repos already had workload-local `Application` manifests, but the
+  central repo still lacked the root orchestration layer that matches the
+  post-split operating model
+- `SwiftPay` was the one workload missing a `dev` `Application` manifest, so
+  the GitOps surface was incomplete
+- a live install was still necessary to prove whether the cluster could support
+  GitOps activation cleanly in its current runtime state
+
+Commands run:
+
+```bash
+kubectl get ns | rg 'argocd|vault|observability|memflip|swiftpay|foodpulse|opensis' || true
+kubectl get applications.argoproj.io -A 2>/dev/null || true
+kubectl get crd applications.argoproj.io appprojects.argoproj.io 2>/dev/null || true
+rg -n "argocd|ArgoCD|ApplicationSet|app-of-apps" /Users/raymond/Documents/devops-easy-learning/internal-developer-platform /Users/raymond/Documents/devops-easy-learning/observability-stack /Users/raymond/Documents/devops-easy-learning/memflip /Users/raymond/Documents/devops-easy-learning/swiftpay /Users/raymond/Documents/devops-easy-learning/foodpulse /Users/raymond/Documents/devops-easy-learning/opensis -g '!**/node_modules/**' -g '!**/.git/**'
+bash -n /Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/activate-argocd-gitops.sh
+kubectl kustomize /Users/raymond/Documents/devops-easy-learning/internal-developer-platform/gitops/argocd/dev >/tmp/idp-argocd-dev.yaml
+./scripts/activate-argocd-gitops.sh
+kubectl get pods -n argocd -o wide
+kubectl get events -n argocd --sort-by=.lastTimestamp | tail -n 40
+kubectl describe node colima | sed -n '/Taints:/,/Unschedulable:/p'
+kubectl get node colima -o jsonpath='{range .status.conditions[*]}{.type}={.status}:{.reason}{"\n"}{end}'
+colima ssh -- sudo journalctl -u k3s --since '10 minutes ago' | tail -n 120
+colima ssh -- curl -I --max-time 20 https://quay.io/v2/
+kubectl delete namespace argocd --ignore-not-found=true
+kubectl delete pod -n argocd --all --force --grace-period=0
+kubectl get namespace argocd -o json | jq '.spec.finalizers=[]' | kubectl replace --raw /api/v1/namespaces/argocd/finalize -f -
+```
+
+Measured outcome:
+- repository-side GitOps activation is now materially prepared:
+  - central root orchestration exists under:
+    - `gitops/argocd/dev`
+    - `gitops/argocd/root`
+  - activation script exists at:
+    - `scripts/activate-argocd-gitops.sh`
+  - `SwiftPay` now has:
+    - `k8s/argocd/swiftpay-dev-application.yaml`
+- live cluster checks proved that ArgoCD was not installed before the attempt:
+  - no `argocd` namespace
+  - no `applications.argoproj.io` CRD
+  - no live `Application` objects
+- the ArgoCD install partially applied successfully:
+  - `applications.argoproj.io` and `appprojects.argoproj.io` CRDs were created
+  - the `argocd` namespace was created
+- the live bootstrap did not complete cleanly:
+  - the node briefly flipped back to `NodeReady` after instability
+  - `metrics-server` was already degraded with `MissingEndpoints`
+  - `k3s` logs showed runtime and API timeout symptoms
+  - ArgoCD pods stalled in image acquisition and startup long enough that the
+    controller install could not be called healthy or trustworthy
+- the partial install was rolled back on purpose:
+  - `argocd` workloads were force deleted
+  - the namespace was finalized manually after the namespace controller stalled
+    on stale discovery and content-deletion state
+- the repo now has a repeatable retry path, but the live activation should not
+  be called complete until the cluster is stable enough to keep `argocd`
+  controllers healthy after install

@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - internal-developer-platform-dev-project.yaml
+  - observability-dev-application.yaml
+  - memflip-dev-application.yaml
+  - swiftpay-dev-application.yaml
+  - foodpulse-dev-application.yaml
+  - opensis-dev-application.yaml
