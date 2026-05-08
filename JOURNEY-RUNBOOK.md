@@ -85,6 +85,64 @@ This is the stronger engineering story:
 - the live test then exposed the next real resiliency gap
 - instead of claiming success too early, we added a second, explicit recovery layer for the broader local platform
 
+## 2026-05-08 - End-to-end Colima restart retest after both recovery layers
+
+### Goal
+
+Run a second full Colima stop/start test after both recovery LaunchAgents were installed and verify whether the local platform can converge back to healthy public service without manual operator recovery.
+
+### Commands
+
+```bash
+colima status
+kubectl get nodes
+kubectl -n vault exec vault-0 -- sh -c 'vault status'
+for ns in memflip-dev swiftpay-dev foodpulse-dev opensis-dev platform-observability-dev; do
+  echo "[$ns]"
+  kubectl -n "$ns" get secretstore,externalsecret
+  echo
+done
+curl -I https://portfolio.eseosadevbox.com
+launchctl print "gui/$(id -u)/com.internal-developer-platform.vault-recovery" | sed -n '1,120p'
+launchctl print "gui/$(id -u)/com.internal-developer-platform.k3s-platform-recovery" | sed -n '1,120p'
+: > ~/Library/Logs/internal-developer-platform-vault-recovery.out.log
+: > ~/Library/Logs/internal-developer-platform-vault-recovery.err.log
+: > ~/Library/Logs/internal-developer-platform-k3s-platform-recovery.out.log
+: > ~/Library/Logs/internal-developer-platform-k3s-platform-recovery.err.log
+colima stop
+colima start --runtime docker --cpu "${IDP_RUNTIME_CPU:-6}" --memory "${IDP_RUNTIME_MEMORY_GIB:-12}" --disk "${IDP_RUNTIME_DISK_GIB:-100}" --kubernetes --network-address
+kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded
+kubectl -n kube-system logs svclb-traefik-bc857937-lfnx9 -c lb-tcp-80 --tail=120
+kubectl -n kube-system logs svclb-traefik-bc857937-lfnx9 -c lb-tcp-443 --tail=120
+kubectl -n traefik describe svc traefik
+colima ssh -- sudo iptables -t nat -S
+curl -sSI https://portfolio.eseosadevbox.com
+curl -sSI -H 'Host: portfolio.eseosadevbox.com' http://192.168.64.2
+launchctl print "gui/$(id -u)/com.internal-developer-platform.vault-recovery" | sed -n '1,120p'
+launchctl print "gui/$(id -u)/com.internal-developer-platform.k3s-platform-recovery" | sed -n '1,120p'
+```
+
+### What We Learned
+
+- both LaunchAgents ran during the restart window
+- the Vault agent briefly returned a non-zero exit while the Kubernetes API and Vault pod were not yet ready, then recovered on the next interval
+- the platform recovery agent converged the broader stack without manual `ensure-k3s-runtime.sh` intervention
+- there was a short public `502` window while Traefik service-lb plumbing was still settling
+- the final state recovered cleanly:
+  - `portfolio.eseosadevbox.com` returned `200`
+  - direct host-header traffic to `http://192.168.64.2` returned `200`
+  - `vault-backend` `SecretStore` objects were `Valid`
+  - `ExternalSecret` objects were `SecretSynced`
+  - no non-running pods remained cluster-wide
+
+### Why This Step Mattered
+
+This is the first end-to-end proof that the local restart model now behaves like a layered recovery system instead of an operator-only repair exercise:
+
+- Vault recovery is automatic
+- broader k3s platform recovery is automatic
+- brief restart turbulence is acceptable, but manual post-restart surgery is no longer the normal path
+
 ## Purpose
 
 This file is the living runbook for this workspace.

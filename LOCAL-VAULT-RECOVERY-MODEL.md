@@ -83,6 +83,22 @@ This gives us:
 4. Detect whether core platform namespaces still have restart-stuck pods.
 5. Reconcile Traefik and re-nudge the core platform until the control plane can serve traffic again.
 
+## What A Successful Restart Now Looks Like
+
+A successful local Colima restart no longer means every public hostname is healthy immediately at process start. The expected recovery pattern is:
+
+1. Colima and `k3s` return.
+2. Vault may briefly be sealed or unreachable.
+3. The Vault recovery LaunchAgent retries until the secret platform is healthy.
+4. The platform recovery LaunchAgent reconciles Traefik and any restart-stuck core pods.
+5. Public ingress may show a short `502` window while service-lb plumbing settles.
+6. The steady-state success criteria are:
+   - `vault status` shows `Sealed false`
+   - namespace `vault-backend` `SecretStore` objects are `Valid`
+   - `ExternalSecret` objects are `SecretSynced`
+   - `kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded` returns no resources
+   - `https://portfolio.eseosadevbox.com` returns `200`
+
 ## Operator Commands
 
 Manual Vault recovery:
