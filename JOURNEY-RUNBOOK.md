@@ -1,5 +1,47 @@
 # DevOps Easy Learning Journey Runbook
 
+## 2026-05-08 - Local Vault restart hardening
+
+### Goal
+
+Fix the recurring local design flaw where direct Colima stop/start cycles brought Vault back sealed and left every namespace `vault-backend` `SecretStore` invalid until manual operator recovery.
+
+### Commands
+
+```bash
+colima status
+kubectl config current-context
+kubectl get nodes -o wide
+kubectl -n vault get pods -o wide
+kubectl -n vault exec vault-0 -- sh -c 'vault status'
+kubectl -A get secretstore
+```
+
+### What We Learned
+
+- the cluster itself returned healthy after Colima restart
+- Vault returned `Initialized=true` and `Sealed=true`
+- namespace `vault-backend` `SecretStore` objects failed with `InvalidProviderConfig`
+- the recurring failure was not a cluster-down problem; it was a local Vault restart-model weakness
+
+### Fix Applied
+
+- added host-side recovery script:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh)
+- added macOS LaunchAgent installer:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh)
+- changed [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/ensure-k3s-runtime.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/ensure-k3s-runtime.sh) to call the recovery script instead of calling the Vault bootstrap reconcile path directly
+- changed [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-macos-userland.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-macos-userland.sh) so fresh workstation bootstrap installs the LaunchAgent automatically
+- documented the design in [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md)
+
+### Why This Step Mattered
+
+This turned a recurring operator pain point into a deliberate platform design decision:
+
+- local recovery is now automatic from the host side
+- the unseal key still does not live inside Kubernetes
+- the project now has a strong talking point about balancing local resiliency with enterprise-grade trust boundaries
+
 ## Purpose
 
 This file is the living runbook for this workspace.

@@ -83,7 +83,7 @@ reconcile_shared_vault_platform() {
   fi
 
   echo "Reconciling shared Vault and External Secrets platform..."
-  "${SCRIPT_DIR}/bootstrap-k3s-vault-secrets.sh" --skip-helm >/dev/null
+  "${SCRIPT_DIR}/recover-k3s-vault.sh" --quiet >/dev/null
 }
 
 ensure_macos_k3s() {

@@ -47,6 +47,7 @@ Notes:
 - it uses Colima and Lima for the local Docker runtime
 - it provisions a local k3s cluster through Colima and installs Traefik as the ingress controller
 - the primary platform target is k3s; Docker Compose remains a stable foundation, not the main runtime-sizing driver
+- it installs a host-side Vault recovery LaunchAgent so local Colima restarts do not leave External Secrets permanently degraded
 - cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - after bootstrap, the main Docker context should be `colima`
 
@@ -178,6 +179,24 @@ be driven by the shared k3s platform:
 - the control-plane UI
 - migrated application namespaces
 - local image builds and image imports
+
+## Local Vault Recovery
+
+Local Vault restart recovery is now a first-class platform concern.
+
+The chosen local model is host-side, not in-cluster:
+
+- host-side recovery script:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh)
+- host-side macOS LaunchAgent installer:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh)
+- rationale and tradeoffs:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md)
+
+This is intentional:
+
+- local restarts should recover cleanly
+- the Vault unseal key should not be stored inside Kubernetes just for convenience
 
 ### Recommended baseline
 
