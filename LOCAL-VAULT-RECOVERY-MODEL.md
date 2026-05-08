@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains the local Vault restart design for the Internal Developer Platform.
+This document explains the local restart recovery design for the Internal Developer Platform.
 
 It exists because the local `docker + k3s` platform has a real tension:
 
@@ -35,31 +35,38 @@ For this project, that would be operationally convenient but architecturally wea
 
 ## Chosen Local Design
 
-For the local platform only, the recovery model is host-side:
+For the local platform only, the recovery model is host-side and layered:
 
 - Vault init material stays on the operator host:
   - `~/.config/internal-developer-platform/k3s-vault-init.json`
 - the cluster remains unaware of the unseal key
-- a host-side recovery script reconciles Vault and External Secrets after runtime restart
-- a macOS LaunchAgent runs that recovery script at login and every minute
-- the LaunchAgent runs from a mirrored bundle under `~/.local/share/internal-developer-platform/vault-recovery` so it does not depend on macOS `Documents` access
+- one host-side recovery script reconciles Vault and External Secrets after runtime restart
+- a second host-side recovery script reconciles the broader k3s platform after runtime restart
+- macOS LaunchAgents run both recovery paths from mirrored bundles under `~/.local/share/internal-developer-platform/` so they do not depend on macOS `Documents` access
 
 This gives us:
 
 - restart recovery without manual cluster surgery
 - a repeatable and observable operator path
 - preserved separation between host state and cluster state
+- a clear distinction between secret-platform recovery and full local platform recovery
 
 ## Recovery Components
 
-- Recovery script:
+- Vault recovery script:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh)
-- LaunchAgent installer:
+- Vault LaunchAgent installer:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh)
+- Platform recovery script:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh)
+- Platform LaunchAgent installer:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh)
 - Authoritative reconcile path reused by recovery:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-k3s-vault-secrets.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-k3s-vault-secrets.sh)
 
 ## How Recovery Works
+
+### Layer 1: Vault and External Secrets
 
 1. Detect whether Vault is sealed.
 2. Detect whether any `SecretStore` or `ExternalSecret` objects are not ready.
@@ -68,36 +75,56 @@ This gives us:
 5. Force-refresh `SecretStore` and `ExternalSecret` objects.
 6. Wait until the secret platform returns to `Ready=True`.
 
+### Layer 2: Full local platform
+
+1. Detect whether the Kubernetes API is ready.
+2. Detect whether Traefik is healthy.
+3. Reuse the Vault recovery layer.
+4. Detect whether core platform namespaces still have restart-stuck pods.
+5. Reconcile Traefik and re-nudge the core platform until the control plane can serve traffic again.
+
 ## Operator Commands
 
-Manual recovery:
+Manual Vault recovery:
 
 ```bash
 cd /Users/raymond/Documents/devops-easy-learning/internal-developer-platform
 ./scripts/recover-k3s-vault.sh
 ```
 
-Install the automatic recovery agent:
+Manual full platform recovery:
+
+```bash
+cd /Users/raymond/Documents/devops-easy-learning/internal-developer-platform
+./scripts/recover-k3s-platform.sh
+```
+
+Install the automatic recovery agents:
 
 ```bash
 cd /Users/raymond/Documents/devops-easy-learning/internal-developer-platform
 ./scripts/install-vault-recovery-launchagent.sh
+./scripts/install-platform-recovery-launchagent.sh
 ```
 
-Check the LaunchAgent:
+Check the LaunchAgents:
 
 ```bash
 launchctl print "gui/$(id -u)/com.internal-developer-platform.vault-recovery"
+launchctl print "gui/$(id -u)/com.internal-developer-platform.k3s-platform-recovery"
 ```
 
 Logs:
 
 - `~/Library/Logs/internal-developer-platform-vault-recovery.out.log`
 - `~/Library/Logs/internal-developer-platform-vault-recovery.err.log`
+- `~/Library/Logs/internal-developer-platform-k3s-platform-recovery.out.log`
+- `~/Library/Logs/internal-developer-platform-k3s-platform-recovery.err.log`
 
 Runtime bundle:
 
 - `~/.local/share/internal-developer-platform/vault-recovery`
+- `~/.local/share/internal-developer-platform/k3s-platform-recovery`
 
 ## Why This Is A Strong Talking Point
 
@@ -111,7 +138,9 @@ The project story is:
 
 - we identified that manual Vault unseal after local runtime restart was operationally weak
 - we rejected the lazy fix of storing unseal material in-cluster
-- we implemented a host-side recovery control for local development
+- we implemented a host-side recovery control for Vault
+- we then proved through live restart testing that full local platform recovery needed a second control
+- we implemented that second host-side platform recovery layer instead of pretending the first fix solved everything
 - we kept the production recommendation stricter than the local workaround
 
 ## Production Recommendation

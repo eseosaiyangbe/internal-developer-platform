@@ -298,6 +298,8 @@ main() {
   "${SCRIPT_DIR}/ensure-k3s-runtime.sh"
   echo "Installing host-side Vault recovery LaunchAgent..."
   "${SCRIPT_DIR}/install-vault-recovery-launchagent.sh" >/dev/null
+  echo "Installing host-side k3s platform recovery LaunchAgent..."
+  "${SCRIPT_DIR}/install-platform-recovery-launchagent.sh" >/dev/null
 
   cat <<'EOF'
 
@@ -313,6 +315,7 @@ Container runtime:
   colima start --runtime docker --cpu "$IDP_RUNTIME_CPU" --memory "$IDP_RUNTIME_MEMORY_GIB" --disk "$IDP_RUNTIME_DISK_GIB" --kubernetes --network-address
   docker context use colima
   ./scripts/recover-k3s-vault.sh
+  ./scripts/recover-k3s-platform.sh
 
 Verification:
   docker version

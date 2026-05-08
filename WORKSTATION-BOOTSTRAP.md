@@ -48,6 +48,7 @@ Notes:
 - it provisions a local k3s cluster through Colima and installs Traefik as the ingress controller
 - the primary platform target is k3s; Docker Compose remains a stable foundation, not the main runtime-sizing driver
 - it installs a host-side Vault recovery LaunchAgent so local Colima restarts do not leave External Secrets permanently degraded
+- it installs a host-side k3s platform recovery LaunchAgent so raw Colima restarts can reconcile Traefik and the control-plane stack automatically
 - cert-manager is intentionally optional and should be installed only when you are validating the TLS production path
 - after bootstrap, the main Docker context should be `colima`
 
@@ -190,6 +191,10 @@ The chosen local model is host-side, not in-cluster:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-vault.sh)
 - host-side macOS LaunchAgent installer:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-vault-recovery-launchagent.sh)
+- host-side full platform recovery script:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh)
+- host-side full platform LaunchAgent installer:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh)
 - rationale and tradeoffs:
   - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/LOCAL-VAULT-RECOVERY-MODEL.md)
 
@@ -197,6 +202,7 @@ This is intentional:
 
 - local restarts should recover cleanly
 - the Vault unseal key should not be stored inside Kubernetes just for convenience
+- full platform recovery after a raw runtime restart should be explicit and automated, not left to operator memory
 
 ### Recommended baseline
 

@@ -42,6 +42,49 @@ This turned a recurring operator pain point into a deliberate platform design de
 - the unseal key still does not live inside Kubernetes
 - the project now has a strong talking point about balancing local resiliency with enterprise-grade trust boundaries
 
+## 2026-05-08 - Full local platform restart test and second recovery layer
+
+### Goal
+
+Run a real Colima restart test and determine whether the new Vault recovery path was sufficient by itself.
+
+### Commands
+
+```bash
+colima stop
+colima start --runtime docker --cpu "${IDP_RUNTIME_CPU:-6}" --memory "${IDP_RUNTIME_MEMORY_GIB:-12}" --disk "${IDP_RUNTIME_DISK_GIB:-100}" --kubernetes --network-address
+tail -f ~/Library/Logs/internal-developer-platform-vault-recovery.out.log ~/Library/Logs/internal-developer-platform-vault-recovery.err.log
+kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded
+curl -I https://portfolio.eseosadevbox.com
+```
+
+### What We Learned
+
+- the Vault recovery LaunchAgent did run automatically after restart
+- Vault and the `SecretStore` / `ExternalSecret` layer recovered
+- that was not sufficient to bring the full platform back by itself
+- Traefik, kube-system components, and parts of the observability stack still came back in `Error`
+- public Cloudflare hostnames returned `502` until a broader platform reconcile was run
+
+### Fix Applied
+
+- added full platform recovery script:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/recover-k3s-platform.sh)
+- added full platform LaunchAgent installer:
+  - [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/install-platform-recovery-launchagent.sh)
+- updated [/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-macos-userland.sh](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/scripts/bootstrap-macos-userland.sh) so fresh bootstrap installs both recovery agents
+- extended the recovery model documentation so the architecture now distinguishes:
+  - secret platform recovery
+  - full local platform recovery
+
+### Why This Step Mattered
+
+This is the stronger engineering story:
+
+- the first restart fix solved the original Vault design flaw
+- the live test then exposed the next real resiliency gap
+- instead of claiming success too early, we added a second, explicit recovery layer for the broader local platform
+
 ## Purpose
 
 This file is the living runbook for this workspace.
