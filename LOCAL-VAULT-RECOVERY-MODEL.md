@@ -51,6 +51,12 @@ This gives us:
 - preserved separation between host state and cluster state
 - a clear distinction between secret-platform recovery and full local platform recovery
 
+Human browser access is intentionally separate from workload access:
+
+- `AppRole` remains the machine-auth path for workloads
+- `userpass` is the normal local operator UI login path
+- the root token remains break-glass only
+
 ## Recovery Components
 
 - Vault recovery script:
@@ -128,6 +134,15 @@ Check the LaunchAgents:
 ```bash
 launchctl print "gui/$(id -u)/com.internal-developer-platform.vault-recovery"
 launchctl print "gui/$(id -u)/com.internal-developer-platform.k3s-platform-recovery"
+```
+
+Local Vault UI login:
+
+```text
+URL:       http://vault.devops.local/ui/
+Method:    Username
+admin:     Admin@123
+readonly:  readonly
 ```
 
 Logs:

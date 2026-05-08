@@ -178,6 +178,16 @@ Then the browser entrypoints are:
 - `http://foodpulse.devops.local`
 - `http://opensis.devops.local`
 
+Vault browser access for the local platform:
+
+- URL: `http://vault.devops.local/ui/`
+- normal operator login method: `Username`
+- local operator users seeded by the platform bootstrap:
+  - `admin` / `Admin@123`
+  - `readonly` / `readonly`
+- break-glass admin remains available through the root token stored in:
+  - `~/.config/internal-developer-platform/k3s-vault-init.json`
+
 Recommended workspace commands:
 
 ```bash

@@ -208,7 +208,17 @@ fi
 echo "[vault-bootstrap] Enabling Vault engines and Kubernetes auth"
 vault_exec_with_token "vault secrets enable -path=kv kv-v2 >/dev/null 2>&1 || true"
 vault_exec_with_token "vault auth enable kubernetes >/dev/null 2>&1 || true"
+vault_exec_with_token "vault auth enable userpass >/dev/null 2>&1 || true"
 vault_exec_with_token 'vault write auth/kubernetes/config kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT" >/dev/null'
+
+write_policy "local-admin" 'path "*" { capabilities = ["create", "read", "update", "delete", "list", "patch", "sudo"] }'
+write_policy "local-readonly" '
+path "sys/*" { capabilities = ["read", "list"] }
+path "auth/*" { capabilities = ["read", "list"] }
+path "kv/data/*" { capabilities = ["read", "list"] }
+path "kv/metadata/*" { capabilities = ["read", "list"] }
+path "kv/subkeys/*" { capabilities = ["read", "list"] }
+'
 
 write_policy "memflip-dev" "$(policy_rules_for_workspace_path "memflip/dev")"
 write_policy "memflip-prod" "$(policy_rules_for_workspace_path "memflip/prod")"
@@ -232,6 +242,8 @@ vault_exec_with_token "vault write auth/kubernetes/role/opensis-dev bound_servic
 vault_exec_with_token "vault write auth/kubernetes/role/opensis-prod bound_service_account_names=opensis-vault-reader bound_service_account_namespaces=opensis-prod audience=vault token_policies=opensis-prod ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/observability-dev bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-dev audience=vault token_policies=observability-dev ttl=1h >/dev/null"
 vault_exec_with_token "vault write auth/kubernetes/role/observability-prod bound_service_account_names=observability-vault-reader bound_service_account_namespaces=platform-observability-prod audience=vault token_policies=observability-prod ttl=1h >/dev/null"
+vault_exec_with_token "vault write auth/userpass/users/admin password='Admin@123' policies='local-admin' >/dev/null"
+vault_exec_with_token "vault write auth/userpass/users/readonly password='readonly' policies='local-readonly' >/dev/null"
 
 MEMFLIP_DEV_DB_PASSWORD="gamepass123"
 MEMFLIP_DEV_REDIS_PASSWORD="gamepass123"
