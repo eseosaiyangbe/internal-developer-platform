@@ -74,3 +74,22 @@ resolve_foodpulse_dir() {
 resolve_memflip_dir() {
   resolve_repo_dir "MemFlip" "memflip" "docker-compose.yml"
 }
+
+resolve_internal_developer_platform_dir() {
+  resolve_repo_dir "internal-developer-platform" "internal_developer_platform" "scripts/workspace-lib.sh"
+}
+
+resolve_workspace_script() {
+  local script_name="$1"
+  local platform_dir
+
+  platform_dir="$(resolve_internal_developer_platform_dir)"
+
+  if [[ -f "${platform_dir}/scripts/${script_name}" ]]; then
+    printf '%s\n' "${platform_dir}/scripts/${script_name}"
+    return 0
+  fi
+
+  printf 'Unable to locate workspace script %s under %s/scripts.\n' "${script_name}" "${platform_dir}" >&2
+  return 1
+}
