@@ -194,11 +194,15 @@ Recommended workspace commands:
 ./scripts/bootstrap-sibling-repos.sh
 ./scripts/workspace-start.sh
 ./scripts/workspace-stop.sh
+./scripts/workspace-k8s-start.sh
+./scripts/workspace-k8s-stop.sh
 ./scripts/workspace-layout.sh
 ```
 
-`workspace-start.sh` and `workspace-stop.sh` now support the sibling-checkout
-platform layout directly.
+`workspace-start.sh` and `workspace-stop.sh` support the sibling-checkout
+platform layout directly and are Docker Compose only.
+
+`workspace-k8s-start.sh` and `workspace-k8s-stop.sh` are the Kubernetes entrypoints.
 
 If you need to override any resolved path explicitly, use:
 
@@ -227,6 +231,26 @@ When a child repo includes `.env.example`, the sibling bootstrap also seeds a
 local `.env` automatically so first-run Compose paths do not depend on leftover
 files from the old embedded workspace layout.
 
+Compose workspace controls:
+
+```bash
+./scripts/workspace-compose-start.sh
+./scripts/workspace-compose-stop.sh
+```
+
+The Compose aliases above are thin wrappers around:
+
+```bash
+./scripts/workspace-start.sh
+./scripts/workspace-stop.sh
+```
+
+These Compose workspace scripts:
+
+- start and stop Docker Compose services only
+- do not apply, delete, or reconcile Kubernetes manifests
+- do not replace the Kubernetes workspace controls
+
 Force a rebuild only when you actually need one:
 
 ```bash
@@ -243,10 +267,22 @@ What `./scripts/workspace-start.sh` does:
 6. Wait for the control-plane app snapshot to stabilize
 7. Run the shared operator check
 
-Start the full workspace:
+Start the full Compose workspace:
 
 ```bash
 ./scripts/workspace-start.sh
+```
+
+Start the full Kubernetes workspace:
+
+```bash
+./scripts/workspace-k8s-start.sh
+```
+
+Stop the full Kubernetes workspace:
+
+```bash
+./scripts/workspace-k8s-stop.sh
 ```
 
 If you want the underlying repo-by-repo commands instead of the wrapper, the
@@ -267,6 +303,25 @@ how to resolve the sibling workload repos without assuming they live inside
 this central repo.
 
 Apple Silicon note for `OpenSIS`: the wrapper automatically uses `./scripts/compose-start.sh --build-local`.
+
+## Local Compose URLs
+
+When you use the Compose workspace path, the main local browser entrypoints are:
+
+- control plane: `http://localhost:4000`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+- Loki: `http://localhost:3100`
+- Alertmanager: `http://localhost:9093`
+- cAdvisor: `http://localhost:8082/containers/`
+- OpenSIS: `http://localhost:8088`
+- SwiftPay frontend: `http://localhost:8081`
+- SwiftPay API health: `http://localhost:3007/health`
+- SwiftPay RabbitMQ UI: `http://localhost:15672`
+- FoodPulse app: `http://localhost:8090`
+- FoodPulse API direct: `http://localhost:3102`
+- FoodPulse health via UI proxy: `http://localhost:8090/health`
+- MemFlip: `http://localhost:8083`
 
 Target healthy result:
 

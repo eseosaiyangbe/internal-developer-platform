@@ -9,7 +9,10 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-start.sh [options]
 
-Start the full Internal Developer Platform workspace in the recommended order.
+Start the full Internal Developer Platform Compose workspace in the recommended order.
+
+This script is Docker Compose only. It does not deploy or manage Kubernetes.
+For Kubernetes, use ./scripts/workspace-k8s-start.sh instead.
 
 Options:
   --rebuild          Force image rebuilds for local-build services before startup

@@ -107,6 +107,21 @@ workload directories, and the central operator scripts support:
 - a central platform repo with no embedded workload repos
 - sibling workload checkouts
 
+The central workspace scripts are now intentionally split by runtime model:
+
+- Compose workspace controls:
+  - `./scripts/workspace-start.sh`
+  - `./scripts/workspace-stop.sh`
+  - `./scripts/workspace-compose-start.sh`
+  - `./scripts/workspace-compose-stop.sh`
+- Kubernetes workspace controls:
+  - `./scripts/workspace-k8s-start.sh`
+  - `./scripts/workspace-k8s-stop.sh`
+
+Do not treat the Compose and Kubernetes entrypoints as interchangeable. The
+Compose scripts manage Docker Compose services only, while the Kubernetes
+scripts apply or delete workload overlays in the current cluster context.
+
 To inspect the currently resolved layout:
 
 ```bash

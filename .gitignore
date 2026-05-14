@@ -10,3 +10,7 @@
 **/.next
 node_modules
 **/node_modules
+
+.playwright-cli/
+**/.playwright-cli/
+output/playwright/

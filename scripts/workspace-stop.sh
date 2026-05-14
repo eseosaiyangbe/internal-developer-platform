@@ -9,7 +9,10 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-stop.sh [options]
 
-Stop the full Internal Developer Platform workspace in reverse order.
+Stop the full Internal Developer Platform Compose workspace in reverse order.
+
+This script is Docker Compose only. It does not manage Kubernetes resources.
+For Kubernetes, use ./scripts/workspace-k8s-stop.sh instead.
 
 Options:
   --volumes         Remove named volumes where the repo-specific stop path supports it

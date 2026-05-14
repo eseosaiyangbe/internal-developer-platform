@@ -112,7 +112,17 @@ Current status:
   - `./scripts/bootstrap-sibling-repos.sh`
   - `./scripts/workspace-start.sh`
   - `./scripts/workspace-stop.sh`
+  - `./scripts/workspace-compose-start.sh`
+  - `./scripts/workspace-compose-stop.sh`
+  - `./scripts/workspace-k8s-start.sh`
+  - `./scripts/workspace-k8s-stop.sh`
   - `./scripts/workspace-layout.sh`
+
+Runtime split:
+
+- `workspace-start.sh` and `workspace-stop.sh` are Docker Compose workspace controls
+- `workspace-compose-start.sh` and `workspace-compose-stop.sh` are explicit Compose aliases
+- `workspace-k8s-start.sh` and `workspace-k8s-stop.sh` are Kubernetes workspace controls
 
 ### Option 2: Git submodules
 
