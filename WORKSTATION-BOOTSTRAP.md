@@ -117,10 +117,17 @@ The central workspace scripts are now intentionally split by runtime model:
 - Kubernetes workspace controls:
   - `./scripts/workspace-k8s-start.sh`
   - `./scripts/workspace-k8s-stop.sh`
+  - `./scripts/workspace-k8s-reset.sh`
 
 Do not treat the Compose and Kubernetes entrypoints as interchangeable. The
 Compose scripts manage Docker Compose services only, while the Kubernetes
 scripts apply or delete workload overlays in the current cluster context.
+
+Workspace Kubernetes semantics:
+
+- `workspace-k8s-start.sh` resumes preserved app state when possible
+- `workspace-k8s-stop.sh` safely pauses apps without deleting namespaces or persistent volumes
+- `workspace-k8s-reset.sh` is the destructive reset path when you intentionally want a clean reinstall
 
 To inspect the currently resolved layout:
 

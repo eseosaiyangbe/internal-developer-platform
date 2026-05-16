@@ -9,10 +9,10 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-k8s-start.sh [options]
 
-Start the shared k3s runtime and deploy all managed dev overlays.
+Start the shared k3s runtime and resume or deploy all managed dev overlays.
 
 By default, this script reuses existing local images and focuses on a safe
-start/deploy path. Use --build only when you intentionally want fresh images.
+start/resume path. Use --build only when you intentionally want fresh images.
 
 Options:
   --app NAME   Start only one app: observability-stack, opensis, swiftpay, memflip, foodpulse
@@ -55,6 +55,22 @@ run_step() {
   "$@"
 }
 
+run_app_start() {
+  local label="$1"
+  local repo_dir="$2"
+  shift 2
+
+  local cmd=("${repo_dir}/scripts/k8s-start.sh")
+  if [[ "${BUILD_IMAGES}" -eq 1 ]]; then
+    cmd+=(--build)
+  fi
+  if [[ "$#" -gt 0 ]]; then
+    cmd+=("$@")
+  fi
+
+  run_step "Starting ${label}" "${cmd[@]}"
+}
+
 validate_target_app() {
   case "$1" in
     all|observability-stack|opensis|swiftpay|memflip|foodpulse)
@@ -72,11 +88,6 @@ should_run_app() {
   [[ "${TARGET_APP}" == "all" || "${TARGET_APP}" == "${app_name}" ]]
 }
 
-build_flag_args=()
-if [[ "${BUILD_IMAGES}" -eq 0 ]]; then
-  build_flag_args+=(--skip-build)
-fi
-
 validate_target_app "${TARGET_APP}"
 
 platform_dir="$(resolve_internal_developer_platform_dir)"
@@ -93,42 +104,23 @@ run_step "Ensuring k3s runtime" "${runtime_script}"
 run_step "Bootstrapping shared Vault and External Secrets" "${secrets_script}"
 
 if should_run_app "observability-stack"; then
-  run_step "Deploying observability-stack" \
-    "${observability_dir}/scripts/k8s-dev-deploy.sh" \
-    --skip-runtime \
-    --skip-secrets-platform \
-    "${build_flag_args[@]}"
+  run_app_start "observability-stack" "${observability_dir}"
 fi
 
 if should_run_app "opensis"; then
-  run_step "Deploying OpenSIS" \
-    "${opensis_dir}/scripts/k8s-dev-deploy.sh" \
-    --skip-runtime \
-    --skip-secrets-platform \
-    "${build_flag_args[@]}"
+  run_app_start "OpenSIS" "${opensis_dir}"
 fi
 
 if should_run_app "swiftpay"; then
-  run_step "Deploying SwiftPay" \
-    "${swiftpay_dir}/scripts/k8s-dev-deploy.sh" \
-    --skip-runtime \
-    --skip-secrets-platform \
-    "${build_flag_args[@]}"
+  run_app_start "SwiftPay" "${swiftpay_dir}"
 fi
 
 if should_run_app "memflip"; then
-  run_step "Deploying MemFlip" \
-    "${memflip_dir}/scripts/k8s-dev-deploy.sh" \
-    --skip-secrets-platform \
-    "${build_flag_args[@]}"
+  run_app_start "MemFlip" "${memflip_dir}"
 fi
 
 if should_run_app "foodpulse"; then
-  run_step "Deploying FoodPulse" \
-    "${foodpulse_dir}/scripts/k8s-dev-deploy.sh" \
-    --skip-runtime \
-    --skip-secrets-platform \
-    "${build_flag_args[@]}"
+  run_app_start "FoodPulse" "${foodpulse_dir}"
 fi
 
 echo

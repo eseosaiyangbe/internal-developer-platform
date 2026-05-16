@@ -196,13 +196,31 @@ Recommended workspace commands:
 ./scripts/workspace-stop.sh
 ./scripts/workspace-k8s-start.sh
 ./scripts/workspace-k8s-stop.sh
+./scripts/workspace-k8s-reset.sh
 ./scripts/workspace-layout.sh
 ```
 
 `workspace-start.sh` and `workspace-stop.sh` support the sibling-checkout
 platform layout directly and are Docker Compose only.
 
-`workspace-k8s-start.sh` and `workspace-k8s-stop.sh` are the Kubernetes entrypoints.
+`workspace-k8s-start.sh`, `workspace-k8s-stop.sh`, and `workspace-k8s-reset.sh` are the Kubernetes entrypoints.
+
+Kubernetes lifecycle semantics:
+
+- `workspace-k8s-start.sh` resumes preserved namespaces when possible and falls back to full deploy only when needed
+- `workspace-k8s-stop.sh` is state-preserving and delegates to each app repo's safe pause path
+- `workspace-k8s-reset.sh` is intentionally destructive and delegates to each app repo's reset path
+
+Local recovery note:
+
+- the host-side platform recovery path now checks both Traefik readiness and the direct origin listener on `192.168.64.2:80`
+- if the platform falls into the `scheduled but no sandbox/IP` wedge pattern after a runtime fault, the recovery script can restart Colima once and retry automatically
+- use `./scripts/recover-k3s-platform.sh --no-colima-restart` if you need to suppress that escalation for a one-off manual debug session
+
+Single-node footprint note:
+
+- this workstation can run both `platform-observability-dev` and `platform-observability-prod`, but keeping both observability namespaces active full-time on one Colima node increases restart churn materially
+- use `dev` as the default local control-plane footprint and bring `prod` up intentionally when you are validating prod-specific behavior
 
 If you need to override any resolved path explicitly, use:
 

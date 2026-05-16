@@ -85,9 +85,12 @@ Human browser access is intentionally separate from workload access:
 
 1. Detect whether the Kubernetes API is ready.
 2. Detect whether Traefik is healthy.
-3. Reuse the Vault recovery layer.
-4. Detect whether core platform namespaces still have restart-stuck pods.
-5. Reconcile Traefik and re-nudge the core platform until the control plane can serve traffic again.
+3. Probe the public origin listener directly on `192.168.64.2:80`.
+4. Reuse the Vault recovery layer.
+5. Detect whether core platform namespaces still have restart-stuck pods.
+6. Treat `scheduled but no sandbox/IP` pods as a real runtime wedge, not as harmless pending work.
+7. Reconcile Traefik and re-nudge the core platform until the control plane can serve traffic again.
+8. If the origin listener stays down and the runtime wedge pattern persists, restart Colima once and retry the reconcile.
 
 ## What A Successful Restart Now Looks Like
 
@@ -103,7 +106,31 @@ A successful local Colima restart no longer means every public hostname is healt
    - namespace `vault-backend` `SecretStore` objects are `Valid`
    - `ExternalSecret` objects are `SecretSynced`
    - `kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded` returns no resources
+   - `curl -I -H 'Host: portfolio.eseosadevbox.com' http://192.168.64.2` returns an HTTP response instead of `connection refused`
    - `https://portfolio.eseosadevbox.com` returns `200`
+
+## Single-Node Capacity Note
+
+This workstation currently runs both:
+
+- `platform-observability-dev`
+- `platform-observability-prod`
+
+on the same single-node Colima cluster.
+
+That is acceptable for controlled validation, but it increases restart churn and
+recovery time materially:
+
+- more Traefik routes
+- more TLS and cert-manager work
+- more PostgreSQL, Loki, and Prometheus footprint
+- more restart contention when the runtime wedges
+
+Recommended local operator posture:
+
+- keep `dev` observability active by default
+- bring `prod` observability up only when you are actively validating prod-specific behavior
+- do not treat simultaneous long-lived `dev + prod` observability on one laptop node as a stable default
 
 ## Operator Commands
 
@@ -119,6 +146,13 @@ Manual full platform recovery:
 ```bash
 cd /Users/raymond/Documents/devops-easy-learning/internal-developer-platform
 ./scripts/recover-k3s-platform.sh
+```
+
+Disable the automatic Colima restart escalation for one run:
+
+```bash
+cd /Users/raymond/Documents/devops-easy-learning/internal-developer-platform
+./scripts/recover-k3s-platform.sh --no-colima-restart
 ```
 
 Install the automatic recovery agents:

@@ -116,13 +116,18 @@ Current status:
   - `./scripts/workspace-compose-stop.sh`
   - `./scripts/workspace-k8s-start.sh`
   - `./scripts/workspace-k8s-stop.sh`
+  - `./scripts/workspace-k8s-reset.sh`
   - `./scripts/workspace-layout.sh`
 
 Runtime split:
 
 - `workspace-start.sh` and `workspace-stop.sh` are Docker Compose workspace controls
 - `workspace-compose-start.sh` and `workspace-compose-stop.sh` are explicit Compose aliases
-- `workspace-k8s-start.sh` and `workspace-k8s-stop.sh` are Kubernetes workspace controls
+- `workspace-k8s-start.sh`, `workspace-k8s-stop.sh`, and `workspace-k8s-reset.sh` are Kubernetes workspace controls
+- workspace Kubernetes semantics now match the child repos:
+  - `start` resumes preserved state when possible
+  - `stop` preserves state
+  - `reset` is destructive by design
 
 ### Option 2: Git submodules
 

@@ -9,24 +9,30 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/workspace-k8s-stop.sh [options]
 
-Stop all managed dev overlays from the current Kubernetes context.
+Safely stop all managed dev overlays from the current Kubernetes context.
 
-This removes the workload manifests but does not intentionally purge persistent
-volume data.
+This preserves namespaces and persistent data so workloads can be resumed
+cleanly with ./scripts/workspace-k8s-start.sh.
 
 Options:
   --app NAME   Stop only one app: observability-stack, opensis, swiftpay, memflip, foodpulse
+  --wait       Wait for delete completion before returning
   -h, --help   Show this help message
 EOF
 }
 
 TARGET_APP="all"
+WAIT_FOR_DELETE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app)
       TARGET_APP="${2:?Missing app name}"
       shift 2
+      ;;
+    --wait)
+      WAIT_FOR_DELETE=1
+      shift
       ;;
     -h|--help)
       usage
@@ -59,11 +65,15 @@ should_run_app() {
 
 run_delete() {
   local label="$1"
-  local overlay_dir="$2"
+  local repo_dir="$2"
+  local cmd=("${repo_dir}/scripts/k8s-stop.sh")
 
   echo
-  echo "==> Removing ${label}"
-  kubectl delete --ignore-not-found -k "${overlay_dir}"
+  echo "==> Stopping ${label}"
+  if [[ "${WAIT_FOR_DELETE}" -eq 1 ]]; then
+    cmd+=(--wait)
+  fi
+  "${cmd[@]}"
 }
 
 validate_target_app "${TARGET_APP}"
@@ -75,21 +85,21 @@ memflip_dir="$(resolve_memflip_dir)"
 foodpulse_dir="$(resolve_foodpulse_dir)"
 
 if should_run_app "foodpulse"; then
-  run_delete "FoodPulse" "${foodpulse_dir}/k8s/overlays/dev"
+  run_delete "FoodPulse" "${foodpulse_dir}"
 fi
 if should_run_app "memflip"; then
-  run_delete "MemFlip" "${memflip_dir}/k8s/overlays/dev"
+  run_delete "MemFlip" "${memflip_dir}"
 fi
 if should_run_app "swiftpay"; then
-  run_delete "SwiftPay" "${swiftpay_dir}/k8s/overlays/dev"
+  run_delete "SwiftPay" "${swiftpay_dir}"
 fi
 if should_run_app "opensis"; then
-  run_delete "OpenSIS" "${opensis_dir}/k8s/overlays/dev"
+  run_delete "OpenSIS" "${opensis_dir}"
 fi
 if should_run_app "observability-stack"; then
-  run_delete "observability-stack" "${observability_dir}/k8s/overlays/dev"
+  run_delete "observability-stack" "${observability_dir}"
 fi
 
 echo
 echo "Kubernetes workspace stop completed for target: ${TARGET_APP}."
-echo "Namespaces may take a short time to finish terminating pods."
+echo "State was preserved for later resume."
