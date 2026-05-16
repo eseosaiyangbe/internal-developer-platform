@@ -55,6 +55,27 @@ run_step() {
   "$@"
 }
 
+shared_platform_healthy() {
+  local vault_status_json
+
+  command -v jq >/dev/null 2>&1 || return 1
+  kubectl get nodes >/dev/null 2>&1 || return 1
+  kubectl get namespace traefik >/dev/null 2>&1 || return 1
+  kubectl get namespace vault >/dev/null 2>&1 || return 1
+  kubectl get namespace external-secrets >/dev/null 2>&1 || return 1
+  kubectl get pod vault-0 -n vault >/dev/null 2>&1 || return 1
+
+  vault_status_json="$(kubectl exec -n vault vault-0 -- sh -lc 'vault status -format=json || true' 2>/dev/null || true)"
+  [[ -n "${vault_status_json}" ]] || return 1
+  printf '%s' "${vault_status_json}" | jq -e '.sealed == false' >/dev/null 2>&1 || return 1
+
+  kubectl get secretstore -A -o json 2>/dev/null \
+    | jq -e '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length == 0' >/dev/null 2>&1 || return 1
+
+  kubectl get externalsecret -A -o json 2>/dev/null \
+    | jq -e '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length == 0' >/dev/null 2>&1 || return 1
+}
+
 run_app_start() {
   local label="$1"
   local repo_dir="$2"
@@ -99,9 +120,20 @@ foodpulse_dir="$(resolve_foodpulse_dir)"
 
 runtime_script="$(resolve_workspace_script "ensure-k3s-runtime.sh")"
 secrets_script="$(resolve_workspace_script "bootstrap-k3s-vault-secrets.sh")"
+skip_shared_bootstrap=0
+if [[ "${TARGET_APP}" != "all" ]] && shared_platform_healthy; then
+  skip_shared_bootstrap=1
+fi
 
-run_step "Ensuring k3s runtime" "${runtime_script}"
-run_step "Bootstrapping shared Vault and External Secrets" "${secrets_script}"
+if [[ "${skip_shared_bootstrap}" -eq 1 ]]; then
+  run_step "Ensuring k3s runtime" env IDP_SKIP_SHARED_VAULT_RECONCILE=1 "${runtime_script}"
+  echo
+  echo "==> Bootstrapping shared Vault and External Secrets"
+  echo "Skipping full shared bootstrap for targeted app start because the platform is already healthy."
+else
+  run_step "Ensuring k3s runtime" "${runtime_script}"
+  run_step "Bootstrapping shared Vault and External Secrets" "${secrets_script}"
+fi
 
 if should_run_app "observability-stack"; then
   run_app_start "observability-stack" "${observability_dir}"

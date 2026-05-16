@@ -8,6 +8,7 @@ VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 RUNTIME_CPU="$(idp_runtime_value "IDP_RUNTIME_CPU" "DEVOPS_EASY_LEARNING_RUNTIME_CPU" "6")"
 RUNTIME_MEMORY_GIB="$(idp_runtime_value "IDP_RUNTIME_MEMORY_GIB" "DEVOPS_EASY_LEARNING_RUNTIME_MEMORY_GIB" "12")"
 RUNTIME_DISK_GIB="$(idp_runtime_value "IDP_RUNTIME_DISK_GIB" "DEVOPS_EASY_LEARNING_RUNTIME_DISK_GIB" "100")"
+SKIP_SHARED_VAULT_RECONCILE="${IDP_SKIP_SHARED_VAULT_RECONCILE:-0}"
 SYSCTL_FILE="/etc/sysctl.d/90-${IDP_PLATFORM_SLUG}-k3s.conf"
 LEGACY_SYSCTL_FILE="/etc/sysctl.d/90-${IDP_LEGACY_PLATFORM_SLUG}-k3s.conf"
 
@@ -70,6 +71,11 @@ ensure_traefik_with_helm() {
 }
 
 reconcile_shared_vault_platform() {
+  if [[ "${SKIP_SHARED_VAULT_RECONCILE}" == "1" ]]; then
+    echo "Skipping shared Vault and External Secrets reconcile by request."
+    return 0
+  fi
+
   if [[ ! -f "${VAULT_INIT_FILE}" ]]; then
     return 0
   fi
