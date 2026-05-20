@@ -3,6 +3,8 @@ kind: AppProject
 metadata:
   name: internal-developer-platform-dev
   namespace: argocd
+  annotations:
+    gitops.dev/validation-marker: "2026-05-20-argocd-project"
   labels:
     app.kubernetes.io/part-of: internal-developer-platform
     environment: dev
