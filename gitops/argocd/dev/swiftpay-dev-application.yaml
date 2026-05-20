@@ -10,6 +10,37 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: internal-developer-platform-dev
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: api-gateway
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: auth-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: frontend
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: notification-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: transaction-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: wallet-service
+      jsonPointers:
+        - /spec/replicas
   source:
     repoURL: https://github.com/eseosaiyangbe/SwiftPay.git
     targetRevision: main
