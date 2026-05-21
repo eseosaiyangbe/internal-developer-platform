@@ -23,10 +23,10 @@ What is already true:
 
 What is not yet true:
 
-- ArgoCD is not yet the default reconciler for the owned paths
-- the platform is not yet operating GitOps-first day two
+- ArgoCD is now the default reconciler for the owned `dev` paths
+- the platform has completed an initial GitOps validation pass across workload, app baseline, and shared platform categories
 - Phase 7 is not yet formally closed
-- the root GitOps artifacts now exist, but the first live activation attempt was rolled back after cluster runtime instability prevented a clean ArgoCD bootstrap
+- production-control tightening and formal closeout are still pending
 
 ## Remaining Work
 
@@ -35,6 +35,10 @@ What is not yet true:
 Objective:
 
 - make ArgoCD the default reconciler for the owned Kubernetes paths
+
+Status:
+
+- Completed on `2026-05-20` and `2026-05-21`
 
 Tasks:
 
@@ -57,6 +61,10 @@ Success criteria:
 Objective:
 
 - prove GitOps actually works under the current repo model
+
+Status:
+
+- Completed initial pass on `2026-05-20` and `2026-05-21`
 
 Tasks:
 
@@ -140,11 +148,9 @@ Decision rule:
 
 ## Recommended Execution Order
 
-1. GitOps activation
-2. GitOps validation pass
-3. production-control tightening review
-4. documentation closeout
-5. formal Phase 7 closeout decision
+1. production-control tightening review
+2. documentation closeout
+3. formal Phase 7 closeout decision
 
 ## Definition Of Done
 

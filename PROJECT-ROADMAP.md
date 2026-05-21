@@ -99,7 +99,7 @@ Phase 6 is complete. Phase 7 is no longer just planning and early slicing. The c
 The remaining Phase 7 focus is:
 
 - formal roadmap and closeout reconciliation
-- GitOps activation so ArgoCD moves from declared standard to default reconciler
+- production-control tightening after GitOps activation and validation
 - production-control tightening where the repo still carries placeholder or lab-safe posture
 
 Execution checklist:
@@ -130,7 +130,9 @@ Phase 7 will be considered successful when:
 GitOps note:
 
 - ArgoCD is already the declared GitOps standard and the repo already contains the owned ArgoCD application structure
-- the root GitOps orchestration layer and activation script now exist in the central repo, but the first live activation attempt on `2026-05-07` was rolled back after node-runtime instability prevented a trustworthy controller bring-up
+- the first live activation attempt on `2026-05-07` was rolled back after node-runtime instability prevented a trustworthy controller bring-up
+- GitOps activation and validation were completed on `2026-05-20` and `2026-05-21`
+- ArgoCD is now the default reconciler for the owned `dev` paths
 - Phase 7 does not need to wait for perfect GitOps promotion before the implementation story is credible
 - however, Phase 7 is not fully closed until we decide whether GitOps activation lands as the final Phase 7 slice or the opening Phase 8 execution slice
 
