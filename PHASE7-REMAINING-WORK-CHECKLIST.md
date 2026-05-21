@@ -21,10 +21,8 @@ What is already true:
 - Cloudflare Access is working for the protected observability services
 - Phase 7 `k3s` `dev` certification already exists
 
-What is not yet true:
+What still remains:
 
-- ArgoCD is now the default reconciler for the owned `dev` paths
-- the platform has completed an initial GitOps validation pass across workload, app baseline, and shared platform categories
 - Phase 7 is not yet formally closed
 - production-control tightening and formal closeout are still pending
 
@@ -104,6 +102,10 @@ Success criteria:
 
 - remaining production gaps are explicitly classified
 - no material “pretend prod” claims remain undocumented
+
+Reference:
+
+- use [PRODUCTION-CONTROL-TIGHTENING-REVIEW.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PRODUCTION-CONTROL-TIGHTENING-REVIEW.md) as the current audit baseline for this step
 
 ### 4. Documentation Closeout
 

@@ -106,6 +106,7 @@ Execution checklist:
 
 - use [PHASE7-REMAINING-WORK-CHECKLIST.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/PHASE7-REMAINING-WORK-CHECKLIST.md) as the concrete closeout plan for the remaining Phase 7 work
 - use [GITOPS-ACTIVATION.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/GITOPS-ACTIVATION.md) as the repeatable ArgoCD activation and retry procedure
+- use [PRODUCTION-CONTROL-TIGHTENING-REVIEW.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PRODUCTION-CONTROL-TIGHTENING-REVIEW.md) as the current production-control audit baseline
 
 Phase 6 completed intent was:
 
