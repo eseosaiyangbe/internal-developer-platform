@@ -83,10 +83,11 @@ The work is divided into seven phases.
 | 5. Operator workflows and incident drills | Complete | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and five executed drills are now in place |
 | 6. UX and demo polish | Complete | Control-plane story, demo center, comparison view, app handoff pages, and live demo validation now meet the Phase 6 standard |
 | 7. Production-style maturity and portfolio packaging | Complete | The owned k3s workload set, control plane, Vault-first secrets, public ingress, GitOps reconciliation, and production-control closeout are complete; remaining work now belongs to Phase 8 operational rigor |
+| 8. Operational rigor and production-depth hardening | In progress | The next maturity slice focuses on deeper durability, failure-mode validation, stricter access hardening, broader production-path proof, and higher-confidence platform operations under load |
 
 ## Current Focus
 
-Phase 7 is complete.
+We are currently in **Phase 8: operational rigor and production-depth hardening**.
 
 The platform has moved beyond late-stage assembly. The current state is:
 
@@ -98,7 +99,7 @@ The platform has moved beyond late-stage assembly. The current state is:
 - ArgoCD is the default reconciler for the owned `dev` paths
 - the formal Phase 7 closeout decision has been recorded
 
-Phase 8 should now focus on:
+Phase 8 now focuses on:
 
 - deeper durability and failure-mode validation
 - stronger production access and operational hardening
@@ -111,6 +112,7 @@ Execution checklist:
 - use [PHASE7-REMAINING-WORK-CHECKLIST.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/PHASE7-REMAINING-WORK-CHECKLIST.md) as the completed closeout checklist
 - use [GITOPS-ACTIVATION.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/GITOPS-ACTIVATION.md) as the repeatable ArgoCD activation and retry procedure
 - use [PRODUCTION-CONTROL-TIGHTENING-REVIEW.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PRODUCTION-CONTROL-TIGHTENING-REVIEW.md) as the current production-control audit baseline
+- use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
 
@@ -685,6 +687,63 @@ Turn the project from a cool local lab into a serious engineering narrative.
 
 ---
 
+## Phase 8: Operational Rigor And Production-Depth Hardening
+
+### Goal
+
+Turn the now-complete platform into a more resilient, better-proven, and more defensible operating environment under stricter runtime and operational assumptions.
+
+### Workstreams
+
+#### 8.1 Durability And Failure-Mode Validation
+
+- validate restart, stop/start, and reset behavior for stateful services under GitOps control
+- prove control-plane durability behavior for Grafana, Alertmanager, Promtail, and notification persistence
+- run explicit restart and failure drills to confirm state continuity and recovery behavior
+
+#### 8.2 Access And Security Hardening
+
+- strengthen operator access patterns for ArgoCD and other protected platform surfaces
+- tighten credential handling, admin access expectations, and break-glass procedures
+- review namespace, service-account, and network-policy boundaries for stronger production-style posture
+
+#### 8.3 Runtime And Placement Rigor
+
+- validate platform behavior under higher load and tighter resource conditions
+- re-check HPA behavior, probe thresholds, and disruption posture under real runtime pressure
+- document what is single-node-safe versus what requires multi-node assumptions
+
+#### 8.4 Production-Path Proof
+
+- exercise more of the production overlays as live operational paths, not just as Git-defined intent
+- validate the dev/prod contract separation more aggressively
+- ensure public routing, ingress, TLS, and control-plane expectations remain consistent under continued change
+
+#### 8.5 Reliability And Operator Maturity
+
+- reduce recurring manual interventions in the control plane
+- document and minimize known GitOps comparison and local-runtime instability patterns
+- keep the operational story honest by separating local constraints from platform design quality
+
+### Deliverables
+
+- a Phase 8 operational rigor plan with explicit execution slices
+- documented durability validation results for the major stateful and control-plane components
+- hardened operator access guidance for ArgoCD and protected platform services
+- validated runtime and scaling notes for the owned workloads under stricter conditions
+- clearer dev versus prod operating boundaries with more live production-path proof
+- updated roadmap and runbooks reflecting the deeper operational maturity posture
+
+### Success Criteria
+
+- major stateful and control-plane durability assumptions are tested rather than inferred
+- operator access and recovery procedures are documented, repeatable, and less dependent on tribal knowledge
+- known local-runtime and GitOps edge cases are clearly classified and operationally manageable
+- the platform can defend a stronger production-style claim without overstating current multi-node or cloud-scale proof
+- the roadmap story is no longer about establishing ownership, but about increasing confidence under failure and operational stress
+
+---
+
 ## Priority Order
 
 This is the order I recommend we actually execute in:
@@ -695,6 +754,7 @@ This is the order I recommend we actually execute in:
 4. Phase 5: Operator workflows and drills
 5. Phase 6: UX and demo polish
 6. Phase 7: Portfolio packaging
+7. Phase 8: Operational rigor and production-depth hardening
 
 Reason:
 
