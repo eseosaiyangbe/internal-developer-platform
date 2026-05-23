@@ -198,6 +198,104 @@ kubectl logs -n argocd deployment/argocd-repo-server
 kubectl annotate application internal-developer-platform-dev-root -n argocd argocd.argoproj.io/refresh=hard --overwrite
 ```
 
+## Known Operational Pattern
+
+### `Unknown` does not automatically mean the workload is down
+
+During live operation on `2026-05-23`, `opensis-dev` showed:
+
+- `sync.status=Unknown`
+- `health.status=Healthy`
+- `ComparisonError`
+
+The application condition was:
+
+```text
+Failed to load target state: failed to generate manifest for source 1 of 1:
+rpc error: code = Unavailable desc = connection error:
+transport: Error while dialing: dial tcp 10.43.192.137:8081: connect: connection refused
+```
+
+That endpoint was the in-cluster `argocd-repo-server` service.
+
+This means:
+
+- ArgoCD could not compare desired state to live state
+- ArgoCD therefore marked sync as `Unknown`
+- the workload itself may still be healthy
+
+In this incident, the `opensis-dev` namespace remained healthy throughout:
+
+```bash
+kubectl get pods -n opensis-dev
+```
+
+The namespace showed:
+
+- `opensis-ui` `1/1 Running`
+- `opensis-db-0` `1/1 Running`
+- Redis and exporters also `Running`
+
+The failure was in the ArgoCD comparison path, not the OpenSIS runtime.
+
+### How to diagnose it
+
+Check the application object first:
+
+```bash
+kubectl get application opensis-dev -n argocd -o yaml
+```
+
+If the condition includes `ComparisonError`, inspect the ArgoCD control-plane path:
+
+```bash
+kubectl get pods -n argocd
+kubectl get svc -n argocd argocd-repo-server -o wide
+kubectl logs -n argocd statefulset/argocd-application-controller --tail=200
+kubectl logs -n argocd deployment/argocd-repo-server --tail=200
+```
+
+### How to recover it
+
+Force a hard refresh on the child application:
+
+```bash
+kubectl annotate application opensis-dev -n argocd argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Then confirm status again:
+
+```bash
+kubectl get application opensis-dev -n argocd -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}' && echo
+```
+
+In the live incident, the controller later recorded:
+
+- `Updated sync status: Unknown -> Synced`
+
+and the application returned to:
+
+- `Synced`
+- `Healthy`
+
+### Operator rule
+
+When an ArgoCD child application shows `Unknown`, do not assume the workload is broken.
+
+First distinguish:
+
+- GitOps comparison or repo-server failure
+- from
+- actual workload or namespace failure
+
+The correct first question is:
+
+- can ArgoCD still render and compare the target state?
+
+not:
+
+- is the application necessarily down?
+
 ## Live Completion Record
 
 The successful live activation was completed across `2026-05-20` and `2026-05-21`.
@@ -255,6 +353,7 @@ The activation did not start from a clean cluster window. These issues had to be
 - `metrics.k8s.io` became unavailable during the same runtime churn
 - `platform-observability-prod` was adding unnecessary footprint on the single-node local `Colima` cluster
 - `SwiftPay` later exposed a GitOps ownership conflict between ArgoCD and HPA on `transaction-service`
+- `opensis-dev` later demonstrated that ArgoCD can report `Unknown` during repo-server comparison failures even while the namespace runtime remains healthy
 
 ### Runtime Recovery Actions Used
 
@@ -270,6 +369,16 @@ To reduce local runtime pressure before activation:
 
 - the local `platform-observability-prod` slice was paused
 - the production observability footprint was treated as non-essential for the `dev` GitOps activation window
+
+To recover a child application that was `Unknown` because of an ArgoCD comparison failure:
+
+```bash
+kubectl annotate application opensis-dev -n argocd argocd.argoproj.io/refresh=hard --overwrite
+kubectl get application opensis-dev -n argocd -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}' && echo
+kubectl get pods -n opensis-dev
+kubectl logs -n argocd statefulset/argocd-application-controller --tail=200
+kubectl logs -n argocd deployment/argocd-repo-server --tail=200
+```
 
 ### GitOps Drift Issues Resolved
 

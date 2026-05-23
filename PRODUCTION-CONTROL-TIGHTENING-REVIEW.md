@@ -227,6 +227,7 @@ Recent activation work proved that:
 - `metrics-server` can flap under local runtime pressure
 - `Colima` restart can still be the decisive recovery step during severe churn
 - shared `dev` plus extra local `prod` footprint can create pressure on the single-node environment
+- ArgoCD child applications can temporarily show `Unknown` during repo-server comparison failures even while the underlying workload namespace remains healthy
 
 This is a real operational constraint and should remain documented honestly.
 
