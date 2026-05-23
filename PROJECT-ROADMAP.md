@@ -113,6 +113,8 @@ Execution checklist:
 - use [PHASE7-REMAINING-WORK-CHECKLIST.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/PHASE7-REMAINING-WORK-CHECKLIST.md) as the completed closeout checklist
 - use [GITOPS-ACTIVATION.md](/Users/raymond/Documents/devops-easy-learning/internal-developer-platform/GITOPS-ACTIVATION.md) as the repeatable ArgoCD activation and retry procedure
 - use [PRODUCTION-CONTROL-TIGHTENING-REVIEW.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PRODUCTION-CONTROL-TIGHTENING-REVIEW.md) as the current production-control audit baseline
+- use [PHASE8-EXECUTION-PLAN.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-EXECUTION-PLAN.md) as the active execution sequence for Phase 8
+- use [PHASE8-BACKUP-RESTORE-STANDARD.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-STANDARD.md) as the initial durability and recovery contract
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
