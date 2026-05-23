@@ -102,6 +102,7 @@ The platform has moved beyond late-stage assembly. The current state is:
 Phase 8 now focuses on:
 
 - deeper durability and failure-mode validation
+- platform backup and restore standards across the owned workloads
 - stronger production access and operational hardening
 - broader runtime proof beyond the primary `dev` path
 - platform behavior under higher load and stricter runtime assumptions
@@ -699,6 +700,9 @@ Turn the now-complete platform into a more resilient, better-proven, and more de
 
 - validate restart, stop/start, and reset behavior for stateful services under GitOps control
 - prove control-plane durability behavior for Grafana, Alertmanager, Promtail, and notification persistence
+- define a platform-level backup and restore standard for stateful workloads and control-plane data
+- establish retention, backup execution, restore execution, and restore verification expectations per app
+- use `OpenSIS` as the first-class reference implementation for backup and restore workflow shape
 - run explicit restart and failure drills to confirm state continuity and recovery behavior
 
 #### 8.2 Access And Security Hardening
@@ -729,6 +733,18 @@ Turn the now-complete platform into a more resilient, better-proven, and more de
 
 - a Phase 8 operational rigor plan with explicit execution slices
 - documented durability validation results for the major stateful and control-plane components
+- a platform backup and restore standard covering:
+  - backup strategy
+  - restore strategy
+  - retention policy
+  - restore drill evidence
+  - per-app recovery contract
+- explicit backup and restore implementation status across:
+  - `observability-stack`
+  - `SwiftPay`
+  - `FoodPulse`
+  - `MemFlip`
+  - `OpenSIS`
 - hardened operator access guidance for ArgoCD and protected platform services
 - validated runtime and scaling notes for the owned workloads under stricter conditions
 - clearer dev versus prod operating boundaries with more live production-path proof
@@ -737,6 +753,8 @@ Turn the now-complete platform into a more resilient, better-proven, and more de
 ### Success Criteria
 
 - major stateful and control-plane durability assumptions are tested rather than inferred
+- backup and restore are treated as platform controls rather than optional app-local utilities
+- at least one restore drill path is documented and repeatable per protected stateful workload class
 - operator access and recovery procedures are documented, repeatable, and less dependent on tribal knowledge
 - known local-runtime and GitOps edge cases are clearly classified and operationally manageable
 - the platform can defend a stronger production-style claim without overstating current multi-node or cloud-scale proof
