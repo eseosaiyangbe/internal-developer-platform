@@ -21,10 +21,17 @@ What is already true:
 - Cloudflare Access is working for the protected observability services
 - Phase 7 `k3s` `dev` certification already exists
 
-What still remains:
+What is now true:
 
-- Phase 7 is not yet formally closed
-- production-control tightening and formal closeout are still pending
+- GitOps activation is complete
+- the initial GitOps validation pass is complete
+- the production-control tightening review is complete
+- the formal Phase 7 closeout decision is complete
+
+Current status:
+
+- Phase 7 is operationally complete and formally closed on `2026-05-23`
+- the next remaining work is Phase 8 operational rigor, not late Phase 7 assembly
 
 ## Remaining Work
 
@@ -86,6 +93,10 @@ Objective:
 
 - decide what still belongs to late Phase 7 versus what should become Phase 8
 
+Status:
+
+- Completed on `2026-05-23`
+
 Tasks:
 
 - review whether current `prod` posture is sufficient for a credible portfolio claim
@@ -113,6 +124,10 @@ Objective:
 
 - make the platform story easy to follow for a new reader
 
+Status:
+
+- Completed on `2026-05-23`
+
 Tasks:
 
 - ensure root docs reflect the current multi-repo model consistently
@@ -137,6 +152,10 @@ Objective:
 
 - decide whether GitOps activation closes Phase 7 or opens Phase 8
 
+Status:
+
+- Completed on `2026-05-23`
+
 Decision rule:
 
 - close Phase 7 if:
@@ -148,18 +167,27 @@ Decision rule:
   - GitOps remains partial or optional
   - the next major work is about deeper operational rigor rather than platform assembly
 
+Decision:
+
+- Phase 7 is formally closed
+- Phase 8 begins as the deeper operational rigor and durability phase
+
 ## Recommended Execution Order
 
-1. production-control tightening review
-2. documentation closeout
-3. formal Phase 7 closeout decision
+1. Phase 7 closeout documentation maintenance
+2. Phase 8 operational rigor planning
+3. Phase 8 execution
 
 ## Definition Of Done
 
-Phase 7 can be considered operationally complete when:
+Phase 7 is considered operationally complete because:
 
 - the platform is multi-repo and stable
 - ArgoCD is the default reconciler for the owned paths
 - the control plane, public ingress, and protected observability surfaces all work under the new structure
 - production-style constraints are documented honestly
 - the remaining roadmap story is no longer “build the platform” but “operate and mature the platform”
+
+Formal closeout reference:
+
+- use [PHASE7-CLOSEOUT-DECISION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE7-CLOSEOUT-DECISION.md) as the final decision record
