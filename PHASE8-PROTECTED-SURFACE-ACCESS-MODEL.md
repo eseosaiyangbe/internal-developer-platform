@@ -108,6 +108,7 @@ Current recovery scripts:
 ```bash
 ./scripts/recover-k3s-vault.sh
 ./scripts/recover-k3s-platform.sh
+./scripts/platform-recovery-readiness.sh
 ```
 
 Current launch-agent installers:
@@ -162,6 +163,12 @@ Protected-surface status snapshot:
 
 ```bash
 ./scripts/platform-protected-surface-status.sh
+```
+
+Host-side recovery readiness snapshot:
+
+```bash
+./scripts/platform-recovery-readiness.sh
 ```
 
 Vault operator-access snapshot:

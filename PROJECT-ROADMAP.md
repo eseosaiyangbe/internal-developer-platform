@@ -733,6 +733,7 @@ Current status:
 - Vault and host-side local recovery controls are now explicitly classified as protected operator surfaces
 - a protected-surface status snapshot helper now exists
 - a Vault access and break-glass verification helper now exists
+- a host-side recovery readiness helper now exists
 - GitOps modeling discipline now explicitly treats one-shot initialization work as hook-style sync activity rather than steady-state desired infrastructure
 - broader protected-surface access hardening beyond the current local model still remains open
 
@@ -782,6 +783,7 @@ Current status:
 - a protected-surface access model covering Vault and host-side local recovery controls
 - a protected-surface status snapshot helper for day-two operator checks
 - a Vault access and break-glass verification helper
+- a host-side recovery readiness helper
 - validated runtime and scaling notes for the owned workloads under stricter conditions
 - clearer dev versus prod operating boundaries with more live production-path proof
 - updated roadmap and runbooks reflecting the deeper operational maturity posture
