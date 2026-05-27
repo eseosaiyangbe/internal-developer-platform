@@ -1,6 +1,7 @@
 # Phase 8 Backup And Restore Standard
 
 Date: `2026-05-23`
+Updated: `2026-05-27`
 
 ## Purpose
 
@@ -77,7 +78,7 @@ Required controls:
 
 ## Reference Implementation
 
-`OpenSIS` is the current reference implementation shape because it already has:
+`OpenSIS` remains the reference implementation shape because it now has:
 
 - backup execution helpers
 - backup inspection helpers
@@ -85,6 +86,8 @@ Required controls:
 - restore execution flow
 - restore verification flow
 - runbook and architecture documentation describing why backup failure matters operationally
+- a validated live backup artifact
+- a validated live restore drill under GitOps-managed runtime conditions
 
 Reference docs:
 
@@ -97,66 +100,111 @@ Reference docs:
 
 Status:
 
-- implemented baseline
+- implemented
+- live backup validated
+- live restore drill validated
 
 Current evidence:
 
-- one-off backup helper exists
-- backup inspection helper exists
-- restore reset helper exists
-- restore execution helper exists
-- restore verification helper exists
-- runbook coverage exists
+- backup artifact:
+  - `opensis-20260527T163506Z.sql.gz`
+- restore verification:
+  - `102` tables restored
+  - `app` table row count `5`
+- schedule:
+  - `0 2 * * *`
+  - `Etc/UTC`
+- retention:
+  - newest `7` archives
 
 ### `observability-stack`
 
 Status:
 
-- next implementation target
+- implemented
+- live backup validated
+- live restore drill validated
 
 Current evidence:
 
-- durability posture is materially stronger than before
-- Grafana state is now PostgreSQL-backed
-- Alertmanager is now PVC-backed
-- Promtail positions are now node-local and persistent on the node
-- platform-level backup and restore workflow is not yet documented as a unified operator contract
+- backup artifacts:
+  - `observability-postgres-20260523T210236Z.dump`
+  - `alertmanager-20260523T210236Z.tgz`
+- restore verification includes:
+  - PostgreSQL-backed control-plane state
+  - Grafana dashboard state
+  - Alertmanager persisted state
+- schedule:
+  - `0 3 * * *`
+  - `Etc/UTC`
+- retention:
+  - newest `7` backup sets
 
 ### `SwiftPay`
 
 Status:
 
-- gap to close
+- implemented
+- live backup validated
+- live restore drill validated
 
 Current evidence:
 
-- persistent services exist
-- platform lifecycle controls exist
-- backup and restore workflow is not yet documented as a first-class operational contract
+- backup artifacts:
+  - `swiftpay-postgres-20260523T214822Z.dump`
+  - `swiftpay-redis-20260523T214822Z.rdb`
+- restore verification includes:
+  - relational state
+  - Redis persisted state
+- schedule:
+  - `0 2 * * *`
+  - `Etc/UTC`
+- retention:
+  - newest `7` backup sets
 
 ### `FoodPulse`
 
 Status:
 
-- gap to close
+- implemented
+- live backup validated
+- live restore drill validated
 
 Current evidence:
 
-- persistent services exist
-- platform lifecycle controls exist
-- backup and restore workflow is not yet documented as a first-class operational contract
+- backup artifacts:
+  - `foodpulse-postgres-20260525T033228Z.dump`
+  - `foodpulse-redis-20260525T033228Z.rdb`
+- restore verification includes:
+  - PostgreSQL relational state
+  - Redis persisted state
+- schedule:
+  - `0 4 * * *`
+  - `Etc/UTC`
+- retention:
+  - newest `7` backup sets
 
 ### `MemFlip`
 
 Status:
 
-- gap to close
+- implemented
+- live backup validated
+- live restore drill validated
 
 Current evidence:
 
-- persistent services exist
-- platform lifecycle controls exist
-- backup and restore workflow is not yet documented as a first-class operational contract
+- backup artifacts:
+  - `memflip-postgres-20260525T043725Z.dump`
+  - `memflip-redis-20260525T043725Z.rdb`
+- restore verification includes:
+  - PostgreSQL relational state
+  - Redis persisted state
+- schedule:
+  - `0 5 * * *`
+  - `Etc/UTC`
+- retention:
+  - newest `7` backup sets
 
 ## Retention Expectations
 
@@ -179,10 +227,21 @@ A restore is complete only when:
 - critical records or functional markers are verified
 - the operator runbook records the verification steps
 
-## Phase 8 Initial Implementation Order
+## Current Outcome
 
-1. document and implement `observability-stack` backup and restore contract
-2. standardize `SwiftPay`
-3. standardize `FoodPulse`
-4. standardize `MemFlip`
-5. then review whether `OpenSIS` needs alignment updates to match the final shared contract
+The app-level and control-plane recovery contract is now implemented across the owned workloads.
+
+Use [PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md) as the operational status record for:
+
+- validated artifacts
+- validated restore-drill evidence
+- standardized schedules
+- standardized retention
+
+## Next Phase 8 Focus After Standardization
+
+The next major Phase 8 follow-on work should be:
+
+1. operator access and break-glass hardening
+2. restart and pressure-validation coverage beyond restore drills
+3. broader production-path proof

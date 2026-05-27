@@ -62,7 +62,7 @@ Every meaningful step should land in:
 
 ## Roadmap Overview
 
-The work is divided into seven phases.
+The work is divided into eight phases.
 
 1. Foundation and governance
 2. Workspace normalization
@@ -103,6 +103,7 @@ Phase 8 now focuses on:
 
 - deeper durability and failure-mode validation
 - platform backup and restore standards across the owned workloads
+- centralized recording of validated recovery evidence across the owned workloads
 - stronger production access and operational hardening
 - broader runtime proof beyond the primary `dev` path
 - platform behavior under higher load and stricter runtime assumptions
@@ -115,6 +116,7 @@ Execution checklist:
 - use [PRODUCTION-CONTROL-TIGHTENING-REVIEW.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PRODUCTION-CONTROL-TIGHTENING-REVIEW.md) as the current production-control audit baseline
 - use [PHASE8-EXECUTION-PLAN.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-EXECUTION-PLAN.md) as the active execution sequence for Phase 8
 - use [PHASE8-BACKUP-RESTORE-STANDARD.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-STANDARD.md) as the initial durability and recovery contract
+- use [PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md) as the current portfolio-wide implementation and validation record
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
@@ -707,6 +709,12 @@ Turn the now-complete platform into a more resilient, better-proven, and more de
 - use `OpenSIS` as the first-class reference implementation for backup and restore workflow shape
 - run explicit restart and failure drills to confirm state continuity and recovery behavior
 
+Current status:
+
+- app-level and control-plane backup and restore contracts are now implemented across `observability-stack`, `SwiftPay`, `FoodPulse`, `MemFlip`, and `OpenSIS`
+- live backup validation and controlled restore-drill evidence now exist for all five owned workload slices
+- the next remaining durability work is broader restart, stop/start, and runtime-pressure validation rather than missing backup or restore coverage
+
 #### 8.2 Access And Security Hardening
 
 - strengthen operator access patterns for ArgoCD and other protected platform surfaces
@@ -741,6 +749,12 @@ Turn the now-complete platform into a more resilient, better-proven, and more de
   - retention policy
   - restore drill evidence
   - per-app recovery contract
+- a centralized implementation-status record showing validated recovery evidence for:
+  - `observability-stack`
+  - `SwiftPay`
+  - `FoodPulse`
+  - `MemFlip`
+  - `OpenSIS`
 - explicit backup and restore implementation status across:
   - `observability-stack`
   - `SwiftPay`
@@ -876,14 +890,14 @@ These are the next decisions that will shape implementation.
 
 ## Recommended Immediate Next Step
 
-Start with **Phase 2: Workspace normalization**.
+Proceed with **Phase 8.2: Access And Security Hardening**.
 
 Specifically:
 
-1. create a root architecture summary
-2. create a repo setup matrix
-3. verify and document all `observability-net` aliases
-4. clean obvious junk and missing setup docs
-5. then move directly into control plane hardening
+1. document the current ArgoCD operator access and break-glass model
+2. standardize the restore-drill automation suspension and re-enable procedure across the platform
+3. review service-account and network-policy boundaries for recovery helpers and privileged operator flows
+4. record which remaining manual interventions are temporary local-runtime constraints versus hardening gaps
+5. then move directly into broader restart and runtime-pressure validation
 
-That gives us the strongest base for every later phase.
+That keeps the next maturity slice aligned with the durability work that is already complete.

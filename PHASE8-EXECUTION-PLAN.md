@@ -1,6 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
+Updated: `2026-05-27`
 
 ## Purpose
 
@@ -24,6 +25,22 @@ Phase 8 execution is organized into five ordered slices:
 3. operator access and break-glass hardening
 4. runtime pressure and placement validation
 5. broader production-path proof
+
+## Current Status Snapshot
+
+As of `2026-05-27`:
+
+- Slice 1 is complete at the app-contract level
+- Slice 2 has live restore-drill evidence across the owned stateful workloads
+- the next major execution target is Slice 3 operator access and break-glass hardening
+
+Validated app-level recovery coverage now exists for:
+
+- `observability-stack`
+- `SwiftPay`
+- `FoodPulse`
+- `MemFlip`
+- `OpenSIS`
 
 ## Execution Order
 
@@ -54,6 +71,10 @@ Why this order:
 - `observability-stack` is the control plane and should not lag behind the app workloads
 - `SwiftPay`, `FoodPulse`, and `MemFlip` can then inherit one common platform contract
 
+Status:
+
+- complete at the owned workload level
+
 ### Slice 2. Durability Validation And Restore Drills
 
 Goal:
@@ -66,6 +87,11 @@ Outputs:
 - stop/start validation evidence
 - restore drill evidence
 - gap log for any workload that still lacks repeatable recovery proof
+
+Status:
+
+- core restore-drill coverage complete for the owned app and control-plane state stores
+- broader restart and pressure-validation work remains open
 
 ### Slice 3. Operator Access And Break-Glass Hardening
 
@@ -115,9 +141,8 @@ Phase 8 can be considered successful when:
 
 ## Immediate Next Step
 
-Start with Slice 1:
+Proceed to Slice 3:
 
-- write the platform backup and restore standard
-- map current implementation status across all owned workloads
-- use `OpenSIS` as the baseline shape
-- identify the first missing implementation target in `observability-stack`
+- document and tighten ArgoCD operator access and break-glass paths
+- standardize how live restore drills temporarily suspend and re-enable GitOps automation
+- classify which remaining recovery actions are acceptable operator intervention versus maturity gaps to remove
