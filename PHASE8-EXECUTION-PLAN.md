@@ -109,6 +109,8 @@ Status:
 
 - ArgoCD operator access and break-glass guidance documented
 - restore-drill GitOps suspension and re-enable path scripted
+- Vault and host-side protected-surface access model documented
+- protected-surface status snapshot scripted
 - broader protected-surface access hardening still remains open
 
 ### Slice 4. Runtime Pressure And Placement Validation
@@ -149,6 +151,6 @@ Phase 8 can be considered successful when:
 
 Proceed to Slice 3:
 
-- extend the same explicit access and break-glass model to the remaining protected platform surfaces
-- review which remaining manual operator actions should become scripted helpers
+- extend the same explicit access and break-glass model to any remaining protected platform surfaces not yet covered
+- review which remaining manual operator actions should still become scripted helpers
 - classify which live interventions are acceptable local-runtime recovery actions versus hardening gaps to remove

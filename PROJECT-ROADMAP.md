@@ -118,6 +118,7 @@ Execution checklist:
 - use [PHASE8-BACKUP-RESTORE-STANDARD.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-STANDARD.md) as the initial durability and recovery contract
 - use [PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md) as the current portfolio-wide implementation and validation record
 - use [PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md) as the current ArgoCD operator access and restore-drill recovery contract
+- use [PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md) as the current operator access model for Vault and host-side local recovery controls
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
@@ -727,7 +728,9 @@ Current status:
 - ArgoCD operator access is now explicitly documented as an operator-local port-forward model rather than an implied access path
 - break-glass categories and restore-drill GitOps suspension rules are now documented
 - a scripted helper now exists for root-plus-child ArgoCD automated sync suspension, status, and re-enable during restore drills
-- broader protected-surface access hardening beyond ArgoCD still remains open
+- Vault and host-side local recovery controls are now explicitly classified as protected operator surfaces
+- a protected-surface status snapshot helper now exists
+- broader protected-surface access hardening beyond the current local model still remains open
 
 #### 8.3 Runtime And Placement Rigor
 
@@ -771,6 +774,8 @@ Current status:
   - `OpenSIS`
 - hardened operator access guidance for ArgoCD and protected platform services
 - scripted restore-drill GitOps suspension and re-enable support for ArgoCD-managed child applications
+- a protected-surface access model covering Vault and host-side local recovery controls
+- a protected-surface status snapshot helper for day-two operator checks
 - validated runtime and scaling notes for the owned workloads under stricter conditions
 - clearer dev versus prod operating boundaries with more live production-path proof
 - updated roadmap and runbooks reflecting the deeper operational maturity posture
