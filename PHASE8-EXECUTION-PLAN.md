@@ -111,6 +111,7 @@ Status:
 - restore-drill GitOps suspension and re-enable path scripted
 - Vault and host-side protected-surface access model documented
 - protected-surface status snapshot scripted
+- observability control-plane database initialization corrected toward ArgoCD hook semantics instead of steady-state Job drift
 - broader protected-surface access hardening still remains open
 
 ### Slice 4. Runtime Pressure And Placement Validation

@@ -238,6 +238,27 @@ Check:
 kubectl get application opensis-dev -n argocd -o yaml
 kubectl logs -n argocd statefulset/argocd-application-controller --tail=200
 kubectl logs -n argocd deployment/argocd-repo-server --tail=200
+
+### 2. One-shot initialization jobs should not be modeled as steady-state desired resources
+
+If a database migration, seed, or bootstrap job is intended to run and then disappear, treat it as a controlled sync action rather than permanent infrastructure.
+
+Risk if modeled incorrectly:
+
+- ArgoCD can report the application `OutOfSync` or `Missing` after the job is deleted
+- TTL-based cleanup can fight with GitOps truth
+- operators can be pushed into unnecessary break-glass recreation work for a resource that was never meant to persist
+
+Preferred pattern:
+
+- model one-shot initialization jobs as ArgoCD hooks
+- use explicit hook delete policy
+- keep long-lived workload health anchored to the durable runtime resources, not the disposable initialization job
+
+Observed local example:
+
+- `observability-dev` drifted after `Job/devops-monitor-db-init` was deleted while still declared as a normal desired resource
+- the correct remediation was to fix the desired-state model in Git, not to normalize repeated live deletion and recreation
 ```
 
 ### 2. Manual validation Jobs can make an app appear `OutOfSync`

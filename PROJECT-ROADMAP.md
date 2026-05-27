@@ -730,6 +730,7 @@ Current status:
 - a scripted helper now exists for root-plus-child ArgoCD automated sync suspension, status, and re-enable during restore drills
 - Vault and host-side local recovery controls are now explicitly classified as protected operator surfaces
 - a protected-surface status snapshot helper now exists
+- GitOps modeling discipline now explicitly treats one-shot initialization work as hook-style sync activity rather than steady-state desired infrastructure
 - broader protected-surface access hardening beyond the current local model still remains open
 
 #### 8.3 Runtime And Placement Rigor
