@@ -60,6 +60,10 @@ Scripted helper:
 
 ## Surface 2. Vault
 
+Authoritative doc:
+
+- [PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md)
+
 Current posture:
 
 - local UI access through `http://vault.devops.local/ui/`
@@ -78,10 +82,13 @@ Normal operator path:
   - `kubectl get pods -n vault`
   - `kubectl get secretstore -A`
   - `kubectl get externalsecret -A`
+  - `./scripts/vault-access-status.sh status`
 
 Break-glass path:
 
 - recover sealed or degraded Vault through the host-side recovery workflow
+- verify the host-side break-glass path without disclosing secret material:
+  - `./scripts/vault-access-status.sh break-glass-check`
 - do not normalize routine use of the root token
 
 Key rule:
@@ -155,6 +162,18 @@ Protected-surface status snapshot:
 
 ```bash
 ./scripts/platform-protected-surface-status.sh
+```
+
+Vault operator-access snapshot:
+
+```bash
+./scripts/vault-access-status.sh status
+```
+
+Vault break-glass verification:
+
+```bash
+./scripts/vault-access-status.sh break-glass-check
 ```
 
 Quiet status snapshot:

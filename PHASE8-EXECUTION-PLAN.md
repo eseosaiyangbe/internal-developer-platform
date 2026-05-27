@@ -109,8 +109,10 @@ Status:
 
 - ArgoCD operator access and break-glass guidance documented
 - restore-drill GitOps suspension and re-enable path scripted
+- Vault operator access and break-glass guidance documented
 - Vault and host-side protected-surface access model documented
 - protected-surface status snapshot scripted
+- Vault access status and break-glass verification scripted
 - observability control-plane database initialization corrected toward ArgoCD hook semantics instead of steady-state Job drift
 - broader protected-surface access hardening still remains open
 

@@ -1,0 +1,137 @@
+# Phase 8 Vault Access And Break-Glass Model
+
+Date: `2026-05-27`
+
+## Purpose
+
+This document defines the current operator access model for Vault on the local `k3s` platform and distinguishes normal operator behavior from true break-glass use.
+
+This is intentionally a local-platform contract.
+
+It is not a final enterprise identity architecture.
+
+## Current Access Posture
+
+Current truth:
+
+- Vault UI is available only through the local platform hostname:
+  - [http://vault.devops.local/ui/](http://vault.devops.local/ui/)
+- normal local operator login uses `userpass`
+- bootstrap local users currently include:
+  - `admin`
+  - `readonly`
+- the Vault root token remains break-glass only
+- root-token and unseal material remain on the operator host rather than in Kubernetes
+
+This posture is acceptable only if it is treated as:
+
+- a local operator surface
+- a constrained recovery control
+- not a team-grade or internet-exposed admin surface
+
+## Normal Operator Path
+
+Routine operator checks should stay read-oriented first:
+
+```bash
+kubectl get pod vault-0 -n vault
+kubectl get secretstore -A
+kubectl get externalsecret -A
+./scripts/vault-access-status.sh status
+```
+
+Use the browser UI only when interaction is actually required:
+
+- auth inspection
+- secret-path validation
+- policy inspection
+
+Normal operator rule:
+
+- do not use the root token for routine day-two work
+- prefer namespace health, SecretStore readiness, and ExternalSecret readiness as the first checks
+
+## Break-Glass Path
+
+Break-glass use begins when Vault is:
+
+- sealed
+- degraded in a way that blocks normal userpass access
+- unable to satisfy downstream SecretStore or ExternalSecret recovery
+
+The current local break-glass controls are:
+
+```bash
+./scripts/recover-k3s-vault.sh
+./scripts/vault-access-status.sh break-glass-check
+```
+
+The recovery material lives on the operator host:
+
+- `~/.config/internal-developer-platform/k3s-vault-init.json`
+
+Key rule:
+
+- the root token is a recovery credential, not a normal operator identity
+
+## Scripted Helper
+
+Safe day-two snapshot:
+
+```bash
+./scripts/vault-access-status.sh status
+```
+
+Explicit break-glass verification:
+
+```bash
+./scripts/vault-access-status.sh break-glass-check
+```
+
+What the helper verifies:
+
+- Vault pod phase
+- Vault sealed state
+- host-side init-material presence
+- host-side init-material file mode
+- SecretStore readiness count
+- ExternalSecret readiness count
+- break-glass root-token lookup path
+- `userpass/` auth mount presence
+- `admin` and `readonly` user definitions
+
+What the helper does not do:
+
+- print the root token
+- unseal Vault directly
+- mutate policies or users
+
+## Acceptable Local-Runtime Recovery Actions
+
+These are acceptable in the current local Phase 8 posture:
+
+- using `recover-k3s-vault.sh` after a runtime restart or sealed-Vault event
+- using `vault-access-status.sh break-glass-check` to confirm the host-side recovery material still works
+- using the Vault UI through the local hostname for deliberate operator tasks
+
+## Hardening Gaps Still Open
+
+These remain clearly open:
+
+- Vault still lacks SSO or audited identity-aware access
+- `userpass` is still a bootstrap-pattern operator path, not a final production model
+- root-token recovery material still exists on the operator host
+- the current Vault access model is local-operator-centric, not team-grade
+
+## Current Phase 8 Assessment
+
+This improves Slice 3 because it turns Vault access from an implied local habit into an explicit operator contract.
+
+It does not overclaim maturity.
+
+It makes these things unambiguous:
+
+- what is normal day-two access
+- what is break-glass only
+- what helper is safe to run
+- what still remains a maturity gap
