@@ -32,7 +32,7 @@ As of `2026-05-27`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
-- Slice 3 is now started with the ArgoCD access and break-glass contract documented
+- Slice 3 is materially complete for the current local-platform objective
 
 Validated app-level recovery coverage now exists for:
 
@@ -115,7 +115,7 @@ Status:
 - Vault access status and break-glass verification scripted
 - host-side recovery readiness verification scripted
 - observability control-plane database initialization corrected toward ArgoCD hook semantics instead of steady-state Job drift
-- broader protected-surface access hardening still remains open
+- remaining access limitations are now classified as intentional local-runtime constraints or later-stage maturity work
 
 ### Slice 4. Runtime Pressure And Placement Validation
 
@@ -153,8 +153,8 @@ Phase 8 can be considered successful when:
 
 ## Immediate Next Step
 
-Proceed to Slice 3:
+Proceed to Slice 4:
 
-- extend the same explicit access and break-glass model to any remaining protected platform surfaces not yet covered
-- review which remaining manual operator actions should still become scripted helpers
-- classify which live interventions are acceptable local-runtime recovery actions versus hardening gaps to remove
+- validate workload behavior under runtime pressure and tighter placement assumptions
+- record which services remain healthy under constrained local resources
+- separate single-node-safe behavior from assumptions that would require a broader runtime class

@@ -148,6 +148,18 @@ These are acceptable in the current Phase 8 posture:
 - one-time local port-forward for ArgoCD UI access
 - one-time local Vault UI access through the documented hostname
 
+### Intentional local-runtime constraints
+
+These are acceptable and intentionally retained in the current runtime class:
+
+- ArgoCD UI access stays operator-local and port-forward-based
+- Vault UI access stays local-hostname-based and operator-local
+- host-side Vault recovery material stays outside Kubernetes
+- host-side LaunchAgent recovery stays part of the supported local-runtime posture
+- one-time Colima restart escalation stays an acceptable recovery action for local runtime wedges
+
+These are constraints of the local platform design, not hidden defects.
+
 ### Hardening gaps still open
 
 These should remain clearly classified as not-yet-final:
@@ -228,3 +240,5 @@ Instead, it makes the real operator contract explicit:
 - what is break-glass only
 - what is an acceptable local-runtime recovery action
 - what still remains a maturity gap
+
+Slice 3 should now be treated as materially complete for the current local-platform objective.

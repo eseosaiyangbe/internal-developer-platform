@@ -120,6 +120,7 @@ Execution checklist:
 - use [PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md) as the current ArgoCD operator access and restore-drill recovery contract
 - use [PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md) as the current Vault operator access and break-glass contract
 - use [PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md) as the current operator access model for Vault and host-side local recovery controls
+- use [PHASE8-SLICE3-CLOSEOUT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE3-CLOSEOUT.md) as the formal closeout record for the first access-hardening pass
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
@@ -735,7 +736,7 @@ Current status:
 - a Vault access and break-glass verification helper now exists
 - a host-side recovery readiness helper now exists
 - GitOps modeling discipline now explicitly treats one-shot initialization work as hook-style sync activity rather than steady-state desired infrastructure
-- broader protected-surface access hardening beyond the current local model still remains open
+- the remaining limitations are now explicitly classified as intentional local-runtime constraints or later-stage maturity work
 
 #### 8.3 Runtime And Placement Rigor
 
@@ -784,6 +785,7 @@ Current status:
 - a protected-surface status snapshot helper for day-two operator checks
 - a Vault access and break-glass verification helper
 - a host-side recovery readiness helper
+- a formal Slice 3 closeout record separating intentional local-runtime constraints from later-stage hardening gaps
 - validated runtime and scaling notes for the owned workloads under stricter conditions
 - clearer dev versus prod operating boundaries with more live production-path proof
 - updated roadmap and runbooks reflecting the deeper operational maturity posture
