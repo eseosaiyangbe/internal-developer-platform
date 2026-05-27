@@ -32,7 +32,7 @@ As of `2026-05-27`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
-- the next major execution target is Slice 3 operator access and break-glass hardening
+- Slice 3 is now started with the ArgoCD access and break-glass contract documented
 
 Validated app-level recovery coverage now exists for:
 
@@ -105,6 +105,12 @@ Outputs:
 - clearer break-glass procedures
 - explicit admin and recovery paths for protected platform surfaces
 
+Status:
+
+- ArgoCD operator access and break-glass guidance documented
+- restore-drill GitOps suspension and re-enable path scripted
+- broader protected-surface access hardening still remains open
+
 ### Slice 4. Runtime Pressure And Placement Validation
 
 Goal:
@@ -143,6 +149,6 @@ Phase 8 can be considered successful when:
 
 Proceed to Slice 3:
 
-- document and tighten ArgoCD operator access and break-glass paths
-- standardize how live restore drills temporarily suspend and re-enable GitOps automation
-- classify which remaining recovery actions are acceptable operator intervention versus maturity gaps to remove
+- extend the same explicit access and break-glass model to the remaining protected platform surfaces
+- review which remaining manual operator actions should become scripted helpers
+- classify which live interventions are acceptable local-runtime recovery actions versus hardening gaps to remove

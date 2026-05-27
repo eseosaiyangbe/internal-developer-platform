@@ -159,6 +159,10 @@ Login:
 - username: `admin`
 - password: output from the command above
 
+Phase 8 access note:
+
+- use [PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md) as the current day-two operator access and restore-drill contract for ArgoCD
+
 ## Day-Two Operating Rule
 
 Normal Kubernetes changes for the owned development paths should move through Git first.
@@ -168,6 +172,14 @@ That means:
 - commit changes in the authoritative child repo or central repo
 - let ArgoCD reconcile
 - only use direct `kubectl apply` for break-glass recovery or bootstrap work
+
+For controlled restore drills on GitOps-managed child applications, use:
+
+```bash
+./scripts/argocd-restore-drill-sync.sh suspend --app opensis-dev
+./scripts/argocd-restore-drill-sync.sh status --app opensis-dev
+./scripts/argocd-restore-drill-sync.sh resume --app opensis-dev
+```
 
 ## Recovery Notes
 

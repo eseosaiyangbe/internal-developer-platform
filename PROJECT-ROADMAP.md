@@ -117,6 +117,7 @@ Execution checklist:
 - use [PHASE8-EXECUTION-PLAN.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-EXECUTION-PLAN.md) as the active execution sequence for Phase 8
 - use [PHASE8-BACKUP-RESTORE-STANDARD.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-STANDARD.md) as the initial durability and recovery contract
 - use [PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-BACKUP-RESTORE-IMPLEMENTATION-STATUS.md) as the current portfolio-wide implementation and validation record
+- use [PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-ARGOCD-ACCESS-AND-BREAK-GLASS.md) as the current ArgoCD operator access and restore-drill recovery contract
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:
@@ -721,6 +722,13 @@ Current status:
 - tighten credential handling, admin access expectations, and break-glass procedures
 - review namespace, service-account, and network-policy boundaries for stronger production-style posture
 
+Current status:
+
+- ArgoCD operator access is now explicitly documented as an operator-local port-forward model rather than an implied access path
+- break-glass categories and restore-drill GitOps suspension rules are now documented
+- a scripted helper now exists for root-plus-child ArgoCD automated sync suspension, status, and re-enable during restore drills
+- broader protected-surface access hardening beyond ArgoCD still remains open
+
 #### 8.3 Runtime And Placement Rigor
 
 - validate platform behavior under higher load and tighter resource conditions
@@ -762,6 +770,7 @@ Current status:
   - `MemFlip`
   - `OpenSIS`
 - hardened operator access guidance for ArgoCD and protected platform services
+- scripted restore-drill GitOps suspension and re-enable support for ArgoCD-managed child applications
 - validated runtime and scaling notes for the owned workloads under stricter conditions
 - clearer dev versus prod operating boundaries with more live production-path proof
 - updated roadmap and runbooks reflecting the deeper operational maturity posture
@@ -895,7 +904,7 @@ Proceed with **Phase 8.2: Access And Security Hardening**.
 Specifically:
 
 1. document the current ArgoCD operator access and break-glass model
-2. standardize the restore-drill automation suspension and re-enable procedure across the platform
+2. extend the same explicit access model to the remaining protected platform surfaces
 3. review service-account and network-policy boundaries for recovery helpers and privileged operator flows
 4. record which remaining manual interventions are temporary local-runtime constraints versus hardening gaps
 5. then move directly into broader restart and runtime-pressure validation
