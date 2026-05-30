@@ -107,6 +107,7 @@ Phase 8 now focuses on:
 - stronger production access and operational hardening
 - broader runtime proof beyond the primary `dev` path
 - platform behavior under higher load and stricter runtime assumptions
+- documenting which runtime wedges are app defects versus single-node `k3s` runtime defects
 
 Execution checklist:
 
@@ -121,6 +122,7 @@ Execution checklist:
 - use [PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-VAULT-ACCESS-AND-BREAK-GLASS.md) as the current Vault operator access and break-glass contract
 - use [PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md) as the current operator access model for Vault and host-side local recovery controls
 - use [PHASE8-SLICE3-CLOSEOUT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE3-CLOSEOUT.md) as the formal closeout record for the first access-hardening pass
+- use [PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md) as the active evidence log for runtime-pressure and placement validation
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:

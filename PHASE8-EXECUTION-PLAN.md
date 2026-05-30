@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-05-27`
+Updated: `2026-05-30`
 
 ## Purpose
 
@@ -28,11 +28,12 @@ Phase 8 execution is organized into five ordered slices:
 
 ## Current Status Snapshot
 
-As of `2026-05-27`:
+As of `2026-05-30`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
 - Slice 3 is materially complete for the current local-platform objective
+- Slice 4 has started and now has first-pass live runtime-pressure evidence
 
 Validated app-level recovery coverage now exists for:
 
@@ -129,6 +130,15 @@ Outputs:
 - resource-pressure findings
 - single-node versus multi-node assumptions called out explicitly
 
+Status:
+
+- first live Slice 4 validation pass executed
+- HPA runtime evidence is currently blocked by unstable Metrics API behavior
+- a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
+- the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
+- the current recovery path required a full Colima recycle rather than a clean in-cluster converge
+- follow-up validation remains open after post-restart platform reconciliation
+
 ### Slice 5. Broader Production-Path Proof
 
 Goal:
@@ -153,8 +163,9 @@ Phase 8 can be considered successful when:
 
 ## Immediate Next Step
 
-Proceed to Slice 4:
+Continue Slice 4:
 
-- validate workload behavior under runtime pressure and tighter placement assumptions
-- record which services remain healthy under constrained local resources
-- separate single-node-safe behavior from assumptions that would require a broader runtime class
+- complete post-restart platform reconciliation after the first runtime wedge
+- stabilize the Metrics API path so HPA validation can become evidence-backed
+- rerun the controlled runtime drill once the node and control plane are fully healthy again
+- keep separating single-node-safe behavior from assumptions that require a broader runtime class
