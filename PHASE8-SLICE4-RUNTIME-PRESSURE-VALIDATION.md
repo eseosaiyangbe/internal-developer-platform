@@ -451,3 +451,74 @@ Residual cautions:
 2. Expand the pressure matrix gradually above the successful `8`-way profile instead of reverting to unbounded concurrency jumps.
 3. Re-check transient metrics-server, Redis, and wallet-service probe instability so unrelated local-runtime noise does not get mislabeled as SwiftPay failure.
 4. Continue Slice 4 on the other owned workloads using the same evidence-first drill discipline.
+
+## FoodPulse Lifecycle Update
+
+The next Slice 4 pass targeted `FoodPulse` lifecycle resilience rather than HPA behavior.
+
+Why this workload was chosen:
+
+- the `dev` runtime does not expose live HPA behavior for FoodPulse
+- the more relevant runtime-pressure signal is whether the preserved stop/start path converges cleanly under GitOps
+- earlier operator experience had already shown resume-path fragility around Redis and lifecycle sequencing
+
+### 1. The original preserved stop path was not GitOps-safe
+
+Observed behavior from the initial `./scripts/k8s-stop.sh --wait` drill:
+
+- the script scaled API, UI, and Redis down and hibernated the CNPG cluster
+- ArgoCD automated sync remained enabled on:
+  - `internal-developer-platform-dev-root`
+  - `foodpulse-dev`
+- the controller immediately started reconciling workloads back toward desired state during the stop window
+- the namespace entered a noisy partial state instead of a clean preserved stop
+
+This is an operational design defect, not just a drill inconvenience.
+
+It means the original lifecycle helper allowed an operator to trigger reconciliation conflict during a legitimate preserved-stop workflow.
+
+### 2. FoodPulse lifecycle controls were hardened to suspend and resume GitOps intentionally
+
+The operator path in `FoodPulse` was updated so lifecycle controls now support GitOps-aware execution directly:
+
+- `./scripts/k8s-stop.sh --wait --suspend-gitops`
+- `./scripts/k8s-start.sh --resume-gitops`
+
+What changed:
+
+- `k8s-stop.sh` now fails fast if ArgoCD automation is still enabled and `--suspend-gitops` is not supplied
+- `k8s-stop.sh --suspend-gitops` removes automated sync from both:
+  - `internal-developer-platform-dev-root`
+  - `foodpulse-dev`
+- `k8s-start.sh --resume-gitops` restores automated sync for both applications after workload recovery
+
+### 3. The full GitOps-safe FoodPulse lifecycle round-trip was verified live
+
+Validated stop sequence:
+
+- `foodpulse-dev` moved to `OutOfSync` and then `Suspended`
+- workload pods terminated cleanly instead of being recreated by ArgoCD
+- CNPG hibernation condition completed successfully
+- the namespace drained to only the completed backup job
+
+Validated resume sequence:
+
+- CNPG rehydration succeeded
+- Redis StatefulSet converged
+- API and UI deployments rolled out successfully
+- ArgoCD automation was re-enabled by the script
+- final live state returned to:
+  - `foodpulse-dev` `Synced Healthy`
+  - `internal-developer-platform-dev-root` `Synced Healthy`
+
+What this means:
+
+- FoodPulse now has a verified GitOps-safe preserved stop/start path
+- the remaining lifecycle complexity is explicit and operator-controlled rather than hidden behind reconciliation conflict
+- for Slice 4, this converts FoodPulse from a fragile lifecycle drill into a repeatable one
+
+### 4. Residual local-runtime cautions remain
+
+- FoodPulse API and UI still showed intermittent readiness and liveness turbulence during some lifecycle transitions
+- Redis resume remains one of the slower convergence points in the local single-node runtime
+- these are now runtime characteristics to monitor, not workflow-design defects

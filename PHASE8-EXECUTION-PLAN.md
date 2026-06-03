@@ -137,6 +137,7 @@ Status:
 - the second pass showed the Metrics API path working again during the drill window
 - SwiftPay HPA scale-up is now live-observed evidence, not only declared intent
 - a third SwiftPay-specific pass hardened the auth-service dev baseline and converted the prior bounded registration failure into a clean `8/8` successful public-ingress run
+- a FoodPulse lifecycle pass confirmed the preserved stop/start workflow must suspend ArgoCD automation first and now has a validated GitOps-safe round-trip
 - a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
 - the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
 - the current recovery path required a full Colima recycle rather than a clean in-cluster converge
@@ -172,5 +173,6 @@ Continue Slice 4:
 - keep the improved SwiftPay register-path diagnostics as the new operator baseline
 - keep the hardened SwiftPay auth-service dev baseline as the validated contract for current local-runtime drills
 - expand bounded pressure validation gradually beyond the now-successful `8`-way SwiftPay profile
+- keep the GitOps-safe FoodPulse lifecycle path as the validated preserved-stop contract for that workload
 - inspect transient metrics-server and probe noise so local-runtime instability is classified correctly
 - keep separating single-node-safe behavior from assumptions that require a broader runtime class
