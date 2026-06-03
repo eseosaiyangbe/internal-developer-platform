@@ -302,34 +302,38 @@ The operator script was corrected to include extra uniqueness in the generated s
 
 ### 4. After fixing the harness defect, bounded parallel registration still exposed a real runtime weakness
 
-After the uniqueness fix, a follow-up 12-way concurrent `smoke-send-money.sh` run still failed.
+After the uniqueness fix, a follow-up bounded concurrent `smoke-send-money.sh` run still failed.
 
 Observed state:
 
-- all `12` runs failed
+- all `8` concurrent runs failed
 - failure point was `POST /api/auth/register`
 - api-gateway returned HTTP `500`
-- auth-service logs did not show a matching volume of registration requests during that failure window
-- one isolated registration succeeded, but the parallel batch did not converge cleanly
+- api-gateway structured logs now show the upstream failure class directly:
+  - `message: timeout of 10000ms exceeded`
+  - `code: ECONNABORTED`
+  - `status: null`
+- api-gateway circuit-breaker failure count increased from `1` through `8`
+- the auth-service circuit breaker opened after the fifth upstream timeout
 - Kubernetes events recorded auth-service probe instability during the same window:
+  - HPA rescaled auth-service from `1` to `3`
   - readiness probe failures
   - liveness probe failures
-  - container restarts on two auth-service pods
+  - restart of the original serving auth-service pod during scale-up
 
 What this means:
 
 - the remaining failure is no longer explained by duplicate test identities
 - the current public registration path still has a real concurrency weakness under bounded parallel pressure
 - the observable failure boundary currently appears at or before the auth registration path, not in the transaction-processing path
-- the issue is not only client-visible; it also degrades auth-service pod health under pressure
+- the issue is not only client-visible; it also degrades auth-service pod health under pressure while new replicas are still converging
 
-Current evidence is not yet enough to prove the exact sub-root-cause.
+Current evidence is now strong enough to narrow the defect materially:
 
-Most likely classes are:
-
-- gateway-side upstream failure handling
-- register-path circuit-breaker behavior under burst conditions
-- incomplete error visibility around auth-service upstream failures
+- api-gateway is waiting `10s` for auth-service and timing out upstream
+- auth-service does scale out, but not fast enough to absorb the registration burst before the gateway timeout window closes
+- the original serving pod becomes unhealthy during the same scale-up interval
+- the dev overlay currently makes this worse by allowing auth-service to idle at `1` replica with reduced resource requests (`75m` CPU and `128Mi` memory) versus the stronger base contract
 
 ### 5. Slice 4 now has both positive proof and a concrete remaining defect
 
@@ -354,7 +358,8 @@ The second pass materially improves Slice 4 confidence:
 ### Confirmed Slice 4 defects
 
 - `SwiftPay` public registration is not yet dependable under bounded parallel pressure
-- api-gateway does not currently emit enough upstream error detail to make the failing registration path immediately diagnosable from normal operator logs
+- auth-service can still hit readiness and liveness failures during burst registration scale-up
+- the current SwiftPay dev overlay weakens auth-service resilience by shrinking resource requests and allowing a single warm replica
 
 ### Still-acceptable local-runtime constraints
 
@@ -372,10 +377,12 @@ Current honest status after the second pass:
 - SwiftPay autoscaling now has live evidence
 - the local node remained healthy during the bounded SwiftPay load pass
 - a real concurrency defect remains on the SwiftPay registration path
+- the defect is now narrowed to upstream auth-service timeout and convergence behavior rather than an opaque gateway-only failure
 
 ## Immediate Next Steps
 
 1. Keep the `smoke-send-money.sh` uniqueness fix as the new operator baseline for future Slice 4 drills.
-2. Increase error visibility on the SwiftPay api-gateway register path so upstream failures are diagnosable without guesswork.
-3. Re-run a bounded auth-focused concurrency drill after improving register-path observability.
-4. Continue separating app-path defects from node-runtime defects before closing Slice 4.
+2. Keep the improved api-gateway register-path diagnostics as the new baseline evidence path.
+3. Harden the SwiftPay dev overlay so auth-service keeps stronger baseline requests and at least two warm replicas during public-ingress pressure.
+4. Re-run a bounded auth-focused concurrency drill after the overlay hardening lands.
+5. Continue separating app-path defects from node-runtime defects before closing Slice 4.
