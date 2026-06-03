@@ -203,3 +203,179 @@ Current honest status:
 2. Isolate why the Metrics API and HPA resource metrics are unstable in the current local runtime.
 3. Repeat the controlled app-lifecycle drill after stabilization to confirm whether `FoodPulse` convergence issues were purely node-runtime-driven or also script-path-driven.
 4. Record a second Slice 4 pass once the runtime is healthy enough to trust the next set of observations.
+
+## Second Validation Pass
+
+Date: `2026-06-03`
+
+## Validation Baseline
+
+Baseline captured before the second drill window:
+
+- timestamp: `2026-06-03T16:46:18Z`
+- cluster running pods: `65`
+- ArgoCD applications healthy:
+  - `internal-developer-platform-dev-root`
+  - `observability-dev`
+  - `swiftpay-dev`
+  - `foodpulse-dev`
+  - `memflip-dev`
+  - `opensis-dev`
+- node topology:
+  - single node only
+  - node: `colima`
+  - status: `Ready`
+- live resource metrics working again:
+  - `kubectl top node` succeeded
+  - SwiftPay HPAs reported real CPU and memory targets instead of `unknown`
+
+## What This Validation Attempt Targeted
+
+The second Slice 4 pass focused on three concrete runtime questions:
+
+1. Is the Metrics API path healthy enough to treat SwiftPay HPA behavior as evidence-backed?
+2. Does controlled parallel traffic against the public SwiftPay ingress trigger real autoscaling?
+3. After removing a known test-harness defect, does the public registration and transaction path remain stable under bounded parallel demand?
+
+## Findings
+
+### 1. The Metrics API path is currently usable again
+
+Observed state before the drill:
+
+- `kubectl top` succeeded
+- SwiftPay HPAs reported live CPU and memory utilization
+- HPA conditions showed `ScalingActive=True` and `ValidMetricFound`
+
+What this means:
+
+- the earlier Metrics API blockage from the first Slice 4 pass is not the current limiting factor
+- HPA observations from this second pass can be treated as real runtime evidence
+
+This does not prove the metrics path is permanently stable.
+
+It does prove the current drill window had a working autoscaling signal path.
+
+### 2. SwiftPay autoscaling was observed live under bounded public-ingress pressure
+
+The drill used bounded concurrent executions of the public `smoke-send-money.sh` path against:
+
+- `https://swiftpay.eseosadevbox.com/api`
+
+Observed scale behavior:
+
+- `auth-service-hpa` scaled from `1` to `2`, then from `2` to `3`
+- `api-gateway-hpa` scaled from `1` to `2`
+- these rescale events were confirmed both by live HPA snapshots and by HPA events:
+  - `auth-service-hpa`: `SuccessfulRescale`
+  - `api-gateway-hpa`: `SuccessfulRescale`
+
+Observed runtime state after scale-up:
+
+- `api-gateway` deployment: `2/2`
+- `auth-service` deployment: `3/3`
+- all managed applications remained `Synced Healthy`
+- the node remained `Ready`
+- no repeat of the earlier `PLEG` wedge occurred during this SwiftPay-specific drill
+
+What this means:
+
+- SwiftPay now has evidence-backed live autoscaling behavior in the local `k3s` runtime
+- the current local runtime can absorb this class of stateless scale-up without repeating the broader node-level failure seen in the earlier `FoodPulse` lifecycle drill
+
+### 3. The initial non-zero load result was caused by a test-harness defect, not by SwiftPay itself
+
+The first bounded concurrent run returned a non-zero result.
+
+Root cause identified from live auth-service logs:
+
+- the original `smoke-send-money.sh` script generated account emails using only second-level timestamp precision
+- concurrent executions created duplicate email addresses
+- auth-service returned PostgreSQL uniqueness violations on `users.email`
+
+This was a test artifact, not a trustworthy platform failure signal.
+
+The operator script was corrected to include extra uniqueness in the generated stamp:
+
+- file: `SwiftPay/scripts/smoke-send-money.sh`
+- change: stamp now includes second-level timestamp plus process ID and random suffix
+
+### 4. After fixing the harness defect, bounded parallel registration still exposed a real runtime weakness
+
+After the uniqueness fix, a follow-up 12-way concurrent `smoke-send-money.sh` run still failed.
+
+Observed state:
+
+- all `12` runs failed
+- failure point was `POST /api/auth/register`
+- api-gateway returned HTTP `500`
+- auth-service logs did not show a matching volume of registration requests during that failure window
+- one isolated registration succeeded, but the parallel batch did not converge cleanly
+- Kubernetes events recorded auth-service probe instability during the same window:
+  - readiness probe failures
+  - liveness probe failures
+  - container restarts on two auth-service pods
+
+What this means:
+
+- the remaining failure is no longer explained by duplicate test identities
+- the current public registration path still has a real concurrency weakness under bounded parallel pressure
+- the observable failure boundary currently appears at or before the auth registration path, not in the transaction-processing path
+- the issue is not only client-visible; it also degrades auth-service pod health under pressure
+
+Current evidence is not yet enough to prove the exact sub-root-cause.
+
+Most likely classes are:
+
+- gateway-side upstream failure handling
+- register-path circuit-breaker behavior under burst conditions
+- incomplete error visibility around auth-service upstream failures
+
+### 5. Slice 4 now has both positive proof and a concrete remaining defect
+
+The second pass materially improves Slice 4 confidence:
+
+- positive proof:
+  - Metrics API usable during drill window
+  - SwiftPay HPA scale-up observed live
+  - node stayed healthy
+  - control plane stayed healthy
+- remaining defect:
+  - public auth registration path does not yet handle bounded parallel pressure cleanly
+
+## Classification
+
+### Confirmed Slice 4 improvements
+
+- SwiftPay HPA behavior is now live-observed, not just Git-defined intent
+- the local runtime can perform at least one real stateless scale-up path without triggering a node wedge
+- the earlier Metrics API `unknown` state is not currently blocking Slice 4 validation
+
+### Confirmed Slice 4 defects
+
+- `SwiftPay` public registration is not yet dependable under bounded parallel pressure
+- api-gateway does not currently emit enough upstream error detail to make the failing registration path immediately diagnosable from normal operator logs
+
+### Still-acceptable local-runtime constraints
+
+- single-node-only live placement proof
+- one-time Colima restart as an allowed recovery action
+- local-runtime rather than production-grade scheduler diversity
+
+## Status
+
+Slice 4 remains in progress.
+
+Current honest status after the second pass:
+
+- Metrics API path is usable in the current drill window
+- SwiftPay autoscaling now has live evidence
+- the local node remained healthy during the bounded SwiftPay load pass
+- a real concurrency defect remains on the SwiftPay registration path
+
+## Immediate Next Steps
+
+1. Keep the `smoke-send-money.sh` uniqueness fix as the new operator baseline for future Slice 4 drills.
+2. Increase error visibility on the SwiftPay api-gateway register path so upstream failures are diagnosable without guesswork.
+3. Re-run a bounded auth-focused concurrency drill after improving register-path observability.
+4. Continue separating app-path defects from node-runtime defects before closing Slice 4.

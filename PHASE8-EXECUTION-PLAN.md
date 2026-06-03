@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-05-30`
+Updated: `2026-06-03`
 
 ## Purpose
 
@@ -28,12 +28,12 @@ Phase 8 execution is organized into five ordered slices:
 
 ## Current Status Snapshot
 
-As of `2026-05-30`:
+As of `2026-06-03`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
 - Slice 3 is materially complete for the current local-platform objective
-- Slice 4 has started and now has first-pass live runtime-pressure evidence
+- Slice 4 has started and now has first-pass runtime-wedge evidence plus a second-pass SwiftPay autoscaling validation
 
 Validated app-level recovery coverage now exists for:
 
@@ -133,11 +133,14 @@ Outputs:
 Status:
 
 - first live Slice 4 validation pass executed
-- HPA runtime evidence is currently blocked by unstable Metrics API behavior
+- the first pass exposed a node-level runtime wedge and CNPG lifecycle instability
+- the second pass showed the Metrics API path working again during the drill window
+- SwiftPay HPA scale-up is now live-observed evidence, not only declared intent
+- a remaining SwiftPay registration-path concurrency defect is still open under bounded parallel pressure and can trigger auth-service probe failures and pod restarts
 - a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
 - the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
 - the current recovery path required a full Colima recycle rather than a clean in-cluster converge
-- follow-up validation remains open after post-restart platform reconciliation
+- follow-up validation remains open because app-path concurrency failures still need to be separated cleanly from local-runtime failure modes
 
 ### Slice 5. Broader Production-Path Proof
 
@@ -165,7 +168,7 @@ Phase 8 can be considered successful when:
 
 Continue Slice 4:
 
-- complete post-restart platform reconciliation after the first runtime wedge
-- stabilize the Metrics API path so HPA validation can become evidence-backed
-- rerun the controlled runtime drill once the node and control plane are fully healthy again
+- preserve the corrected SwiftPay load harness as the new validation baseline
+- improve error visibility on the SwiftPay public registration path
+- rerun bounded auth-focused concurrency validation after that observability improvement
 - keep separating single-node-safe behavior from assumptions that require a broader runtime class
