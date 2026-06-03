@@ -386,3 +386,68 @@ Current honest status after the second pass:
 3. Harden the SwiftPay dev overlay so auth-service keeps stronger baseline requests and at least two warm replicas during public-ingress pressure.
 4. Re-run a bounded auth-focused concurrency drill after the overlay hardening lands.
 5. Continue separating app-path defects from node-runtime defects before closing Slice 4.
+
+## Third Pass Update
+
+The third SwiftPay-specific Slice 4 pass re-ran the same bounded public-ingress drill after hardening the live dev baseline for `auth-service`.
+
+Applied hardening before the rerun:
+
+- auth-service dev resource requests raised from `75m` CPU and `128Mi` memory to `250m` CPU and `256Mi` memory
+- auth-service HPA `minReplicas` raised from `1` to `2`
+
+Observed state before the rerun:
+
+- `swiftpay-dev` `Synced Healthy`
+- auth-service deployment requests live at `250m|256Mi`
+- auth-service HPA floor live at `2`
+- auth-service steady state at `2/2` running replicas before pressure started
+
+Observed result from the rerun:
+
+- bounded `8`-way concurrent `smoke-send-money.sh` run completed with `RC=0`
+- `SUCCESS_COUNT=8`
+- `FAIL_SIGNAL_COUNT=0`
+- api-gateway logs did not show the earlier `ECONNABORTED` upstream registration timeouts
+- api-gateway remained healthy at `1/1`
+- auth-service remained healthy at `2/2`
+- no auth-service restarts occurred during the successful run window
+
+Observed scale and pressure behavior:
+
+- auth-service stayed at its `2`-replica floor throughout the successful run
+- auth-service CPU remained well below the `70%` target during the captured watch window
+- api-gateway remained at `1` replica and did not need to scale for this bounded workload
+
+What this means:
+
+- the earlier SwiftPay registration-path failure was materially improved by the stronger auth-service dev baseline
+- the current local `k3s` runtime can now complete the bounded public send-money path successfully under the same `8`-way concurrency level that previously failed
+- for the current dev objective, keeping two warm auth-service replicas plus stronger baseline requests is a justified runtime contract
+
+Residual cautions:
+
+- HPA and metrics-server warnings still appeared transiently during the rollout window, even though the successful drill itself completed cleanly
+- unrelated readiness noise still appeared elsewhere in the namespace, including Redis and wallet-service probe warnings
+- this does not yet prove broader high-concurrency stability beyond the bounded `8`-way profile
+
+## Updated Classification
+
+### Confirmed Slice 4 improvements
+
+- SwiftPay HPA behavior is live-observed and no longer only Git-defined intent
+- the bounded public SwiftPay registration and send-money path now succeeds cleanly at `8/8` under the hardened auth-service dev baseline
+- the local runtime can absorb this bounded SwiftPay pressure profile without auth-service pod restarts or gateway registration timeouts
+
+### Confirmed Slice 4 residual risks
+
+- transient metrics-server and HPA signal instability still appears during some rollout windows
+- Redis and other service probes still show occasional namespace-level readiness noise in the local runtime
+- broader concurrency bands remain unproven
+
+## Updated Immediate Next Steps
+
+1. Keep the hardened auth-service dev baseline as the new SwiftPay Slice 4 contract.
+2. Expand the pressure matrix gradually above the successful `8`-way profile instead of reverting to unbounded concurrency jumps.
+3. Re-check transient metrics-server, Redis, and wallet-service probe instability so unrelated local-runtime noise does not get mislabeled as SwiftPay failure.
+4. Continue Slice 4 on the other owned workloads using the same evidence-first drill discipline.

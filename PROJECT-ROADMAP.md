@@ -744,7 +744,7 @@ Current status:
 #### 8.3 Runtime And Placement Rigor
 
 - validate platform behavior under higher load and tighter resource conditions
-- re-check HPA behavior, probe thresholds, replica floors, and disruption posture under real runtime pressure
+- re-check HPA behavior, probe thresholds, replica floors, disruption posture, and metrics-server stability under real runtime pressure
 - document what is single-node-safe versus what requires multi-node assumptions
 
 #### 8.4 Production-Path Proof

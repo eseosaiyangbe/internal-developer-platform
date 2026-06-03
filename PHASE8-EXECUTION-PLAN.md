@@ -136,7 +136,7 @@ Status:
 - the first pass exposed a node-level runtime wedge and CNPG lifecycle instability
 - the second pass showed the Metrics API path working again during the drill window
 - SwiftPay HPA scale-up is now live-observed evidence, not only declared intent
-- a remaining SwiftPay registration-path concurrency defect is still open under bounded parallel pressure and is now narrowed to auth-service upstream timeout and convergence behavior during scale-up
+- a third SwiftPay-specific pass hardened the auth-service dev baseline and converted the prior bounded registration failure into a clean `8/8` successful public-ingress run
 - a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
 - the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
 - the current recovery path required a full Colima recycle rather than a clean in-cluster converge
@@ -170,6 +170,7 @@ Continue Slice 4:
 
 - preserve the corrected SwiftPay load harness as the new validation baseline
 - keep the improved SwiftPay register-path diagnostics as the new operator baseline
-- harden the SwiftPay dev overlay baseline for auth-service replica floor and resource requests
-- rerun bounded auth-focused concurrency validation after that overlay hardening
+- keep the hardened SwiftPay auth-service dev baseline as the validated contract for current local-runtime drills
+- expand bounded pressure validation gradually beyond the now-successful `8`-way SwiftPay profile
+- inspect transient metrics-server and probe noise so local-runtime instability is classified correctly
 - keep separating single-node-safe behavior from assumptions that require a broader runtime class
