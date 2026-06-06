@@ -24,6 +24,8 @@ VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 BOOTSTRAP_SCRIPT="${SCRIPT_DIR}/bootstrap-k3s-vault-secrets.sh"
 QUIET=0
 TIMEOUT_SECONDS=180
+STARTUP_WAIT_SECONDS=240
+POLL_INTERVAL_SECONDS=5
 
 log() {
   if [[ "${QUIET}" -eq 0 ]]; then
@@ -36,6 +38,65 @@ require_command() {
     echo "ERROR: Required command not found: $1" >&2
     exit 1
   fi
+}
+
+wait_for_kube_api() {
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if kubectl get nodes >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  echo "ERROR: Kubernetes API did not become reachable within ${STARTUP_WAIT_SECONDS}s." >&2
+  return 1
+}
+
+wait_for_namespace() {
+  local namespace="$1"
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  return 1
+}
+
+wait_for_pod() {
+  local namespace="$1"
+  local pod="$2"
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if kubectl get pod "${pod}" -n "${namespace}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  return 1
+}
+
+vault_status_json_from_pod() {
+  kubectl exec -n vault vault-0 -- sh -lc 'vault status -format=json || true' 2>/dev/null || true
+}
+
+wait_for_vault_status() {
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    local vault_status_json
+    vault_status_json="$(vault_status_json_from_pod)"
+    if [[ -n "${vault_status_json}" ]]; then
+      printf '%s' "${vault_status_json}"
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -75,19 +136,21 @@ if [[ "${OSTYPE:-}" == darwin* ]] && command -v colima >/dev/null 2>&1; then
   fi
 fi
 
-if ! kubectl get namespace vault >/dev/null 2>&1; then
-  log "Vault namespace is not present; nothing to recover."
+wait_for_kube_api
+
+if ! wait_for_namespace vault; then
+  log "Vault namespace is not present after startup wait; nothing to recover."
   exit 0
 fi
 
-if ! kubectl get pod vault-0 -n vault >/dev/null 2>&1; then
-  log "Vault pod vault-0 is not present; nothing to recover."
+if ! wait_for_pod vault vault-0; then
+  log "Vault pod vault-0 is not present after startup wait; nothing to recover."
   exit 0
 fi
 
-vault_status_json="$(kubectl exec -n vault vault-0 -- sh -lc 'vault status -format=json || true' 2>/dev/null || true)"
+vault_status_json="$(wait_for_vault_status || true)"
 if [[ -z "${vault_status_json}" ]]; then
-  echo "ERROR: Unable to retrieve Vault status from vault-0." >&2
+  echo "ERROR: Unable to retrieve Vault status from vault-0 after ${STARTUP_WAIT_SECONDS}s." >&2
   exit 1
 fi
 

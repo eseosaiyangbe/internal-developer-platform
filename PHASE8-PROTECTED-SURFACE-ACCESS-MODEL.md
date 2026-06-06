@@ -155,7 +155,7 @@ These are acceptable and intentionally retained in the current runtime class:
 - ArgoCD UI access stays operator-local and port-forward-based
 - Vault UI access stays local-hostname-based and operator-local
 - host-side Vault recovery material stays outside Kubernetes
-- host-side LaunchAgent recovery stays part of the supported local-runtime posture
+- host-side LaunchAgent recovery stays part of the supported local-runtime posture, including startup-wait logic that tolerates early Colima and Kubernetes readiness races
 - one-time Colima restart escalation stays an acceptable recovery action for local runtime wedges
 
 These are constraints of the local platform design, not hidden defects.

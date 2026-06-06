@@ -73,6 +73,7 @@ The recovery material lives on the operator host:
 Key rule:
 
 - the root token is a recovery credential, not a normal operator identity
+- the local runtime uses host-side automated recovery, not Vault-native KMS auto-unseal
 
 ## Scripted Helper
 
@@ -111,8 +112,16 @@ What the helper does not do:
 These are acceptable in the current local Phase 8 posture:
 
 - using `recover-k3s-vault.sh` after a runtime restart or sealed-Vault event
+- relying on the installed host-side Vault recovery LaunchAgent to retry through early Colima and Kubernetes startup races
 - using `vault-access-status.sh break-glass-check` to confirm the host-side recovery material still works
 - using the Vault UI through the local hostname for deliberate operator tasks
+
+Current automation characteristics:
+
+- LaunchAgent label: `com.internal-developer-platform.vault-recovery`
+- startup behavior: `RunAtLoad` plus `30s` polling
+- recovery stance: wait through early API and `vault-0` startup instead of failing the first interval
+- trust boundary: unseal material remains on the operator host and is not mirrored into Kubernetes
 
 ## Hardening Gaps Still Open
 

@@ -39,7 +39,7 @@ cat > "${PLIST_PATH}" <<EOF
   <key>RunAtLoad</key>
   <true/>
   <key>StartInterval</key>
-  <integer>60</integer>
+  <integer>30</integer>
   <key>StandardOutPath</key>
   <string>${OUT_LOG}</string>
   <key>StandardErrorPath</key>

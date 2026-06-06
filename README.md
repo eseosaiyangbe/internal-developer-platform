@@ -215,6 +215,8 @@ Local recovery note:
 
 - the host-side platform recovery path now checks both Traefik readiness and the direct origin listener on `192.168.64.2:80`
 - if the platform falls into the `scheduled but no sandbox/IP` wedge pattern after a runtime fault, the recovery script can restart Colima once and retry automatically
+- Vault recovery is automated through host-side LaunchAgents, not Vault-native KMS auto-unseal; the recovery path intentionally waits through early Colima and Kubernetes startup races while keeping unseal material outside the cluster
+- the Vault and platform recovery LaunchAgents poll every `30s` and run at login to narrow the post-restart recovery window
 - use `./scripts/recover-k3s-platform.sh --no-colima-restart` if you need to suppress that escalation for a one-off manual debug session
 
 Single-node footprint note:

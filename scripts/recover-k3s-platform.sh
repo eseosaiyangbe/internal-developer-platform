@@ -23,6 +23,8 @@ source "${SCRIPT_DIR}/platform-identity.sh"
 
 QUIET=0
 TIMEOUT_SECONDS=300
+STARTUP_WAIT_SECONDS=240
+POLL_INTERVAL_SECONDS=5
 ALLOW_COLIMA_RESTART=1
 COLIMA_RESTARTED=0
 TARGET_NAMESPACES=(
@@ -46,6 +48,32 @@ require_command() {
     echo "ERROR: Required command not found: $1" >&2
     exit 1
   fi
+}
+
+wait_for_kube_api() {
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if kubectl get nodes >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  echo "ERROR: Kubernetes API did not become reachable within ${STARTUP_WAIT_SECONDS}s." >&2
+  return 1
+}
+
+wait_for_namespace() {
+  local namespace="$1"
+  local deadline
+  deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -89,13 +117,10 @@ if [[ "${OSTYPE:-}" == darwin* ]] && command -v colima >/dev/null 2>&1; then
   fi
 fi
 
-if ! kubectl get nodes >/dev/null 2>&1; then
-  log "Kubernetes API is not ready yet; skipping this recovery interval."
-  exit 0
-fi
+wait_for_kube_api
 
-if ! kubectl get namespace traefik >/dev/null 2>&1; then
-  log "Traefik namespace is not present; skipping platform recovery."
+if ! wait_for_namespace traefik; then
+  log "Traefik namespace is not present after startup wait; skipping platform recovery."
   exit 0
 fi
 
