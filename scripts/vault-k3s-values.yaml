@@ -1,19 +1,30 @@
 server:
   enabled: true
   standalone:
+    enabled: false
+  ha:
     enabled: true
-    config: |
-      ui = true
+    replicas: 1
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
 
-      listener "tcp" {
-        address         = "[::]:8200"
-        cluster_address = "[::]:8201"
-        tls_disable     = 1
-      }
+        listener "tcp" {
+          address         = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_disable     = 1
+        }
 
-      storage "file" {
-        path = "/vault/data"
-      }
+        storage "raft" {
+          path    = "/vault/data/raft"
+          node_id = "vault-0"
+        }
+
+        service_registration "kubernetes" {}
+
+        disable_mlock = true
   dataStorage:
     enabled: true
     size: 10Gi

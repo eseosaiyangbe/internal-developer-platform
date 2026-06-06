@@ -94,6 +94,7 @@ The platform has moved beyond late-stage assembly. The current state is:
 - `MemFlip`, `SwiftPay`, `FoodPulse`, and `OpenSIS` are live on the owned `k3s` path
 - `Obervability-Stack` is live on the owned `k3s` path
 - Vault is the active secret source of truth for the owned overlays
+- Vault local persistence now uses integrated Raft rather than the earlier file backend
 - public ingress is live through Cloudflare Tunnel
 - the local runtime contract is now Kubernetes-first and sized accordingly
 - ArgoCD is the default reconciler for the owned `dev` paths

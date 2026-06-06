@@ -85,9 +85,11 @@ externalsecrets_not_ready="$(kubectl get externalsecret -A -o json 2>/dev/null |
 if [[ -n "${vault_status_json}" ]]; then
   vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r '.sealed')"
   vault_version="$(printf '%s' "${vault_status_json}" | jq -r '.version // "unknown"')"
+  vault_storage_type="$(printf '%s' "${vault_status_json}" | jq -r '.storage_type // "unknown"')"
 else
   vault_sealed="unknown"
   vault_version="unknown"
+  vault_storage_type="unknown"
 fi
 
 if [[ -f "${VAULT_INIT_FILE}" ]]; then
@@ -102,6 +104,7 @@ log "Vault operator access status"
 printf 'vault-ui|url=%s\n' "${VAULT_UI_URL}"
 printf 'vault-runtime|phase=%s|sealed=%s|version=%s|conditions=%s\n' \
   "${vault_phase:-missing}" "${vault_sealed}" "${vault_version}" "${vault_ready:-missing}"
+printf 'vault-storage|type=%s\n' "${vault_storage_type}"
 printf 'vault-init-material|path=%s|present=%s|mode=%s\n' \
   "${VAULT_INIT_FILE}" "${init_present}" "${init_mode}"
 printf 'external-secrets|secretstores_not_ready=%s|externalsecrets_not_ready=%s\n' \

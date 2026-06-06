@@ -23,6 +23,7 @@ source "${SCRIPT_DIR}/platform-identity.sh"
 STATE_DIR="${IDP_STATE_DIR}"
 VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 VALUES_FILE="${ROOT_DIR}/scripts/vault-k3s-values.yaml"
+MIGRATION_SCRIPT="${SCRIPT_DIR}/migrate-k3s-vault-file-to-raft.sh"
 ROTATE_SECRETS=0
 SKIP_HELM=0
 PLATFORM_SLUGS=()
@@ -145,10 +146,37 @@ require_command helm
 require_command jq
 require_command openssl
 
+current_vault_config_storage() {
+  kubectl get configmap vault-config -n vault -o jsonpath='{.data.extraconfig-from-values\.hcl}' 2>/dev/null || true
+}
+
+desired_vault_storage_backend() {
+  if grep -q 'storage "raft"' "${VALUES_FILE}"; then
+    printf 'raft\n'
+    return 0
+  fi
+
+  if grep -q 'storage "file"' "${VALUES_FILE}"; then
+    printf 'file\n'
+    return 0
+  fi
+
+  printf 'unknown\n'
+}
+
 idp_migrate_legacy_state_dir_if_needed
 idp_ensure_state_dir
 
 if [[ "$SKIP_HELM" -eq 0 ]]; then
+  if helm status vault -n vault >/dev/null 2>&1; then
+    current_storage_config="$(current_vault_config_storage)"
+    desired_storage_backend="$(desired_vault_storage_backend)"
+    if grep -q 'storage "file"' <<<"${current_storage_config}" && [[ "${desired_storage_backend}" == "raft" ]]; then
+      echo "[vault-bootstrap] Migrating existing Vault storage from file to integrated Raft before Helm reconcile"
+      "${MIGRATION_SCRIPT}" --prepare-only
+    fi
+  fi
+
   echo "[vault-bootstrap] Installing or upgrading Vault"
   helm repo add hashicorp https://helm.releases.hashicorp.com >/dev/null 2>&1 || true
   helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true

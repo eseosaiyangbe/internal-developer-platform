@@ -74,6 +74,7 @@ Key rule:
 
 - the root token is a recovery credential, not a normal operator identity
 - the local runtime uses host-side automated recovery, not Vault-native KMS auto-unseal
+- the local runtime now stores Vault state on integrated Raft instead of the legacy file backend
 
 ## Scripted Helper
 
@@ -81,6 +82,12 @@ Safe day-two snapshot:
 
 ```bash
 ./scripts/vault-access-status.sh status
+```
+
+File-to-Raft migration helper:
+
+```bash
+./scripts/migrate-k3s-vault-file-to-raft.sh
 ```
 
 Explicit break-glass verification:
