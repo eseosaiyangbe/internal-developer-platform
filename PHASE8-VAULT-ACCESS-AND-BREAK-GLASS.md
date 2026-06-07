@@ -90,6 +90,14 @@ File-to-Raft migration helper:
 ./scripts/migrate-k3s-vault-file-to-raft.sh
 ```
 
+Vault Raft snapshot helpers:
+
+```bash
+./scripts/vault-raft-snapshot-save.sh
+./scripts/vault-raft-snapshot-inspect.sh --latest
+./scripts/vault-raft-snapshot-restore.sh --snapshot /path/to/vault.snap --yes-really-restore
+```
+
 Explicit break-glass verification:
 
 ```bash
@@ -113,6 +121,12 @@ What the helper does not do:
 - print the root token
 - unseal Vault directly
 - mutate policies or users
+
+What the snapshot helpers do:
+
+- capture host-side Vault Raft snapshots with metadata and checksums
+- inspect locally stored snapshot inventory
+- restore a selected snapshot only through an explicit destructive flag
 
 ## Acceptable Local-Runtime Recovery Actions
 

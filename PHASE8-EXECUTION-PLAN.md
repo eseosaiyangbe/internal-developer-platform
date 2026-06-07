@@ -36,6 +36,7 @@ As of `2026-06-03`:
 - Slice 4 has started and now has first-pass runtime-wedge evidence plus a second-pass SwiftPay autoscaling validation
 - the shared local Vault control plane now runs on integrated Raft storage instead of the legacy file backend
 - the host-side Vault recovery automation has now passed a controlled sealed-Vault drill against the Raft-backed state
+- the shared Vault control plane now has a Raft snapshot backup and destructive restore contract at the helper level
 
 Validated app-level recovery coverage now exists for:
 
