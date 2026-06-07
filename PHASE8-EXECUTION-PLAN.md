@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-06-06`
+Updated: `2026-06-07`
 
 ## Purpose
 
@@ -35,6 +35,7 @@ As of `2026-06-03`:
 - Slice 3 is materially complete for the current local-platform objective
 - Slice 4 has started and now has first-pass runtime-wedge evidence plus a second-pass SwiftPay autoscaling validation
 - the shared local Vault control plane now runs on integrated Raft storage instead of the legacy file backend
+- the host-side Vault recovery automation has now passed a controlled sealed-Vault drill against the Raft-backed state
 
 Validated app-level recovery coverage now exists for:
 

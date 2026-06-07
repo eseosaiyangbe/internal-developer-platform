@@ -32,7 +32,7 @@ cat > "${PLIST_PATH}" <<EOF
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>export PATH="$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"; cd '${RUNTIME_ROOT}' &amp;&amp; '${RUNTIME_SCRIPTS_DIR}/recover-k3s-vault.sh' --quiet</string>
+    <string>export HOME="${HOME}"; export KUBECONFIG="${HOME}/.kube/config"; export KUBECTL_CONTEXT="colima"; export PATH="${HOME}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"; cd '${RUNTIME_ROOT}' &amp;&amp; '${RUNTIME_SCRIPTS_DIR}/recover-k3s-vault.sh'</string>
   </array>
   <key>WorkingDirectory</key>
   <string>${RUNTIME_ROOT}</string>

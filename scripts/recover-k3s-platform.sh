@@ -21,6 +21,11 @@ EOF
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/platform-identity.sh"
 
+export HOME="${HOME:-$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | awk '{print $2}' | head -n1)}"
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
+KUBECTL_CONTEXT="${KUBECTL_CONTEXT:-colima}"
+KUBECTL_REQUEST_TIMEOUT="${KUBECTL_REQUEST_TIMEOUT:-5s}"
+
 QUIET=0
 TIMEOUT_SECONDS=300
 STARTUP_WAIT_SECONDS=240
@@ -43,6 +48,14 @@ log() {
   fi
 }
 
+kubectl_cmd() {
+  if [[ -n "${KUBECTL_CONTEXT}" ]]; then
+    kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" --context "${KUBECTL_CONTEXT}" "$@"
+    return
+  fi
+  kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" "$@"
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "ERROR: Required command not found: $1" >&2
@@ -54,7 +67,7 @@ wait_for_kube_api() {
   local deadline
   deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
   while (( SECONDS < deadline )); do
-    if kubectl get nodes >/dev/null 2>&1; then
+    if kubectl_cmd get nodes >/dev/null 2>&1; then
       return 0
     fi
     sleep "${POLL_INTERVAL_SECONDS}"
@@ -68,7 +81,7 @@ wait_for_namespace() {
   local deadline
   deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
   while (( SECONDS < deadline )); do
-    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+    if kubectl_cmd get namespace "${namespace}" >/dev/null 2>&1; then
       return 0
     fi
     sleep "${POLL_INTERVAL_SECONDS}"
@@ -125,12 +138,12 @@ if ! wait_for_namespace traefik; then
 fi
 
 traefik_ready() {
-  kubectl -n traefik get deployment traefik -o json 2>/dev/null \
+  kubectl_cmd -n traefik get deployment traefik -o json 2>/dev/null \
     | jq -e '(.status.availableReplicas // 0) >= 1' >/dev/null 2>&1
 }
 
 all_nodes_ready() {
-  kubectl get nodes -o json 2>/dev/null \
+  kubectl_cmd get nodes -o json 2>/dev/null \
     | jq -e '
         (.items | length) > 0
         and
@@ -155,7 +168,7 @@ portfolio_origin_healthy() {
 count_unhealthy_target_pods() {
   local namespaces_json
   namespaces_json="$(printf '%s\n' "${TARGET_NAMESPACES[@]}" | jq -R . | jq -s .)"
-  kubectl get pods -A -o json | jq --argjson target "${namespaces_json}" '
+  kubectl_cmd get pods -A -o json | jq --argjson target "${namespaces_json}" '
     [.items[]
      | select(.metadata.namespace as $ns | $target | index($ns))
      | select(
@@ -175,7 +188,7 @@ count_unhealthy_target_pods() {
 count_runtime_wedged_target_pods() {
   local namespaces_json
   namespaces_json="$(printf '%s\n' "${TARGET_NAMESPACES[@]}" | jq -R . | jq -s .)"
-  kubectl get pods -A -o json | jq --argjson target "${namespaces_json}" '
+  kubectl_cmd get pods -A -o json | jq --argjson target "${namespaces_json}" '
     [.items[]
      | select(.metadata.namespace as $ns | $target | index($ns))
      | select(.metadata.ownerReferences | length > 0)
@@ -203,9 +216,9 @@ delete_stuck_target_pods() {
   namespaces_json="$(printf '%s\n' "${TARGET_NAMESPACES[@]}" | jq -R . | jq -s .)"
   while read -r namespace pod; do
     [[ -n "${namespace}" && -n "${pod}" ]] || continue
-    kubectl -n "${namespace}" delete pod "${pod}" --wait=false >/dev/null 2>&1 || true
+    kubectl_cmd -n "${namespace}" delete pod "${pod}" --wait=false >/dev/null 2>&1 || true
   done < <(
-    kubectl get pods -A -o json | jq -r --argjson target "${namespaces_json}" '
+    kubectl_cmd get pods -A -o json | jq -r --argjson target "${namespaces_json}" '
       .items[]
       | select(.metadata.namespace as $ns | $target | index($ns))
       | select(.metadata.ownerReferences | length > 0)
@@ -244,7 +257,7 @@ ensure_traefik_with_helm() {
     --set service.type=LoadBalancer \
     --set ingressClass.enabled=true \
     --set ingressClass.isDefaultClass=true >/dev/null
-  kubectl rollout status deployment/traefik -n traefik --timeout=180s >/dev/null
+  kubectl_cmd rollout status deployment/traefik -n traefik --timeout=180s >/dev/null
 }
 
 restart_colima_runtime() {
@@ -263,7 +276,7 @@ restart_colima_runtime() {
   local deadline
   deadline=$((SECONDS + 240))
   while (( SECONDS < deadline )); do
-    if kubectl get nodes >/dev/null 2>&1 && all_nodes_ready; then
+    if kubectl_cmd get nodes >/dev/null 2>&1 && all_nodes_ready; then
       log "Colima and k3s are back. Re-running platform reconcile."
       return 0
     fi

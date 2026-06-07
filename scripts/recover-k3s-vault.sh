@@ -20,6 +20,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/platform-identity.sh"
 
+export HOME="${HOME:-$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | awk '{print $2}' | head -n1)}"
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
+KUBECTL_CONTEXT="${KUBECTL_CONTEXT:-colima}"
+KUBECTL_REQUEST_TIMEOUT="${KUBECTL_REQUEST_TIMEOUT:-5s}"
+
 VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 BOOTSTRAP_SCRIPT="${SCRIPT_DIR}/bootstrap-k3s-vault-secrets.sh"
 QUIET=0
@@ -40,12 +45,40 @@ require_command() {
   fi
 }
 
+kubectl_cmd() {
+  if [[ "${OSTYPE:-}" == darwin* ]] && command -v colima >/dev/null 2>&1 && [[ "${KUBECTL_CONTEXT}" == "colima" ]]; then
+    colima ssh -- sudo k3s kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" "$@"
+    return
+  fi
+  if [[ -n "${KUBECTL_CONTEXT}" ]]; then
+    kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" --context "${KUBECTL_CONTEXT}" "$@"
+    return
+  fi
+  kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" "$@"
+}
+
+vault_exec_with_root_token() {
+  local command="$1"
+  kubectl_cmd exec -n vault vault-0 -- sh -lc "export VAULT_TOKEN='${ROOT_TOKEN}'; ${command}"
+}
+
 wait_for_kube_api() {
   local deadline
   deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
   while (( SECONDS < deadline )); do
-    if kubectl get nodes >/dev/null 2>&1; then
+    if kubectl_cmd get nodes >/dev/null 2>&1; then
       return 0
+    fi
+    if [[ "${QUIET}" -eq 0 ]]; then
+      local context_err api_err
+      context_err="$(kubectl_cmd config current-context 2>&1 >/dev/null || true)"
+      api_err="$(kubectl_cmd get nodes 2>&1 >/dev/null || true)"
+      if [[ -n "${context_err}" ]]; then
+        log "kubectl context probe failed: ${context_err}"
+      fi
+      if [[ -n "${api_err}" ]]; then
+        log "kubectl API probe failed: ${api_err}"
+      fi
     fi
     sleep "${POLL_INTERVAL_SECONDS}"
   done
@@ -58,7 +91,7 @@ wait_for_namespace() {
   local deadline
   deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
   while (( SECONDS < deadline )); do
-    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+    if kubectl_cmd get namespace "${namespace}" >/dev/null 2>&1; then
       return 0
     fi
     sleep "${POLL_INTERVAL_SECONDS}"
@@ -72,7 +105,7 @@ wait_for_pod() {
   local deadline
   deadline=$((SECONDS + STARTUP_WAIT_SECONDS))
   while (( SECONDS < deadline )); do
-    if kubectl get pod "${pod}" -n "${namespace}" >/dev/null 2>&1; then
+    if kubectl_cmd get pod "${pod}" -n "${namespace}" >/dev/null 2>&1; then
       return 0
     fi
     sleep "${POLL_INTERVAL_SECONDS}"
@@ -81,7 +114,7 @@ wait_for_pod() {
 }
 
 vault_status_json_from_pod() {
-  kubectl exec -n vault vault-0 -- sh -lc 'vault status -format=json || true' 2>/dev/null || true
+  kubectl_cmd exec -n vault vault-0 -- sh -lc 'vault status -format=json || true' 2>/dev/null || true
 }
 
 wait_for_vault_status() {
@@ -155,8 +188,8 @@ if [[ -z "${vault_status_json}" ]]; then
 fi
 
 vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r '.sealed // "true"')"
-secretstore_json="$(kubectl get secretstore -A -o json 2>/dev/null || true)"
-externalsecret_json="$(kubectl get externalsecret -A -o json 2>/dev/null || true)"
+secretstore_json="$(kubectl_cmd get secretstore -A -o json 2>/dev/null || true)"
+externalsecret_json="$(kubectl_cmd get externalsecret -A -o json 2>/dev/null || true)"
 
 secretstores_not_ready=0
 externalsecrets_not_ready=0
@@ -180,25 +213,61 @@ if [[ "${vault_sealed}" == "true" && ! -f "${VAULT_INIT_FILE}" ]]; then
   exit 1
 fi
 
-log "Reconciling Vault and External Secrets through the host-side recovery path..."
-"${BOOTSTRAP_SCRIPT}" --skip-helm >/dev/null
+ROOT_TOKEN=""
+UNSEAL_KEY=""
+if [[ -f "${VAULT_INIT_FILE}" ]]; then
+  ROOT_TOKEN="$(jq -r '.root_token // empty' "${VAULT_INIT_FILE}")"
+  UNSEAL_KEY="$(jq -r '.unseal_keys_b64[0] // empty' "${VAULT_INIT_FILE}")"
+fi
+
+if [[ "${vault_sealed}" == "true" ]]; then
+  if [[ -z "${UNSEAL_KEY}" ]]; then
+    echo "ERROR: Vault is sealed but no unseal key was found in ${VAULT_INIT_FILE}." >&2
+    exit 1
+  fi
+
+  log "Unsealing Vault through the host-side recovery material..."
+  for _attempt in 1 2 3; do
+    kubectl_cmd exec -n vault vault-0 -- sh -lc "vault operator unseal '${UNSEAL_KEY}' >/dev/null" >/dev/null 2>&1 || true
+    sleep 2
+    vault_status_json="$(wait_for_vault_status || true)"
+    vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r '.sealed // "true"')"
+    if [[ "${vault_sealed}" != "true" ]]; then
+      break
+    fi
+  done
+  if [[ "${vault_sealed}" == "true" ]]; then
+    echo "ERROR: Vault is still sealed after the unseal attempt." >&2
+    exit 1
+  fi
+fi
+
+if [[ -z "${ROOT_TOKEN}" ]]; then
+  log "Root token is unavailable; using bootstrap reconcile as the fallback recovery path."
+  "${BOOTSTRAP_SCRIPT}" --skip-helm >/dev/null
+else
+  if ! vault_exec_with_root_token 'vault token lookup >/dev/null' >/dev/null 2>&1; then
+    log "Root-token validation failed; falling back to the bootstrap reconcile path."
+    "${BOOTSTRAP_SCRIPT}" --skip-helm >/dev/null
+  fi
+fi
 
 timestamp="$(date +%s)"
 
 while read -r namespace name; do
   [[ -n "${namespace}" && -n "${name}" ]] || continue
-  kubectl -n "${namespace}" annotate secretstore "${name}" "force-sync=${timestamp}" --overwrite >/dev/null 2>&1 || true
-done < <(kubectl get secretstore -A -o json | jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv')
+  kubectl_cmd -n "${namespace}" annotate secretstore "${name}" "force-sync=${timestamp}" --overwrite >/dev/null 2>&1 || true
+done < <(kubectl_cmd get secretstore -A -o json | jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv')
 
 while read -r namespace name; do
   [[ -n "${namespace}" && -n "${name}" ]] || continue
-  kubectl -n "${namespace}" annotate externalsecret "${name}" "force-sync=${timestamp}" --overwrite >/dev/null 2>&1 || true
-done < <(kubectl get externalsecret -A -o json | jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv')
+  kubectl_cmd -n "${namespace}" annotate externalsecret "${name}" "force-sync=${timestamp}" --overwrite >/dev/null 2>&1 || true
+done < <(kubectl_cmd get externalsecret -A -o json | jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv')
 
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 while (( SECONDS < deadline )); do
-  secretstores_not_ready="$(kubectl get secretstore -A -o json | jq '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length')"
-  externalsecrets_not_ready="$(kubectl get externalsecret -A -o json | jq '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length')"
+  secretstores_not_ready="$(kubectl_cmd get secretstore -A -o json | jq '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length')"
+  externalsecrets_not_ready="$(kubectl_cmd get externalsecret -A -o json | jq '[.items[] | select(((.status.conditions // []) | map(select(.type == "Ready" and .status == "True")) | length) == 0)] | length')"
 
   if [[ "${secretstores_not_ready}" -eq 0 && "${externalsecrets_not_ready}" -eq 0 ]]; then
     log "Vault and External Secrets recovery completed successfully."

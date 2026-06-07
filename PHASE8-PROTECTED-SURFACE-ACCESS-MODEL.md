@@ -157,6 +157,7 @@ These are acceptable and intentionally retained in the current runtime class:
 - host-side Vault recovery material stays outside Kubernetes
 - host-side LaunchAgent recovery stays part of the supported local-runtime posture, including startup-wait logic that tolerates early Colima and Kubernetes readiness races
 - local Vault persistence uses integrated Raft while keeping Shamir recovery material on the operator host
+- unattended Vault recovery now prefers Colima-side `k3s kubectl` so the job is not blocked by host-to-VM API route instability
 - one-time Colima restart escalation stays an acceptable recovery action for local runtime wedges
 
 These are constraints of the local platform design, not hidden defects.

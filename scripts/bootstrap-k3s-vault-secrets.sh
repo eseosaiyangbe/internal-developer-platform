@@ -20,6 +20,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/platform-identity.sh"
 
+export HOME="${HOME:-$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | awk '{print $2}' | head -n1)}"
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
+
 STATE_DIR="${IDP_STATE_DIR}"
 VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 VALUES_FILE="${ROOT_DIR}/scripts/vault-k3s-values.yaml"

@@ -128,7 +128,15 @@ Current automation characteristics:
 - LaunchAgent label: `com.internal-developer-platform.vault-recovery`
 - startup behavior: `RunAtLoad` plus `30s` polling
 - recovery stance: wait through early API and `vault-0` startup instead of failing the first interval
+- recovery execution path: prefer Colima-side `k3s kubectl` for unattended local recovery so the agent does not depend on the host-to-VM API route staying healthy
+- recovery action order: direct unseal first, SecretStore reconcile second, bootstrap reconcile only as a fallback
 - trust boundary: unseal material remains on the operator host and is not mirrored into Kubernetes
+
+Validated drill result on `2026-06-07`:
+
+- a controlled sealed-Vault event returned from `sealed=true` to `sealed=false` through the unattended LaunchAgent path
+- Raft leadership stayed healthy after recovery
+- SecretStore readiness returned to zero-not-ready
 
 ## Hardening Gaps Still Open
 
