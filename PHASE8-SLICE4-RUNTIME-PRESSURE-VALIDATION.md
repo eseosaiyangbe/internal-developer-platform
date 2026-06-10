@@ -452,6 +452,83 @@ Residual cautions:
 3. Re-check transient metrics-server, Redis, and wallet-service probe instability so unrelated local-runtime noise does not get mislabeled as SwiftPay failure.
 4. Continue Slice 4 on the other owned workloads using the same evidence-first drill discipline.
 
+## Fourth SwiftPay Pressure Update
+
+Date: `2026-06-10`
+
+The next bounded SwiftPay Slice 4 pass raised the public-ingress pressure band from the previously successful `8`-way profile to a `12`-way profile.
+
+Observed baseline before the run:
+
+- timestamp: `2026-06-10T17:38:24Z`
+- cluster running pods: `67`
+- `swiftpay-dev` `Synced Healthy`
+- Metrics API working before the burst:
+  - `kubectl top` succeeded
+  - SwiftPay HPAs reported real CPU and memory targets
+- steady state before the burst:
+  - `api-gateway` `1/1`
+  - `auth-service` `2/2`
+  - `transaction-service` `2/2`
+
+Observed result from the `12`-way run:
+
+- bounded concurrent `smoke-send-money.sh` run returned:
+  - `SUCCESS_COUNT=0`
+  - `FAIL_COUNT=12`
+  - `FAIL_SIGNAL_COUNT=12`
+- all client-visible failures occurred on:
+  - `POST /api/auth/register`
+- every failed run returned HTTP `500`
+
+Observed gateway evidence:
+
+- api-gateway logs again showed upstream registration timeout, not a new failure class:
+  - `message: timeout of 10000ms exceeded`
+  - `code: ECONNABORTED`
+  - `status: null`
+- the auth register circuit breaker crossed its open threshold during the burst
+
+Observed scale and probe behavior:
+
+- `auth-service-hpa` scaled from `2` to `3`
+- `api-gateway-hpa` scaled from `1` to `2`
+- during recovery, `auth-service` briefly degraded to:
+  - `0/3` available
+- two existing auth-service pods then failed liveness and were restarted
+- `api-gateway` converged back to `2/2`
+- `auth-service` eventually converged back to `3/3`
+
+Observed runtime side effects:
+
+- the node did not enter the earlier `PLEG` wedge pattern
+- the broader platform remained recoverable
+- `swiftpay-dev` returned to `Synced Healthy`
+- during the post-burst recovery window, the Metrics API again became transiently unavailable and HPAs briefly reported `unknown`
+
+What this means:
+
+- the current validated SwiftPay success ceiling is still `8/8`
+- the next band at `12/12` is not yet dependable
+- the failure boundary remains the same one identified earlier:
+  - auth-service registration path convergence under burst load
+  - followed by api-gateway upstream timeout and circuit-breaker pressure
+- this pass improves the classification materially:
+  - the failure is not a node-level runtime wedge
+  - it is a workload-level concurrency and health-tolerance problem inside the current SwiftPay `dev` contract
+
+Prepared hardening after this pass:
+
+- make api-gateway auth registration timeout configurable instead of hard-coded at `10000ms`
+- set `AUTH_REGISTER_TIMEOUT_MS=15000` in the `dev` overlay
+- increase auth-service `startupProbe`, `readinessProbe`, and `livenessProbe` tolerance in the `dev` overlay so short burst pressure does not trigger container restarts as aggressively
+
+Current honest state after the fourth pass:
+
+- `8/8` remains the highest live-proven clean bounded profile
+- `12/12` is a confirmed failure band in the current deployed runtime
+- a targeted `dev` hardening change is prepared in Git but still requires a manual image rebuild before the next rerun can be treated as live evidence
+
 ## FoodPulse Lifecycle Update
 
 The next Slice 4 pass targeted `FoodPulse` lifecycle resilience rather than HPA behavior.
