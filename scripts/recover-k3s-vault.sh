@@ -187,7 +187,7 @@ if [[ -z "${vault_status_json}" ]]; then
   exit 1
 fi
 
-vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r '.sealed // "true"')"
+vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r 'if .sealed == true then "true" else "false" end')"
 secretstore_json="$(kubectl_cmd get secretstore -A -o json 2>/dev/null || true)"
 externalsecret_json="$(kubectl_cmd get externalsecret -A -o json 2>/dev/null || true)"
 
@@ -231,7 +231,7 @@ if [[ "${vault_sealed}" == "true" ]]; then
     kubectl_cmd exec -n vault vault-0 -- sh -lc "vault operator unseal '${UNSEAL_KEY}' >/dev/null" >/dev/null 2>&1 || true
     sleep 2
     vault_status_json="$(wait_for_vault_status || true)"
-    vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r '.sealed // "true"')"
+    vault_sealed="$(printf '%s' "${vault_status_json}" | jq -r 'if .sealed == true then "true" else "false" end')"
     if [[ "${vault_sealed}" != "true" ]]; then
       break
     fi

@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-06-07`
+Updated: `2026-06-10`
 
 ## Purpose
 
@@ -28,7 +28,7 @@ Phase 8 execution is organized into five ordered slices:
 
 ## Current Status Snapshot
 
-As of `2026-06-03`:
+As of `2026-06-10`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
@@ -37,6 +37,7 @@ As of `2026-06-03`:
 - the shared local Vault control plane now runs on integrated Raft storage instead of the legacy file backend
 - the host-side Vault recovery automation has now passed a controlled sealed-Vault drill against the Raft-backed state
 - the shared Vault control plane now has a Raft snapshot backup and destructive restore contract at the helper level
+- the shared Vault control plane has now passed a reversible Raft snapshot restore drill with a rollback proof marker and return-to-current-state validation
 
 Validated app-level recovery coverage now exists for:
 
@@ -95,6 +96,7 @@ Outputs:
 Status:
 
 - core restore-drill coverage complete for the owned app and control-plane state stores
+- the shared Vault control plane now has live save, rollback-restore, and forward-restore evidence on integrated Raft
 - broader restart and pressure-validation work remains open
 
 ### Slice 3. Operator Access And Break-Glass Hardening

@@ -58,6 +58,21 @@ kubectl_cmd() {
   kubectl --request-timeout "${KUBECTL_REQUEST_TIMEOUT}" "$@"
 }
 
+wait_for_vault_pod_ready() {
+  local deadline
+  deadline=$((SECONDS + 180))
+  while (( SECONDS < deadline )); do
+    local ready
+    ready="$(kubectl_cmd get pod "${VAULT_POD}" -n "${VAULT_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+    if [[ "${ready}" == "True" ]]; then
+      return 0
+    fi
+    sleep 5
+  done
+  printf 'ERROR: Vault pod %s/%s did not become Ready within 180s.\n' "${VAULT_NAMESPACE}" "${VAULT_POD}" >&2
+  return 1
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --snapshot)
@@ -130,7 +145,7 @@ kubectl_cmd exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- sh -lc "rm -f '${remo
 
 log "Restarting Vault to ensure clean post-restore state"
 kubectl_cmd delete pod "${VAULT_POD}" -n "${VAULT_NAMESPACE}" --wait=true >/dev/null
-kubectl_cmd rollout status statefulset/"${VAULT_STATEFULSET}" -n "${VAULT_NAMESPACE}" --timeout=180s >/dev/null
+wait_for_vault_pod_ready
 
 log "Re-running host-side recovery and readiness reconciliation"
 "${SCRIPT_DIR}/recover-k3s-vault.sh" --timeout 180 >/dev/null

@@ -152,6 +152,26 @@ Validated drill result on `2026-06-07`:
 - Raft leadership stayed healthy after recovery
 - SecretStore readiness returned to zero-not-ready
 
+Validated restore-drill result on `2026-06-10`:
+
+- a reversible Raft snapshot restore drill succeeded end to end
+- rollback target:
+  - `vault-raft-20260607T051747Z-phase8-drill.snap`
+- forward-return snapshot:
+  - `vault-raft-20260610T145729Z-pre-restore-forward.snap`
+- a temporary proof marker written at `kv/phase8/vault-restore-drill` disappeared after the rollback restore
+- a second restore returned Vault to the intended pre-drill state
+- Vault ended the drill:
+  - `sealed=false`
+  - `storage_type=raft`
+  - `vault-0` leader
+  - `SecretStore` and `ExternalSecret` readiness back at zero-not-ready
+
+Restore-drill hardening that came out of the exercise:
+
+- `vault-raft-snapshot-restore.sh` no longer assumes a `RollingUpdate` StatefulSet strategy and now waits directly for the Vault pod `Ready` condition
+- `recover-k3s-vault.sh` now parses the Vault boolean sealed state explicitly instead of relying on a brittle `jq` default expression
+
 ## Hardening Gaps Still Open
 
 These remain clearly open:
