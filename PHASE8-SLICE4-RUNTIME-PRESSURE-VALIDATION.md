@@ -529,6 +529,92 @@ Current honest state after the fourth pass:
 - `12/12` is a confirmed failure band in the current deployed runtime
 - a targeted `dev` hardening change is prepared in Git but still requires a manual image rebuild before the next rerun can be treated as live evidence
 
+## Fifth SwiftPay Pressure Update
+
+Date: `2026-06-13`
+
+The next SwiftPay Slice 4 follow-up activated the previously prepared `dev` hardening and reran the same bounded `12`-way public-ingress profile.
+
+Live hardening confirmed before the rerun:
+
+- `swiftpay-dev` reconciled to revision `9b320c4`
+- api-gateway now carries:
+  - `AUTH_REGISTER_TIMEOUT_MS=15000`
+- auth-service `dev` probes now use the hardened tolerance:
+  - `startupProbe.failureThreshold=24`
+  - `startupProbe.timeoutSeconds=5`
+  - `readinessProbe.failureThreshold=12`
+  - `readinessProbe.timeoutSeconds=5`
+  - `livenessProbe.failureThreshold=12`
+  - `livenessProbe.timeoutSeconds=5`
+
+Observed result from the rerun:
+
+- bounded concurrent `smoke-send-money.sh` run returned:
+  - `SUCCESS_COUNT=0`
+  - `FAIL_COUNT=12`
+  - `FAIL_SIGNAL_COUNT=12`
+- all failed runs still returned HTTP `500`
+- api-gateway logs showed the same failure class as before, but now at the new timeout boundary:
+  - `message: timeout of 15000ms exceeded`
+  - `code: ECONNABORTED`
+
+Observed runtime behavior:
+
+- auth-service did not collapse into the earlier `0/3` availability pattern from the June 10 run
+- auth-service remained at its warm `2`-replica baseline during this rerun
+- pod restarts did not recur during the burst window
+- `swiftpay-dev` stayed recoverable and returned cleanly to `Synced Healthy`
+
+What this means:
+
+- widening the gateway register timeout from `10s` to `15s` and softening auth-service probe tolerance improved recovery behavior
+- those changes did not move the user-visible `12`-way success ceiling
+- the current failure boundary is still the auth registration path under bounded burst pressure
+
+## Sixth SwiftPay Pressure Update
+
+Date: `2026-06-13`
+
+Because the fifth pass still failed cleanly at `12/12`, the next manifest-only hardening kept `auth-service` warm at `3` replicas in the `dev` contract and reran the same `12`-way burst.
+
+Live hardening confirmed before the rerun:
+
+- `swiftpay-dev` reconciled to revision `c1f1ccf`
+- `auth-service-hpa` now uses:
+  - `minReplicas=3`
+  - `maxReplicas=3`
+- auth-service steady state before the burst:
+  - `3/3` ready
+
+Observed result from the rerun:
+
+- bounded concurrent `smoke-send-money.sh` run returned:
+  - `SUCCESS_COUNT=2`
+  - `FAIL_COUNT=10`
+  - `FAIL_SIGNAL_COUNT=10`
+- the gateway still returned HTTP `500` for the failed requests
+- api-gateway logs still showed:
+  - `message: timeout of 15000ms exceeded`
+  - `code: ECONNABORTED`
+
+Observed runtime behavior:
+
+- auth-service held `3/3` throughout the burst instead of dropping below full availability
+- auth-service did not restart during the run
+- the namespace recovered cleanly and remained:
+  - `swiftpay-dev` `Synced Healthy`
+- metrics-server and HPA telemetry were again transiently unstable during the same window, but the workload itself remained stable enough to complete the drill
+
+What this means:
+
+- keeping three warm auth-service replicas materially improved the `12`-way outcome from `0/12` to `2/12`
+- the ceiling still has not moved enough to call `12/12` a validated success profile
+- the current honest SwiftPay classification is now:
+  - clean success ceiling: `8/8`
+  - partial improvement at `12/12`, but still failure
+  - failure boundary still centered on auth registration latency through the gateway under burst pressure
+
 ## FoodPulse Lifecycle Update
 
 The next Slice 4 pass targeted `FoodPulse` lifecycle resilience rather than HPA behavior.

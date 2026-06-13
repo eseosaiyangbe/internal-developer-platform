@@ -143,6 +143,7 @@ Status:
 - SwiftPay HPA scale-up is now live-observed evidence, not only declared intent
 - a third SwiftPay-specific pass hardened the auth-service dev baseline and converted the prior bounded registration failure into a clean `8/8` successful public-ingress run
 - a fourth SwiftPay-specific pass established that the next bounded `12/12` profile still fails on auth registration timeout and auth-service health convergence, while remaining a workload-level failure rather than a node wedge
+- a fifth and sixth SwiftPay-specific follow-up on `2026-06-13` showed that increasing auth register timeout, softening probes, and then holding auth-service warm at `3` replicas improved recovery behavior and raised the `12`-way result from `0/12` to `2/12`, but still did not produce a clean `12/12` success band
 - a FoodPulse lifecycle pass confirmed the preserved stop/start workflow must suspend ArgoCD automation first and now has a validated GitOps-safe round-trip
 - a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
 - the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
@@ -178,8 +179,13 @@ Continue Slice 4:
 - preserve the corrected SwiftPay load harness as the new validation baseline
 - keep the improved SwiftPay register-path diagnostics as the new operator baseline
 - keep the hardened SwiftPay auth-service dev baseline as the validated contract for current local-runtime drills
-- treat `8/8` as the current proven SwiftPay ceiling and `12/12` as the current known failure band
-- apply the prepared SwiftPay `dev` hardening for auth register timeout and auth-service probe tolerance, then rerun the `12`-way profile
+- treat `8/8` as the current clean SwiftPay ceiling
+- treat `12/12` as a partially improved but still failing band, even after the June 13 hardening
+- keep the current SwiftPay `dev` drill contract at:
+  - `AUTH_REGISTER_TIMEOUT_MS=15000`
+  - hardened auth-service probe tolerance
+  - auth-service `minReplicas=3`
+- inspect auth-service registration latency directly before raising the concurrency band again
 - keep the GitOps-safe FoodPulse lifecycle path as the validated preserved-stop contract for that workload
 - inspect transient metrics-server and probe noise so local-runtime instability is classified correctly
 - keep separating single-node-safe behavior from assumptions that require a broader runtime class
