@@ -110,6 +110,7 @@ Phase 8 now focuses on:
 - platform behavior under higher load and stricter runtime assumptions
 - documenting which runtime wedges are app defects versus single-node `k3s` runtime defects
 - documenting where autoscaling is now proven live versus where concurrency paths still fail under pressure
+- documenting that the remaining SwiftPay `12`-way registration failure is now classified as auth-service runtime saturation, not only gateway timeout behavior
 
 Execution checklist:
 

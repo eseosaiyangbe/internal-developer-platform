@@ -615,6 +615,114 @@ What this means:
   - partial improvement at `12/12`, but still failure
   - failure boundary still centered on auth registration latency through the gateway under burst pressure
 
+## Seventh SwiftPay Pressure Update
+
+Date: `2026-06-13`
+
+The next Slice 4 step isolated the auth registration path directly so the team could stop guessing whether the remaining `12/12` failure band belonged to api-gateway behavior or auth-service behavior.
+
+### 1. The first direct helper-pod test path was invalid
+
+An initial synthetic benchmark used a temporary helper pod in `swiftpay-dev`.
+
+That path did not produce valid auth-service evidence.
+
+Observed behavior:
+
+- the helper pod could not resolve cluster DNS
+- direct TCP connection attempts to:
+  - `auth-service`
+  - `auth-service.swiftpay-dev.svc.cluster.local`
+  - `10.43.125.57:3004`
+  all failed from that helper pod
+
+This was not an auth-service defect.
+
+It was expected network segmentation.
+
+Live network policy confirmed that backend ingress currently allows auth-service traffic from:
+
+- `api-gateway`
+- observability scrapers
+
+It does not allow arbitrary helper pods.
+
+That means the helper-pod path cannot be used as a valid service-isolation benchmark without explicitly widening the policy, which would distort the real runtime contract.
+
+### 2. The valid direct benchmark had to run from inside api-gateway
+
+To match the production-like SwiftPay service path, the direct auth benchmark was rerun from inside a live `api-gateway` pod against:
+
+- `http://auth-service:3004/auth/register`
+
+Two important observations came out of that isolation test:
+
+- the first attempt used the wrong payload shape and returned fast validation failures:
+  - auth-service expects `name`
+  - the invalid probe used `firstName` and `lastName`
+  - those requests returned HTTP `400` quickly and do not represent the performance boundary
+- the corrected direct benchmark used the real auth-service payload contract and was launched at `12`-way concurrency from `api-gateway`
+
+### 3. Direct auth-service registration can succeed, but still starves pod health under burst load
+
+Once the corrected direct benchmark was in flight, the live runtime showed:
+
+- direct auth-service `POST /auth/register` calls returned `201` from multiple auth-service pods
+- the path therefore does work without the public ingress hop
+- however, at least one auth-service pod then stopped answering `/health` quickly enough for:
+  - kubelet readiness probes
+  - kubelet liveness probes
+  - blackbox probe traffic
+  - api-gateway health polling
+
+Observed runtime consequences:
+
+- `auth-service-686d498c4d-9ckpm` entered prolonged health-check timeouts
+- that pod dropped to `0/1 Ready`
+- kubelet eventually issued:
+  - `Container auth-service failed liveness probe, will be restarted`
+- the pod restarted once
+- the auth-service set then recovered back to:
+  - `3/3 Ready`
+- `swiftpay-dev` recovered back to:
+  - `Synced Healthy`
+
+### 4. What this isolation step proves
+
+This is the strongest SwiftPay Slice 4 classification so far.
+
+It proves that the remaining `12/12` failure band is not just a gateway timeout artifact.
+
+The direct caller path from `api-gateway` into `auth-service` can itself push auth-service into a state where:
+
+- registration requests partially succeed
+- health checks starve
+- at least one pod loses readiness
+- liveness eventually forces a restart
+
+Current honest classification:
+
+- the public `500` responses seen at `12/12` are still surfaced by api-gateway
+- but the underlying bottleneck is now confirmed to include auth-service internal saturation or event-loop starvation under burst registration load
+- the remaining SwiftPay Slice 4 problem is therefore inside the auth registration runtime path itself, not only in gateway timeout tuning
+
+### 5. What this means for the next hardening step
+
+The next useful SwiftPay work is no longer another blind timeout increase.
+
+The platform now needs auth-service-specific runtime diagnostics and hardening, most likely around:
+
+- bcrypt cost and event-loop pressure during burst registration
+- database connection-pool pressure during concurrent user creation
+- registration-path timing instrumentation inside auth-service
+- safer health-check isolation so `/health` does not starve behind burst registration work
+
+Current honest state after the seventh pass:
+
+- clean proven SwiftPay success ceiling remains `8/8`
+- `12/12` is still an invalid success band
+- the failure is now evidence-backed as an auth-service-internal runtime saturation problem, not merely a gateway-facing symptom
+
 ## FoodPulse Lifecycle Update
 
 The next Slice 4 pass targeted `FoodPulse` lifecycle resilience rather than HPA behavior.

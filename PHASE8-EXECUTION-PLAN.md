@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-06-10`
+Updated: `2026-06-13`
 
 ## Purpose
 
@@ -28,7 +28,7 @@ Phase 8 execution is organized into five ordered slices:
 
 ## Current Status Snapshot
 
-As of `2026-06-10`:
+As of `2026-06-13`:
 
 - Slice 1 is complete at the app-contract level
 - Slice 2 has live restore-drill evidence across the owned stateful workloads
@@ -144,6 +144,7 @@ Status:
 - a third SwiftPay-specific pass hardened the auth-service dev baseline and converted the prior bounded registration failure into a clean `8/8` successful public-ingress run
 - a fourth SwiftPay-specific pass established that the next bounded `12/12` profile still fails on auth registration timeout and auth-service health convergence, while remaining a workload-level failure rather than a node wedge
 - a fifth and sixth SwiftPay-specific follow-up on `2026-06-13` showed that increasing auth register timeout, softening probes, and then holding auth-service warm at `3` replicas improved recovery behavior and raised the `12`-way result from `0/12` to `2/12`, but still did not produce a clean `12/12` success band
+- a seventh SwiftPay-specific isolation pass on `2026-06-13` confirmed that direct auth-service registration from the live api-gateway path can succeed but still starves auth-service health enough to force a liveness-driven pod restart under `12`-way burst load
 - a FoodPulse lifecycle pass confirmed the preserved stop/start workflow must suspend ArgoCD automation first and now has a validated GitOps-safe round-trip
 - a controlled `FoodPulse` stop/start drill exposed CNPG admission instability during node degradation
 - the local `colima` node entered a `PLEG`-driven `NotReady` state during the drill window
@@ -181,11 +182,13 @@ Continue Slice 4:
 - keep the hardened SwiftPay auth-service dev baseline as the validated contract for current local-runtime drills
 - treat `8/8` as the current clean SwiftPay ceiling
 - treat `12/12` as a partially improved but still failing band, even after the June 13 hardening
+- treat the remaining `12/12` defect as auth-service-internal saturation under burst registration, not only as gateway timeout behavior
 - keep the current SwiftPay `dev` drill contract at:
   - `AUTH_REGISTER_TIMEOUT_MS=15000`
   - hardened auth-service probe tolerance
   - auth-service `minReplicas=3`
-- inspect auth-service registration latency directly before raising the concurrency band again
+- add auth-service-specific registration timing instrumentation before raising the concurrency band again
+- inspect bcrypt cost, database pool pressure, and health-endpoint starvation inside auth-service before changing gateway timeouts again
 - keep the GitOps-safe FoodPulse lifecycle path as the validated preserved-stop contract for that workload
 - inspect transient metrics-server and probe noise so local-runtime instability is classified correctly
 - keep separating single-node-safe behavior from assumptions that require a broader runtime class
