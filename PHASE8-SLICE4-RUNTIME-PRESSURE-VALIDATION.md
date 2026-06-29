@@ -204,6 +204,388 @@ Current honest status:
 3. Repeat the controlled app-lifecycle drill after stabilization to confirm whether `FoodPulse` convergence issues were purely node-runtime-driven or also script-path-driven.
 4. Record a second Slice 4 pass once the runtime is healthy enough to trust the next set of observations.
 
+## Twelfth SwiftPay And Observability Validation Update
+
+Date: `2026-06-28`
+
+## Additional Validation Baseline
+
+Baseline captured after the bounded `12/12` SwiftPay public-ingress success result:
+
+- SwiftPay `auth-service` remained on the hardened local drill contract:
+  - `AUTH_REGISTER_TIMEOUT_MS=15000`
+  - hardened auth-service probe tolerance
+  - auth-service `minReplicas=3`
+  - `BCRYPT_ROUNDS=10`
+  - `AUTH_REGISTER_MAX_IN_FLIGHT=1`
+  - `AUTH_REGISTER_QUEUE_TIMEOUT_MS=12000`
+- Prometheus alerts still showed `HighResponseTime` for:
+  - `api-gateway.swiftpay-dev.svc.cluster.local:80`
+  - `auth-service.swiftpay-dev.svc.cluster.local:3004`
+- the active alert descriptions referenced the registration paths:
+  - `/api/auth/register`
+  - `/auth/register`
+
+## What This Validation Attempt Targeted
+
+This follow-up asked one narrow question:
+
+1. Did the post-success SwiftPay latency alerts indicate a fresh application regression, or was the observability path itself producing misleading evidence?
+
+## Findings
+
+### 1. The post-success SwiftPay latency alerts were caused by an observability defect, not by a fresh app regression
+
+Observed state:
+
+- the clean bounded `12/12` SwiftPay drill had already completed successfully under the hardened local contract
+- Prometheus was still scraping key SwiftPay metrics through Service VIP targets instead of pod-backed endpoints
+- the affected scrape paths were aggregating request histograms and counters across multiple replicas behind:
+  - `api-gateway.swiftpay-dev.svc.cluster.local:80`
+  - `auth-service.swiftpay-dev.svc.cluster.local:3004`
+
+What this means:
+
+- once the SwiftPay services ran with more than one replica, Service-level scraping no longer represented a trustworthy per-pod latency source for alerting
+- the remaining `HighResponseTime` alerts were therefore not sufficient evidence of a new application-path failure by themselves
+- this was an observability-stack scrape-topology defect that had to be corrected before SwiftPay latency alerts could be treated as reliable production-style evidence
+
+### 2. The observability fix moved SwiftPay scraping to pod-backed endpoint discovery
+
+The remediation changed the observability contract in Git:
+
+- SwiftPay Prometheus jobs now use Kubernetes endpoint discovery rather than static Service targets
+- Prometheus now runs with the discovery RBAC needed to read:
+  - `endpoints`
+  - `namespaces`
+  - `pods`
+  - `services`
+- the Prometheus StatefulSet now runs under an explicit `prometheus` service account aligned with that discovery scope
+
+GitOps evidence:
+
+- observability-stack commit:
+  - `12f04b4`
+- ArgoCD synced revision:
+  - `12f04b46813d5ddc9f9fbe0aa0c4afca5eb59014`
+
+### 3. Live verification confirmed the corrected scrape topology
+
+Observed verification after sync and Prometheus restart:
+
+- the mounted `/etc/prometheus/prometheus.yml` contained only the new SwiftPay endpoint-discovery jobs
+- Prometheus startup logs confirmed Kubernetes service-account discovery was active for the SwiftPay jobs
+- active targets now included pod-backed endpoints such as:
+  - `10.42.0.22:3000`
+  - `10.42.0.222:3000`
+
+Important runtime interpretation:
+
+- the corrected pod-backed scrape topology is now the valid local monitoring contract for scaled SwiftPay services
+- old Service-labeled alert or query series can remain briefly visible while stale time series age out
+- those lingering labels should not be misread as proof that the old scrape configuration is still mounted
+
+## Classification Update
+
+This follow-up changes the Slice 4 interpretation in one important way:
+
+- the clean bounded `12/12` SwiftPay success result still stands as the current local app-path stabilization proof
+- the later latency alert noise was traced to monitoring topology, not to a fresh SwiftPay registration regression
+- future SwiftPay latency findings should be judged against the pod-backed scrape contract, not the retired Service-VIP scrape path
+
+## Thirteenth Slice 4 Runtime Revalidation Update
+
+Date: `2026-06-29`
+
+## Validation Baseline
+
+Baseline captured before the next controlled lifecycle revalidation:
+
+- node state:
+  - `colima` `Ready`
+- running pods cluster-wide:
+  - `68`
+- all managed ArgoCD applications returned to:
+  - `Synced Healthy`
+- Metrics API path working:
+  - `kubectl top node` succeeded
+  - SwiftPay HPAs reported live CPU and memory targets instead of `unknown`
+- current node pressure remained bounded:
+  - CPU: `35%`
+  - memory: `63%`
+
+## What This Validation Attempt Targeted
+
+This follow-up focused on the remaining Slice 4 runtime question that still mattered most after the earlier GitOps hardening:
+
+1. Does the preserved `FoodPulse` stop/start path now converge cleanly without reproducing the earlier node wedge or CNPG lifecycle collapse?
+
+## Findings
+
+### 1. The stale ArgoCD `Unknown` sync state was a transient repo-server comparison error, not a fresh workload fault
+
+Observed pre-drill state:
+
+- `foodpulse-dev` and `memflip-dev` initially showed:
+  - `Sync Status: Unknown`
+  - `Health Status: Healthy`
+- both applications carried the same `ComparisonError`
+- the error pointed to a temporary connection refusal against:
+  - `10.43.192.137:8081`
+  - `argocd-repo-server`
+
+Observed runtime verification:
+
+- the repo-server Service and Endpoints were healthy again
+- the live repo-server pod was:
+  - `Running`
+  - `Ready`
+- forcing a hard ArgoCD refresh on the affected applications returned both to:
+  - `Synced Healthy`
+
+What this means:
+
+- the pre-drill reconciliation noise was stale control-plane metadata, not a current app-runtime defect
+- the Slice 4 baseline was clean enough to trust the next lifecycle observations
+
+### 2. The GitOps-safe preserved-stop path now converges cleanly
+
+Observed stop command:
+
+- `./scripts/k8s-stop.sh --wait --suspend-gitops`
+
+Observed stop outcome:
+
+- ArgoCD automated sync was suspended intentionally for:
+  - `internal-developer-platform-dev-root`
+  - `foodpulse-dev`
+- application deployments scaled down cleanly
+- Redis scaled down cleanly
+- CNPG hibernation completed successfully
+- the namespace drained to only the completed backup job
+- the node remained:
+  - `Ready`
+
+What this means:
+
+- the preserved-stop workflow is now behaving as a controlled operator path rather than as a reconciliation conflict
+- this rerun did not reproduce the earlier node-level wedge during the stop half of the drill
+
+### 3. The preserved-start path also converged cleanly on the same node
+
+Observed start command:
+
+- `./scripts/k8s-start.sh --resume-gitops`
+
+Observed resume outcome:
+
+- CNPG rehydration completed successfully
+- Redis returned to:
+  - `3/3` StatefulSet pods ready
+- application rollouts completed successfully for:
+  - `foodpulse-api`
+  - `foodpulse-ui`
+- ArgoCD automated sync was re-enabled for:
+  - `internal-developer-platform-dev-root`
+  - `foodpulse-dev`
+- final platform state returned to:
+  - all managed applications `Synced Healthy`
+  - `foodpulse-dev` workloads running and ready
+  - node `colima` still `Ready`
+
+### 4. Residual probe noise still exists, but it no longer looks like a runtime wedge
+
+Observed during resume:
+
+- `foodpulse-ui` emitted one transient readiness failure:
+  - `HTTP probe failed with statuscode: 502`
+- Redis emitted one transient readiness cancellation during restart sequencing
+
+Observed final state:
+
+- both `foodpulse-api` and `foodpulse-ui` recovered to `1/1 Ready`
+- Redis recovered to `3` running pods with `2/2` containers ready on each pod
+- CNPG recovered to healthy state with both instances active
+
+What this means:
+
+- the current evidence supports classifying this probe noise as transient local-runtime convergence behavior
+- this rerun did not show the broader kubelet, API, or CNPG collapse that defined the earlier wedge
+
+## Classification Update
+
+This rerun materially improves the Slice 4 interpretation:
+
+- the GitOps-safe `FoodPulse` preserved stop/start path is now revalidated on the live single-node runtime
+- the earlier catastrophic lifecycle failure is not currently reproducible on the hardened workflow under the present node conditions
+- the remaining open Slice 4 risk is now narrower:
+  - distinguish transient single-node convergence noise from true node-runtime instability
+  - continue watching for kubelet or control-plane degradation rather than assuming every readiness blip is a platform failure
+
+## Fourteenth Slice 4 Noise Classification Update
+
+Date: `2026-06-29`
+
+## What This Follow-Up Targeted
+
+This follow-up narrowed the remaining Slice 4 question further:
+
+1. Which current warnings are ordinary local convergence noise, and which still justify being treated as platform-risk signals?
+
+## Findings
+
+### 1. ArgoCD sync-status churn during controlled lifecycle work is now expected control-plane behavior
+
+Observed pattern:
+
+- `foodpulse-dev` moved through:
+  - `Synced`
+  - `OutOfSync`
+  - `Suspended`
+  - `Progressing`
+  - back to `Synced Healthy`
+- `internal-developer-platform-dev-root` also moved temporarily to:
+  - `OutOfSync`
+  - then back to `Synced`
+
+Observed cause:
+
+- these transitions aligned exactly with:
+  - deliberate sync suspension
+  - preserved workload stop
+  - preserved workload resume
+  - automated sync re-enable
+
+What this means:
+
+- this ArgoCD status churn is now expected operator-visible behavior for the hardened preserved-stop workflow
+- it should not be classified as platform instability unless it persists after the lifecycle round-trip finishes
+
+### 2. Short readiness failures during app restart are still present, but they are bounded and self-clearing
+
+Observed current examples:
+
+- `foodpulse-ui` emitted one readiness failure:
+  - `HTTP probe failed with statuscode: 502`
+- Redis readiness briefly reported cancellation while pods were being terminated and recreated
+
+Observed runtime outcome:
+
+- no pod entered crash loop
+- no workload remained unavailable after the restart window
+- final state returned to:
+  - app pods ready
+  - Redis ready
+  - CNPG healthy
+  - all ArgoCD applications healthy
+
+What this means:
+
+- these warnings are best classified as bounded restart-sequencing noise in the current local runtime
+- they are not presently evidence of kubelet collapse, CNPG control-plane loss, or sustained app failure
+
+### 3. The remaining observability UI liveness warning is a separate service-level hardening concern, not a Slice 4 node-wedge signal
+
+Observed event:
+
+- `devops-monitor-ui` reported:
+  - `Liveness probe failed`
+  - `context deadline exceeded`
+
+Observed current runtime state:
+
+- the pod is now:
+  - `Running`
+  - `Ready`
+- the current restart count is historical rather than actively increasing during this FoodPulse lifecycle drill
+- the node remains:
+  - `Ready`
+- Prometheus, Alertmanager, Grafana, and the rest of the observability stack remain up
+
+What this means:
+
+- this warning should be tracked as a service-specific probe-hardening issue for the observability UI
+- it should not be conflated with the earlier Slice 4 node-wide `PLEG` wedge unless it begins to coincide with broader kubelet or API degradation
+
+## Classification Update
+
+The current remaining noise can now be classified more precisely:
+
+- expected during controlled preserved-stop workflows:
+  - temporary ArgoCD sync churn
+  - brief readiness turbulence during workload restart
+- worthy of separate service hardening, but not of node-wedge classification:
+  - isolated `devops-monitor-ui` liveness timeouts
+- still the real Slice 4 high-risk signal if it reappears:
+  - kubelet `NotReady`
+  - CNPG admission or reconciliation collapse
+  - broad multi-namespace control-plane degradation
+
+## Fifteenth Slice 4 Service Hardening Update
+
+Date: `2026-06-29`
+
+## What This Follow-Up Targeted
+
+This follow-up addressed the one remaining service-specific concern left after the broader noise classification pass:
+
+1. Harden the `devops-monitor-ui` health model so isolated frontend latency does not present as a platform-runtime signal.
+
+## Findings
+
+### 1. The prior `devops-monitor-ui` probes were too aggressive for a single-replica control-plane UI
+
+Observed prior probe contract:
+
+- readiness and liveness both checked:
+  - `/`
+- probe timeout was:
+  - `1s`
+- there was no startup probe
+
+What this meant:
+
+- a brief homepage render delay or event-loop stall could cause a false liveness failure
+- the probe path was testing the full page-serving surface instead of a minimal process health endpoint
+
+### 2. The UI now exposes a dedicated lightweight health endpoint and Kubernetes probes use it
+
+Implemented hardening:
+
+- added a dedicated route:
+  - `/api/health`
+- changed `devops-monitor-ui` probes to use:
+  - `/api/health`
+- added a `startupProbe`
+- increased probe timeout and failure tolerance for the single-node local runtime
+
+Current probe contract:
+
+- `startupProbe`
+  - `initialDelaySeconds=10`
+  - `periodSeconds=5`
+  - `timeoutSeconds=3`
+  - `failureThreshold=24`
+- `readinessProbe`
+  - `initialDelaySeconds=15`
+  - `periodSeconds=10`
+  - `timeoutSeconds=3`
+  - `failureThreshold=6`
+- `livenessProbe`
+  - `initialDelaySeconds=45`
+  - `periodSeconds=20`
+  - `timeoutSeconds=5`
+  - `failureThreshold=6`
+
+## Classification Update
+
+This change does not redefine Slice 4.
+
+It does improve the quality of future Slice 4 evidence:
+
+- `devops-monitor-ui` liveness noise now has a hardened remediation path in Git
+- future observability-UI probe failures will be more meaningful because they are no longer tied to an overly aggressive homepage probe contract
+
 ## Second Validation Pass
 
 Date: `2026-06-03`
@@ -793,3 +1175,386 @@ What this means:
 - FoodPulse API and UI still showed intermittent readiness and liveness turbulence during some lifecycle transitions
 - Redis resume remains one of the slower convergence points in the local single-node runtime
 - these are now runtime characteristics to monitor, not workflow-design defects
+
+## SwiftPay Auth-Service Instrumentation Follow-Up
+
+Date: `2026-06-28`
+
+The next Slice 4 step did not rerun concurrency immediately.
+
+It first hardened the auth-service evidence path so the next `12/12` attempt can measure the registration bottleneck directly.
+
+### 1. What was added
+
+The live auth-service registration path now emits dedicated Prometheus metrics for:
+
+- in-flight registration requests
+- end-to-end registration latency by outcome
+- stage latency for:
+  - PostgreSQL pool acquisition
+  - duplicate-email lookup
+  - bcrypt password hashing
+  - user-row insert
+  - refresh-token insert
+- PostgreSQL pool state during the registration path:
+  - idle
+  - active
+  - waiting
+  - total
+- explicit auth-service registration-path error counters for:
+  - pool connection failure
+  - register-flow query failure
+
+### 2. Why this was necessary
+
+The June 13 evidence already narrowed the remaining failure band to auth-service-internal saturation under burst registration.
+
+That was not enough to close Slice 4 honestly.
+
+Without stage-level timing, the platform could not answer which of the following dominates the remaining `12/12` failure:
+
+- bcrypt CPU cost
+- PostgreSQL pool contention
+- write-path latency
+- health-path starvation while the event loop is busy
+
+### 3. What this changes operationally
+
+The next SwiftPay pressure rerun no longer needs to guess from gateway `500` responses alone.
+
+Operators can now inspect the auth-service metrics endpoint during and after the drill to determine:
+
+- whether concurrency backs up at pool acquisition
+- whether bcrypt becomes the dominant latency stage
+- whether successful requests still complete while health checks starve
+- whether the pool enters a waiting state before probe degradation starts
+
+### 4. Current Slice 4 classification after this follow-up
+
+- `8/8` remains the clean proven SwiftPay success ceiling
+- `12/12` remains an invalid success band until the instrumented rerun is completed
+- the auth-service instrumentation is now part of the Phase 8 baseline, not an optional debug add-on
+- the next meaningful Slice 4 action is deployment plus a controlled rerun, not another blind timeout increase
+
+## Eighth SwiftPay Pressure Update
+
+Date: `2026-06-28`
+
+The next Slice 4 rerun used the newly instrumented auth-service build and repeated the bounded `12`-way public-ingress `smoke-send-money.sh` profile against:
+
+- `https://swiftpay.eseosadevbox.com/api`
+
+### 1. Validation baseline before the rerun
+
+Observed baseline captured at `2026-06-28T08:18:15Z`:
+
+- `swiftpay-dev` remained `Synced Healthy`
+- auth-service image live:
+  - `swiftpay-auth-service:dev`
+- auth-service steady state before the burst:
+  - `3/3` ready
+  - no fresh restarts
+- api-gateway steady state before the burst:
+  - `2/2` ready
+- auth-service HPA contract remained:
+  - `minReplicas=3`
+  - `maxReplicas=3`
+- api-gateway HPA steady state remained:
+  - `2` replicas
+
+### 2. Result from the rerun
+
+Observed result from the bounded concurrent public run:
+
+- `SUCCESS_COUNT=7`
+- `FAIL_COUNT=5`
+- `FAIL_SIGNAL_COUNT=5`
+
+All failed runs still exited at:
+
+- `POST /api/auth/register`
+
+Observed client-visible failure signal:
+
+- `curl: (56) The requested URL returned error: 500`
+
+### 3. Gateway evidence still points to upstream auth registration timeout
+
+Live api-gateway logs during the burst still showed the same failure class as earlier passes:
+
+- `message: timeout of 15000ms exceeded`
+- `code: ECONNABORTED`
+- `status: null`
+
+This means the user-visible failure boundary remains the gateway waiting on auth registration beyond the current `15s` timeout contract.
+
+### 4. The new auth-service metrics narrowed the bottleneck materially
+
+The instrumented auth-service metrics captured `8` completed registration requests during the run with:
+
+- end-to-end registration count:
+  - `swiftpay_auth_register_duration_seconds_count{outcome="success"} 8`
+- end-to-end registration sum:
+  - `17.193284946s`
+- average completed registration duration:
+  - about `2.15s`
+
+Stage timing for those `8` successful registrations showed:
+
+- `pool_acquire` sum:
+  - `1.829235894s`
+  - about `0.23s` average
+- `duplicate_check` sum:
+  - `0.91786343s`
+  - about `0.11s` average
+- `password_hash` sum:
+  - `11.687104232s`
+  - about `1.46s` average
+- `user_insert` sum:
+  - `0.631861116s`
+  - about `0.08s` average
+- `refresh_token_insert` sum:
+  - `0.076953507s`
+  - about `0.01s` average
+
+That makes bcrypt hashing the dominant successful-path cost by a wide margin.
+
+It also shows that PostgreSQL pool acquisition is non-zero but clearly secondary on successful requests.
+
+### 5. Runtime stability improved, but the band is still not validated
+
+Observed runtime behavior after the rerun:
+
+- auth-service remained `3/3` ready after the burst
+- no auth-service pod restart occurred during the captured run window
+- the namespace remained recoverable and stayed up
+- one auth-service pod did emit transient readiness and liveness timeout events immediately after the burst
+
+What this means:
+
+- the new instrumented rerun materially improved the observed `12`-way outcome over the prior `2/12` result
+- this is still not a clean success band
+- the remaining failure is no longer well described as generic saturation alone
+- the strongest current evidence now points first to bcrypt CPU cost, then to smaller pool-acquisition delay, with gateway timeout still surfacing the defect to the client
+
+### 6. Current honest Slice 4 classification after the eighth pass
+
+- `8/8` remains the clean proven SwiftPay success ceiling
+- `12/12` has improved to a mixed partial-success band, but is still invalid as a production-style success claim
+- auth-service instrumentation successfully narrowed the dominant completed-path cost to bcrypt hashing
+- the next hardening step should target auth registration CPU cost or its isolation before increasing gateway timeout again
+
+Prepared next hardening step in Git:
+
+- the SwiftPay `dev` overlay now stages a lower `BCRYPT_ROUNDS` value for the next local Slice 4 rerun
+- this is an intentional local-runtime drill control, not a production-strength authentication recommendation
+
+## Ninth SwiftPay Pressure Update
+
+Date: `2026-06-28`
+
+The next Slice 4 rerun applied the prepared dev-only auth-service hardening change:
+
+- `BCRYPT_ROUNDS=10`
+
+The same bounded `12`-way public-ingress `smoke-send-money.sh` profile was then rerun against:
+
+- `https://swiftpay.eseosadevbox.com/api`
+
+### 1. Validation baseline before the rerun
+
+Observed baseline captured at `2026-06-28T08:35:26Z`:
+
+- auth-service rollout completed on the new ReplicaSet:
+  - `auth-service-5f64cc897b`
+- auth-service steady state before the burst:
+  - `3/3` ready
+  - no fresh restarts on the new pods
+- api-gateway steady state before the burst:
+  - `2/2` ready
+
+### 2. Result from the rerun
+
+Observed result from the bounded concurrent public run:
+
+- `SUCCESS_COUNT=5`
+- `FAIL_COUNT=7`
+- `FAIL_SIGNAL_COUNT=7`
+
+All failed runs still exited at:
+
+- `POST /api/auth/register`
+
+Observed client-visible failure signal:
+
+- `curl: (56) The requested URL returned error: 500`
+
+### 3. Gateway evidence still showed the same upstream failure class
+
+Live api-gateway logs during the rerun still showed:
+
+- `message: timeout of 15000ms exceeded`
+- `code: ECONNABORTED`
+- `status: null`
+
+That means lowering bcrypt rounds alone did not remove the gateway-visible timeout boundary.
+
+### 4. Metrics showed faster hashing on successful requests, but not a cleaner band
+
+The auth-service metrics captured `5` completed registration requests during the run with:
+
+- end-to-end registration sum:
+  - `9.967272143s`
+- average completed registration duration:
+  - about `1.99s`
+
+Stage timing for those `5` successful registrations showed:
+
+- `pool_acquire` sum:
+  - `2.625072341s`
+  - about `0.53s` average
+- `duplicate_check` sum:
+  - `0.485096036s`
+  - about `0.10s` average
+- `password_hash` sum:
+  - `5.709371291s`
+  - about `1.14s` average
+- `user_insert` sum:
+  - `0.13758675s`
+  - about `0.03s` average
+- `refresh_token_insert` sum:
+  - `0.32143114s`
+  - about `0.06s` average
+
+Compared with the prior June 28 instrumented baseline:
+
+- successful-path bcrypt time decreased materially
+- pool acquisition time rose materially on the smaller set of completed requests
+- the overall bounded `12`-way outcome still worsened from `7/12` to `5/12`
+
+### 5. Runtime behavior remained recoverable but still showed probe stress
+
+Observed runtime behavior after the rerun:
+
+- auth-service remained `3/3` ready after the burst
+- no auth-service pod restart occurred during the captured run window
+- one auth-service pod emitted fresh readiness and liveness timeout events immediately after the burst:
+  - `context deadline exceeded`
+- the namespace stayed recoverable
+
+### 6. What this means now
+
+This is an important negative result.
+
+Lowering bcrypt rounds in the local dev contract did improve successful-path hash latency, but it did not improve the bounded `12`-way success ceiling and does not justify a new success claim.
+
+Current honest classification after the ninth pass:
+
+- `8/8` remains the clean proven SwiftPay success ceiling
+- `12/12` remains an invalid band
+- bcrypt cost is part of the pressure picture, but it is not the sole blocker
+- connection acquisition delay and burst-path health responsiveness remain active factors
+- the next useful hardening step should target health isolation or registration concurrency control, not another blind bcrypt-only change
+
+Prepared next hardening step in Git:
+
+- auth-service now stages explicit per-pod registration concurrency control for the local `dev` drill contract
+- the staged control uses:
+  - `AUTH_REGISTER_MAX_IN_FLIGHT=1`
+  - `AUTH_REGISTER_QUEUE_TIMEOUT_MS=12000`
+- the intent is to protect event-loop and probe responsiveness during burst registration rather than letting every incoming registration hash immediately
+
+## Eleventh SwiftPay Pressure Update
+
+Date: `2026-06-28`
+
+The next Slice 4 follow-up first exposed an operator activation gap:
+
+- the queue-control code was deployed
+- but the new auth-service environment contract was not yet live in the running pods
+- the first rerun after that image rollout therefore still measured the old runtime behavior, not the intended queue-shaped contract
+
+That activation gap was corrected by making the following env contract live on the running auth-service deployment:
+
+- `BCRYPT_ROUNDS=10`
+- `AUTH_REGISTER_MAX_IN_FLIGHT=1`
+- `AUTH_REGISTER_QUEUE_TIMEOUT_MS=12000`
+
+The same bounded `12`-way public-ingress `smoke-send-money.sh` profile was then rerun against:
+
+- `https://swiftpay.eseosadevbox.com/api`
+
+### 1. Result from the live queue-shaped rerun
+
+Observed result from the corrected bounded concurrent public run:
+
+- `SUCCESS_COUNT=12`
+- `FAIL_COUNT=0`
+- `FAIL_SIGNAL_COUNT=0`
+
+There were no client-visible registration failures.
+
+### 2. Runtime state after the rerun
+
+Observed state captured at `2026-06-28T09:14:47Z`:
+
+- auth-service remained:
+  - `3/3` ready
+  - `0` restarts on the fresh ReplicaSet
+- api-gateway remained:
+  - `2/2` ready
+- no new auth-service liveness or readiness failures were emitted during the successful run window
+
+### 3. Metrics after the successful rerun
+
+Observed auth-service metrics after the successful run showed:
+
+- `swiftpay_auth_register_in_flight 0`
+- `swiftpay_auth_register_queue_depth 0`
+- `swiftpay_auth_register_queue_timeouts_total 0`
+- `swiftpay_db_connection_pool_size{state="waiting"} 0`
+
+The captured successful registration histogram on the scraped pod showed:
+
+- `swiftpay_auth_register_duration_seconds_sum{outcome="success"} 0.766998824`
+- `swiftpay_auth_register_duration_seconds_count{outcome="success"} 4`
+
+Representative successful stage timing on that pod showed:
+
+- `register_slot_wait` sum:
+  - `0.00031921s`
+- `pool_acquire` sum:
+  - `0.000409168s`
+- `duplicate_check` sum:
+  - `0.014492235s`
+- `password_hash` sum:
+  - `0.576339738s`
+
+This is materially different from the earlier failing passes:
+
+- no queue timeout signal fired
+- no pool waiting remained at scrape time
+- successful-path hashing and acquisition cost both stayed bounded
+- probe health remained intact during the burst
+
+### 4. What this means
+
+This is the first clean evidence-backed `12/12` SwiftPay success band in the current local Phase 8 runtime.
+
+The strongest current interpretation is:
+
+- bcrypt cost mattered
+- but explicit registration concurrency control was the decisive stabilizer because it protected health responsiveness and prevented burst-path collapse
+
+### 5. Current honest SwiftPay Slice 4 classification after the eleventh pass
+
+- `12/12` is now a live-proven clean bounded success profile under the queue-shaped local `dev` auth-service contract
+- the prior `8/8` ceiling is superseded by this stronger band
+- the current validated local SwiftPay Slice 4 drill contract now includes:
+  - `AUTH_REGISTER_TIMEOUT_MS=15000`
+  - hardened auth-service probe tolerance
+  - auth-service `minReplicas=3`
+  - `BCRYPT_ROUNDS=10`
+  - `AUTH_REGISTER_MAX_IN_FLIGHT=1`
+  - `AUTH_REGISTER_QUEUE_TIMEOUT_MS=12000`
+- this remains a local-runtime validation result, not a production-wide recommendation without further review
