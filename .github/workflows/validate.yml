@@ -1,0 +1,122 @@
+name: Validate Repository
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/**"
+      - "gitops/**"
+      - "k8s/**"
+      - ".yamllint.yml"
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - ".github/workflows/**"
+      - "scripts/**"
+      - "gitops/**"
+      - "k8s/**"
+      - ".yamllint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
+
+      - name: Install validation tools
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          python -m pip install --upgrade pip
+          python -m pip install yamllint
+
+          ACTIONLINT_VERSION=1.7.7
+          curl -sSL -o /tmp/actionlint.tgz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/actionlint.tgz -C /tmp
+          sudo install /tmp/actionlint /usr/local/bin/actionlint
+
+      - name: Lint GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          actionlint
+
+      - name: Lint shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t shell_scripts < <(find scripts -type f -name '*.sh' | sort)
+          if [ "${#shell_scripts[@]}" -gt 0 ]; then
+            shellcheck "${shell_scripts[@]}"
+            for script in "${shell_scripts[@]}"; do
+              bash -n "${script}"
+            done
+          fi
+
+      - name: Validate Hermes Python entrypoint
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/hermes-agent.py
+
+      - name: Lint YAML files
+        run: |
+          set -euo pipefail
+          mapfile -t yaml_files < <(
+            {
+              find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \)
+              find gitops -type f \( -name '*.yml' -o -name '*.yaml' \)
+              find k8s -type f \( -name '*.yml' -o -name '*.yaml' \)
+              find scripts -type f \( -name '*.yml' -o -name '*.yaml' \)
+            } | sort -u
+          )
+          if [ "${#yaml_files[@]}" -gt 0 ]; then
+            python -m yamllint -c .yamllint.yml -s "${yaml_files[@]}"
+          fi
+
+      - name: Render Kubernetes and GitOps manifests
+        run: |
+          set -euo pipefail
+          kubectl kustomize gitops/argocd/dev >/tmp/idp-argocd-dev.yaml
+          kubectl kustomize gitops/argocd/prod >/tmp/idp-argocd-prod.yaml
+          kubectl kustomize k8s/platform/cert-manager >/tmp/idp-cert-manager.yaml
+
+      - name: Client dry-run Kubernetes manifests
+        run: |
+          set -euo pipefail
+          kubectl apply --dry-run=client -k gitops/argocd/dev >/tmp/idp-argocd-dev-dryrun.txt
+          kubectl apply --dry-run=client -k gitops/argocd/prod >/tmp/idp-argocd-prod-dryrun.txt
+          kubectl apply --dry-run=client -k k8s/platform/cert-manager >/tmp/idp-cert-manager-dryrun.txt
+          kubectl apply --dry-run=client -f gitops/argocd/root/internal-developer-platform-dev-root-application.yaml >/tmp/idp-argocd-dev-root-dryrun.txt
+          kubectl apply --dry-run=client -f gitops/argocd/root/internal-developer-platform-prod-root-application.yaml >/tmp/idp-argocd-prod-root-dryrun.txt
+
+      - name: Summarize validation coverage
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Validation Coverage
+
+          - GitHub Actions workflow linting via `actionlint`
+          - Shell script linting via `shellcheck` and `bash -n`
+          - Python syntax validation for the Hermes operator entrypoint
+          - YAML linting via `yamllint`
+          - `kubectl kustomize` render checks for GitOps and cert-manager manifests
+          - `kubectl apply --dry-run=client` checks for GitOps and root application contracts
+          EOF
