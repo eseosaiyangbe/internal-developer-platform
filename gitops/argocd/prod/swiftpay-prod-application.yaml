@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: swiftpay-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: internal-developer-platform
+    environment: prod
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: internal-developer-platform-prod
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: api-gateway
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: auth-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: frontend
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: notification-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: transaction-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: wallet-service
+      jsonPointers:
+        - /spec/replicas
+  source:
+    repoURL: https://github.com/eseosaiyangbe/SwiftPay.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: swiftpay-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

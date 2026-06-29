@@ -1,7 +1,7 @@
 # Phase 8 Execution Plan
 
 Date: `2026-05-23`
-Updated: `2026-06-28`
+Updated: `2026-06-29`
 
 ## Purpose
 
@@ -38,6 +38,13 @@ As of `2026-06-28`:
 - the host-side Vault recovery automation has now passed a controlled sealed-Vault drill against the Raft-backed state
 - the shared Vault control plane now has a Raft snapshot backup and destructive restore contract at the helper level
 - the shared Vault control plane has now passed a reversible Raft snapshot restore drill with a rollback proof marker and return-to-current-state validation
+- Slice 5 has started on the safe-first path with:
+  - clean render validation for all owned `prod` overlays
+  - live production observability TLS challenge reconciliation proof, still blocked at external DNS or HTTP-01 routing conditions
+  - live Vault-backed secret-delivery proof in the paused `platform-observability-prod` namespace
+  - a centralized dormant `prod` ArgoCD composition path now added and client-side validated in the platform repo
+  - a more coherent production observability network-policy contract across the owned apps, including a corrected SwiftPay `prod` observability path
+  - a stronger production namespace-governance contract in Git through standardized namespace labels and explicit `ResourceQuota` posture across the owned `prod` overlays
 
 Validated app-level recovery coverage now exists for:
 
@@ -171,6 +178,16 @@ Outputs:
 - stronger dev/prod contract guidance
 - clearer documentation on what is Git-defined intent versus what has been live-exercised
 
+Status:
+
+- production overlay render validation complete across the owned repos
+- shared dependency and CRD baseline confirmed live in-cluster
+- production observability TLS challenge reconciliation proven live, with final issuance still blocked by external environment conditions
+- production Vault-backed secret delivery proven live in the paused `platform-observability-prod` namespace
+- centralized dormant `prod` app-of-apps composition now present and client-side validated in the platform repo
+- production observability network-policy posture now reads more coherently across the owned apps after correcting the SwiftPay `prod` overlay
+- production namespace-governance posture now reads more coherently in Git after standardizing namespace labels and adding missing `prod` `ResourceQuota` contracts
+
 ## Phase 8 Definition Of Done
 
 Phase 8 can be considered successful when:
@@ -183,28 +200,13 @@ Phase 8 can be considered successful when:
 
 ## Immediate Next Step
 
-Continue Slice 4:
+Close Phase 8 formally and transition cleanly:
 
-- preserve the corrected SwiftPay load harness as the new validation baseline
-- keep the improved SwiftPay register-path diagnostics as the new operator baseline
-- keep the hardened SwiftPay auth-service dev baseline as the validated contract for current local-runtime drills
-- preserve pod-backed Prometheus scraping as the validated observability contract for scaled SwiftPay services
-- treat `12/12` as the current clean SwiftPay success ceiling under the queue-shaped local dev contract
-- keep the current SwiftPay `dev` drill contract at:
-  - `AUTH_REGISTER_TIMEOUT_MS=15000`
-  - hardened auth-service probe tolerance
-  - auth-service `minReplicas=3`
-  - `BCRYPT_ROUNDS=10`
-  - `AUTH_REGISTER_MAX_IN_FLIGHT=1`
-  - `AUTH_REGISTER_QUEUE_TIMEOUT_MS=12000`
-- keep the new auth-service registration instrumentation as the baseline evidence path for any future concurrency or timeout changes
-- treat the clean `12/12` result as a local-runtime validation win, not as production guidance until a broader contract review is done
-- treat SwiftPay latency alerts as trustworthy only against the corrected pod-backed scrape topology, not against the retired Service-VIP scrape path
-- preserve the queue-shaped register path unless a later production-path design intentionally replaces it
-- treat the hardened FoodPulse preserved stop/start path as the validated lifecycle baseline unless a later drill reproduces node-level degradation
-- use the next Slice 4 effort to separate true single-node runtime instability from transient readiness or reconciliation noise
-- keep the GitOps-safe FoodPulse lifecycle path as the validated preserved-stop contract for that workload
-- inspect transient metrics-server and probe noise so local-runtime instability is classified correctly
-- carry isolated service-specific probe tuning as app or control-plane hardening work, not as automatic evidence of Slice 4 runtime failure
-- preserve the hardened `devops-monitor-ui` probe contract as the new observability-UI baseline for future local-runtime drills
-- keep separating single-node-safe behavior from assumptions that require a broader runtime class
+- stop treating additional work as a new implicit Phase 8 slice, because the approved plan ends at Slice 5
+- preserve the current `dev` cluster as the primary validated operating baseline until a later phase explicitly authorizes broader runtime risk
+- treat the current `prod` path as stronger production-style contract proof, not as live production-runtime proof by itself
+- keep the remaining production TLS issuance gap classified as an external environment constraint in this local setup unless a later phase explicitly chooses to remediate DNS and edge-routing behavior
+- use the next phase decision to choose among:
+  - controlled live activation of selected dormant `prod` GitOps paths
+  - broader runtime-class validation beyond the current single-node local platform
+  - consolidation, documentation normalization, and release discipline across the owned repos

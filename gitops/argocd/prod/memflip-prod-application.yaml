@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: memflip-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: internal-developer-platform
+    environment: prod
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: internal-developer-platform-prod
+  source:
+    repoURL: https://github.com/eseosaiyangbe/MemFlip.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: memflip-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

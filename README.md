@@ -198,6 +198,7 @@ Recommended workspace commands:
 ./scripts/workspace-k8s-stop.sh
 ./scripts/workspace-k8s-reset.sh
 ./scripts/workspace-layout.sh
+./scripts/hermes-agent.py health
 ```
 
 `workspace-start.sh` and `workspace-stop.sh` support the sibling-checkout
@@ -218,6 +219,33 @@ Local recovery note:
 - Vault recovery is automated through host-side LaunchAgents, not Vault-native KMS auto-unseal; the recovery path intentionally waits through early Colima and Kubernetes startup races while keeping unseal material outside the cluster
 - the shared local Vault now targets integrated Raft storage instead of the legacy file backend, while preserving host-side Shamir recovery material
 - Vault now has host-side Raft snapshot save, inspect, and destructive restore helpers for control-plane backup and recovery, and the reversible snapshot restore drill has been exercised successfully against the live local control plane
+
+## Hermes Agent
+
+The workspace now includes a read-only home-lab assistant called Hermes Agent.
+
+Hermes can:
+
+- inspect Kubernetes health
+- summarize ArgoCD sync posture
+- read logs
+- generate incident notes
+- propose remediation steps
+
+Hermes cannot apply changes automatically.
+
+Any remediation action still requires manual operator approval and execution.
+
+Quick examples:
+
+```bash
+./scripts/hermes-agent.py health
+./scripts/hermes-agent.py argocd
+./scripts/hermes-agent.py incident-note --title "SwiftPay health review" --write
+./scripts/hermes-agent.py remediate
+```
+
+Full usage is documented in [HERMES-AGENT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/HERMES-AGENT.md).
 - the Vault and platform recovery LaunchAgents poll every `30s` and run at login to narrow the post-restart recovery window
 - use `./scripts/recover-k3s-platform.sh --no-colima-restart` if you need to suppress that escalation for a one-off manual debug session
 

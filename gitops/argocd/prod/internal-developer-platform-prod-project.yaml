@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: internal-developer-platform-prod
+  namespace: argocd
+  annotations:
+    gitops.dev/validation-marker: "2026-06-29-argocd-prod-project"
+  labels:
+    app.kubernetes.io/part-of: internal-developer-platform
+    environment: prod
+spec:
+  description: Production GitOps boundary for the Internal Developer Platform.
+  sourceRepos:
+    - https://github.com/eseosaiyangbe/internal-developer-platform.git
+    - https://github.com/eseosaiyangbe/Obervability-Stack.git
+    - https://github.com/eseosaiyangbe/MemFlip.git
+    - https://github.com/eseosaiyangbe/SwiftPay.git
+    - https://github.com/eseosaiyangbe/FoodPulse.git
+    - https://github.com/eseosaiyangbe/OpenSIS.git
+  destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    - namespace: platform-observability-prod
+      server: https://kubernetes.default.svc
+    - namespace: memflip-prod
+      server: https://kubernetes.default.svc
+    - namespace: swiftpay-prod
+      server: https://kubernetes.default.svc
+    - namespace: foodpulse-prod
+      server: https://kubernetes.default.svc
+    - namespace: opensis-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
