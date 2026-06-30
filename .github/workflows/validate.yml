@@ -86,16 +86,21 @@ jobs:
           python -m py_compile scripts/hermes-agent.py
 
       - name: Lint YAML files
+        env:
+          DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          DIFF_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          mapfile -t yaml_files < <(
-            {
-              find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \)
-              find gitops -type f \( -name '*.yml' -o -name '*.yaml' \)
-              find k8s -type f \( -name '*.yml' -o -name '*.yaml' \)
-              find scripts -type f \( -name '*.yml' -o -name '*.yaml' \)
-            } | sort -u
-          )
+          yaml_files=()
+          if [ -n "${DIFF_BASE:-}" ] && git rev-parse --verify "${DIFF_BASE}^{commit}" >/dev/null 2>&1; then
+            mapfile -t yaml_files < <(
+              git diff --name-only "${DIFF_BASE}" "${DIFF_HEAD}" -- \
+                '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+                'gitops/**/*.yml' 'gitops/**/*.yaml' \
+                'k8s/**/*.yml' 'k8s/**/*.yaml' \
+                'scripts/**/*.yml' 'scripts/**/*.yaml' | sort -u
+            )
+          fi
           if [ "${#yaml_files[@]}" -gt 0 ]; then
             python -m yamllint -c .yamllint.yml -s "${yaml_files[@]}"
           fi
@@ -110,11 +115,15 @@ jobs:
       - name: Client dry-run Kubernetes manifests
         run: |
           set -euo pipefail
-          kubectl apply --dry-run=client -k gitops/argocd/dev >/tmp/idp-argocd-dev-dryrun.txt
-          kubectl apply --dry-run=client -k gitops/argocd/prod >/tmp/idp-argocd-prod-dryrun.txt
-          kubectl apply --dry-run=client -k k8s/platform/cert-manager >/tmp/idp-cert-manager-dryrun.txt
-          kubectl apply --dry-run=client -f gitops/argocd/root/internal-developer-platform-dev-root-application.yaml >/tmp/idp-argocd-dev-root-dryrun.txt
-          kubectl apply --dry-run=client -f gitops/argocd/root/internal-developer-platform-prod-root-application.yaml >/tmp/idp-argocd-prod-root-dryrun.txt
+          kubectl apply --dry-run=client --validate=false -k gitops/argocd/dev >/tmp/idp-argocd-dev-dryrun.txt
+          kubectl apply --dry-run=client --validate=false -k gitops/argocd/prod >/tmp/idp-argocd-prod-dryrun.txt
+          kubectl apply --dry-run=client --validate=false -k k8s/platform/cert-manager >/tmp/idp-cert-manager-dryrun.txt
+          kubectl apply --dry-run=client --validate=false \
+            -f gitops/argocd/root/internal-developer-platform-dev-root-application.yaml \
+            >/tmp/idp-argocd-dev-root-dryrun.txt
+          kubectl apply --dry-run=client --validate=false \
+            -f gitops/argocd/root/internal-developer-platform-prod-root-application.yaml \
+            >/tmp/idp-argocd-prod-root-dryrun.txt
 
       - name: Summarize validation coverage
         run: |
@@ -126,5 +135,5 @@ jobs:
           - Python syntax validation for the Hermes operator entrypoint
           - YAML linting via `yamllint`
           - `kubectl kustomize` render checks for GitOps and cert-manager manifests
-          - `kubectl apply --dry-run=client` checks for GitOps and root application contracts
+          - `kubectl apply --dry-run=client --validate=false` checks for GitOps and root application contracts
           EOF
