@@ -279,6 +279,23 @@ Full usage is documented in [HERMES-AGENT.md](HERMES-AGENT.md).
 - the Vault and platform recovery LaunchAgents poll every `30s` and run at login to narrow the post-restart recovery window
 - use `./scripts/recover-k3s-platform.sh --no-colima-restart` if you need to suppress that escalation for a one-off manual debug session
 
+## Current Roadmap Position
+
+Phase 8 is now formally closed for the current local-platform objective.
+
+The active next-phase direction is Phase 9:
+
+- AI-infrastructure awareness
+- private self-hosted Hermes runtime planning
+- read-only operator augmentation
+- strict manual-approval guardrails for every proposed change
+
+Primary references:
+
+- [PHASE8-CLOSEOUT-DECISION.md](PHASE8-CLOSEOUT-DECISION.md)
+- [AI-INFRASTRUCTURE-ADOPTION-ROADMAP.md](AI-INFRASTRUCTURE-ADOPTION-ROADMAP.md)
+- [PHASE9-EXECUTION-PLAN.md](PHASE9-EXECUTION-PLAN.md)
+
 Single-node footprint note:
 
 - this workstation can run both `platform-observability-dev` and `platform-observability-prod`, but keeping both observability namespaces active full-time on one Colima node increases restart churn materially

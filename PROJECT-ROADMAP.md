@@ -62,7 +62,7 @@ Every meaningful step should land in:
 
 ## Roadmap Overview
 
-The work is divided into eight phases.
+The work is divided into nine phases.
 
 1. Foundation and governance
 2. Workspace normalization
@@ -71,6 +71,8 @@ The work is divided into eight phases.
 5. Operator workflows and incident drills
 6. UX and demo polish
 7. Production-style maturity and portfolio packaging
+8. Operational rigor and production-depth hardening
+9. AI-infrastructure awareness and operator augmentation
 
 ## Phase Status Tracker
 
@@ -83,11 +85,12 @@ The work is divided into eight phases.
 | 5. Operator workflows and incident drills | Complete | Standard health workflow, incident matrix, app runbooks, incident drill catalog, and five executed drills are now in place |
 | 6. UX and demo polish | Complete | Control-plane story, demo center, comparison view, app handoff pages, and live demo validation now meet the Phase 6 standard |
 | 7. Production-style maturity and portfolio packaging | Complete | The owned k3s workload set, control plane, Vault-first secrets, public ingress, GitOps reconciliation, and production-control closeout are complete; remaining work now belongs to Phase 8 operational rigor |
-| 8. Operational rigor and production-depth hardening | In progress | The next maturity slice focuses on deeper durability, failure-mode validation, stricter access hardening, broader production-path proof, and higher-confidence platform operations under load |
+| 8. Operational rigor and production-depth hardening | Complete | Backup and restore standardization, restore drills, access hardening, runtime validation, production-path proof, and repo-wide workflow normalization are now closed for the current local-platform objective |
+| 9. AI-infrastructure awareness and operator augmentation | Planned | The next phase formalizes private self-hosted Hermes, read-only tool integration, operator-note acceleration, and guarded AI-assisted platform operations |
 
 ## Current Focus
 
-We are currently in **Phase 8: operational rigor and production-depth hardening**.
+We are now transitioning into **Phase 9: AI-infrastructure awareness and operator augmentation**.
 
 The platform has moved beyond late-stage assembly. The current state is:
 
@@ -100,18 +103,18 @@ The platform has moved beyond late-stage assembly. The current state is:
 - ArgoCD is the default reconciler for the owned `dev` paths
 - the formal Phase 7 closeout decision has been recorded
 
-Phase 8 now focuses on:
+Phase 8 is now closed through:
 
-- deeper durability and failure-mode validation
-- platform backup and restore standards across the owned workloads
-- centralized recording of validated recovery evidence across the owned workloads
-- stronger production access and operational hardening
-- broader runtime proof beyond the primary `dev` path
-- repo-wide workflow and documentation normalization so the active public `dev` runtime remains the stated source of truth
-- platform behavior under higher load and stricter runtime assumptions
-- documenting which runtime wedges are app defects versus single-node `k3s` runtime defects
-- documenting where autoscaling is now proven live versus where concurrency paths still fail under pressure
-- documenting that the remaining SwiftPay `12`-way registration failure is now classified as auth-service runtime saturation, not only gateway timeout behavior
+- [PHASE8-CLOSEOUT-DECISION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-CLOSEOUT-DECISION.md)
+- [PHASE8-EXECUTION-PLAN.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-EXECUTION-PLAN.md)
+
+Phase 9 now focuses on:
+
+- turning the platform into an AI-infrastructure-aware operating environment without weakening operator control
+- separating the upstream Hermes runtime from the repo-local platform control adapter
+- keeping all initial AI-assisted cluster interaction read-only and approval-bound
+- enabling faster incident-note creation, health summarization, and workload-aware operator guidance
+- establishing a private self-hosted Hermes runtime before any broader access model is considered
 
 Execution checklist:
 
@@ -128,7 +131,8 @@ Execution checklist:
 - use [PHASE8-SLICE3-CLOSEOUT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE3-CLOSEOUT.md) as the formal closeout record for the first access-hardening pass
 - use [PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md) as the active evidence log for runtime-pressure and placement validation
 - use [PHASE8-SLICE5-PRODUCTION-PATH-VALIDATION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE5-PRODUCTION-PATH-VALIDATION.md) as the current record for production-path validation and repo-wide dev-first workflow normalization
-- use the Phase 8 section below as the active execution scope for the next maturity slice
+- use [AI-INFRASTRUCTURE-ADOPTION-ROADMAP.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/AI-INFRASTRUCTURE-ADOPTION-ROADMAP.md) as the strategic AI adoption direction
+- use [PHASE9-EXECUTION-PLAN.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE9-EXECUTION-PLAN.md) as the active execution sequence for the next maturity slice
 
 Phase 6 completed intent was:
 
