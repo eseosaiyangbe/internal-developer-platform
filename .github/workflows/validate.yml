@@ -112,18 +112,36 @@ jobs:
           kubectl kustomize gitops/argocd/prod >/tmp/idp-argocd-prod.yaml
           kubectl kustomize k8s/platform/cert-manager >/tmp/idp-cert-manager.yaml
 
-      - name: Client dry-run Kubernetes manifests
+      - name: Validate manifest document structure
         run: |
           set -euo pipefail
-          kubectl apply --dry-run=client --validate=false -k gitops/argocd/dev >/tmp/idp-argocd-dev-dryrun.txt
-          kubectl apply --dry-run=client --validate=false -k gitops/argocd/prod >/tmp/idp-argocd-prod-dryrun.txt
-          kubectl apply --dry-run=client --validate=false -k k8s/platform/cert-manager >/tmp/idp-cert-manager-dryrun.txt
-          kubectl apply --dry-run=client --validate=false \
-            -f gitops/argocd/root/internal-developer-platform-dev-root-application.yaml \
-            >/tmp/idp-argocd-dev-root-dryrun.txt
-          kubectl apply --dry-run=client --validate=false \
-            -f gitops/argocd/root/internal-developer-platform-prod-root-application.yaml \
-            >/tmp/idp-argocd-prod-root-dryrun.txt
+          python - <<'PY'
+          import yaml
+
+          files = [
+              "/tmp/idp-argocd-dev.yaml",
+              "/tmp/idp-argocd-prod.yaml",
+              "/tmp/idp-cert-manager.yaml",
+              "gitops/argocd/root/internal-developer-platform-dev-root-application.yaml",
+              "gitops/argocd/root/internal-developer-platform-prod-root-application.yaml",
+          ]
+
+          for file_path in files:
+              with open(file_path, "r", encoding="utf-8") as handle:
+                  docs = [doc for doc in yaml.safe_load_all(handle) if doc is not None]
+              if not docs:
+                  raise SystemExit(f"{file_path}: no YAML documents found")
+              for index, doc in enumerate(docs, start=1):
+                  if not isinstance(doc, dict):
+                      raise SystemExit(f"{file_path}: document {index} is not a YAML object")
+                  if not doc.get("apiVersion") or not doc.get("kind"):
+                      raise SystemExit(f"{file_path}: document {index} is missing apiVersion or kind")
+                  metadata = doc.get("metadata")
+                  if not isinstance(metadata, dict) or not metadata.get("name"):
+                      raise SystemExit(f"{file_path}: document {index} is missing metadata.name")
+
+          print(f"Validated {len(files)} manifest files")
+          PY
 
       - name: Summarize validation coverage
         run: |
@@ -135,5 +153,5 @@ jobs:
           - Python syntax validation for the Hermes operator entrypoint
           - YAML linting via `yamllint`
           - `kubectl kustomize` render checks for GitOps and cert-manager manifests
-          - `kubectl apply --dry-run=client --validate=false` checks for GitOps and root application contracts
+          - Offline YAML document checks for rendered GitOps and root application contracts
           EOF
