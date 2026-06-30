@@ -51,6 +51,9 @@ From this point forward, use these rules:
 - workload-local scripts
 - workload-local docs
 - workload-local ArgoCD application manifests
+- workload-local image publishing workflows
+- workload-local public smoke validation workflows
+- workload-local manual or dormant `prod` promotion workflows where retained
 
 ## What The Central Repo Must Not Become Again
 
@@ -175,3 +178,14 @@ This repo split supports a cleaner GitOps model:
 - the central repo provides environment composition and root orchestration
 
 That is the enterprise pattern we should aim for.
+
+## Workflow Normalization Rule
+
+The child repositories should converge on one honest CI/CD posture:
+
+1. repository validation stays explicit and separate
+2. Docker Hub publish remains the primary image-distribution lane for the current public runtime story
+3. the active public `dev` edge gets its own smoke workflow
+4. `prod` remains manual, dormant, or otherwise clearly non-automatic unless a later phase explicitly activates it
+
+This keeps the operating model truthful. Image publication alone is not runtime proof.

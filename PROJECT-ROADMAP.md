@@ -107,6 +107,7 @@ Phase 8 now focuses on:
 - centralized recording of validated recovery evidence across the owned workloads
 - stronger production access and operational hardening
 - broader runtime proof beyond the primary `dev` path
+- repo-wide workflow and documentation normalization so the active public `dev` runtime remains the stated source of truth
 - platform behavior under higher load and stricter runtime assumptions
 - documenting which runtime wedges are app defects versus single-node `k3s` runtime defects
 - documenting where autoscaling is now proven live versus where concurrency paths still fail under pressure
@@ -126,6 +127,7 @@ Execution checklist:
 - use [PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-PROTECTED-SURFACE-ACCESS-MODEL.md) as the current operator access model for Vault and host-side local recovery controls
 - use [PHASE8-SLICE3-CLOSEOUT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE3-CLOSEOUT.md) as the formal closeout record for the first access-hardening pass
 - use [PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE4-RUNTIME-PRESSURE-VALIDATION.md) as the active evidence log for runtime-pressure and placement validation
+- use [PHASE8-SLICE5-PRODUCTION-PATH-VALIDATION.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/PHASE8-SLICE5-PRODUCTION-PATH-VALIDATION.md) as the current record for production-path validation and repo-wide dev-first workflow normalization
 - use the Phase 8 section below as the active execution scope for the next maturity slice
 
 Phase 6 completed intent was:

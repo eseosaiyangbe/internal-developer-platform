@@ -152,6 +152,33 @@ This pass does not justify claiming:
 - deep production runtime validation
 - production namespace operating maturity equivalent to the heavily exercised `dev` path
 
+## Repo-Wide Workflow Normalization Update
+
+Date: `2026-06-29`
+
+As part of the same production-path honesty pass, the child repositories were normalized around the current runtime truth.
+
+Standard now applied across:
+
+- `SwiftPay`
+- `OpenSIS`
+- `FoodPulse`
+- `MemFlip`
+- `Obervability-Stack`
+
+Normalized workflow shape:
+
+- validation lane
+- Docker Hub publish lane
+- active public `dev` smoke lane
+- dormant or manual `prod` promotion only where still useful
+
+What this improves:
+
+- the current public runtime story no longer depends on old `prod` naming assumptions
+- image publication is no longer allowed to stand in for user-facing runtime proof
+- the Slice 5 production-path narrative now separates live `dev` runtime proof from dormant `prod` contract posture more honestly
+
 ## Recommended Next Step
 
 The next safe Slice 5 step should remain selective and explicit:

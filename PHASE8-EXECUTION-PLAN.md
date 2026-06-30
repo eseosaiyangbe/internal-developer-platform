@@ -45,6 +45,7 @@ As of `2026-06-28`:
   - a centralized dormant `prod` ArgoCD composition path now added and client-side validated in the platform repo
   - a more coherent production observability network-policy contract across the owned apps, including a corrected SwiftPay `prod` observability path
   - a stronger production namespace-governance contract in Git through standardized namespace labels and explicit `ResourceQuota` posture across the owned `prod` overlays
+  - repo-wide child-workload workflow normalization around validation, Docker Hub publishing, active public `dev` smoke, and dormant or manual `prod` promotion
 
 Validated app-level recovery coverage now exists for:
 
@@ -187,6 +188,7 @@ Status:
 - centralized dormant `prod` app-of-apps composition now present and client-side validated in the platform repo
 - production observability network-policy posture now reads more coherently across the owned apps after correcting the SwiftPay `prod` overlay
 - production namespace-governance posture now reads more coherently in Git after standardizing namespace labels and adding missing `prod` `ResourceQuota` contracts
+- repo-by-repo workflow posture now aligns with the current live runtime truth instead of implying that dormant `prod` intent is the primary operating narrative
 
 ## Phase 8 Definition Of Done
 

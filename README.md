@@ -11,6 +11,35 @@ This is not a collection of unrelated demo repos. It is a deliberately mixed env
 
 The center of that experience is `Obervability-Stack`, which acts as the operator control plane for health, probes, alerts, logs, runbooks, and incident evidence.
 
+## CI/CD Workflow Model
+
+This repository intentionally keeps a validation-only workflow surface.
+
+- `validate.yml`
+  Repository validation for workflows, shell scripts, Hermes Agent syntax, YAML, and GitOps manifest render checks.
+- child workload repositories
+  `swiftpay`, `opensis`, `foodpulse`, `memflip`, and `observability-stack` own their own image-publish and promotion workflows.
+
+That separation is deliberate. This repository is the coordination and GitOps layer, so forcing a Docker image publishing lane into it would be the wrong boundary. The full rationale is documented in [CI-CD-WORKFLOW.md](CI-CD-WORKFLOW.md).
+
+## Active Runtime And Release Posture
+
+The current platform posture is deliberately dev-first.
+
+- the active live runtime truth is the public `dev` path for the owned workload repos
+- Docker Hub is the primary image registry path for the current public runtime story
+- public `dev` smoke validation now exists repo by repo in the child workload repositories
+- `prod` remains a held promotion contract and must not be described as continuously active runtime truth
+
+Child repository workflow posture now follows one consistent model:
+
+- validation lane
+- Docker Hub publish lane
+- active public `dev` smoke lane
+- dormant or manual `prod` promotion only where it is still useful
+
+That distinction matters. A green image-publish workflow is not the same thing as proving that the current public runtime is healthy and usable.
+
 ## Repository Topology
 
 The platform is now in a controlled repository-transition state.
@@ -46,6 +75,7 @@ This workspace demonstrates something harder:
 - executing incident drills instead of only writing theoretical runbooks
 - documenting commands, failures, and fixes as reusable operator evidence
 - preparing local platform decisions for a future Kubernetes path with separate `dev` and `prod` thinking
+- keeping the active runtime narrative honest instead of overstating dormant `prod` intent
 
 This makes the repo useful to:
 
@@ -245,7 +275,7 @@ Quick examples:
 ./scripts/hermes-agent.py remediate
 ```
 
-Full usage is documented in [HERMES-AGENT.md](/Users/raymond/Documents/DevOps-Easy-Learning/internal-developer-platform/HERMES-AGENT.md).
+Full usage is documented in [HERMES-AGENT.md](HERMES-AGENT.md).
 - the Vault and platform recovery LaunchAgents poll every `30s` and run at login to narrow the post-restart recovery window
 - use `./scripts/recover-k3s-platform.sh --no-colima-restart` if you need to suppress that escalation for a one-off manual debug session
 
