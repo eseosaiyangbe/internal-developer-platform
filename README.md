@@ -13,14 +13,16 @@ The center of that experience is `Obervability-Stack`, which acts as the operato
 
 ## CI/CD Workflow Model
 
-This repository intentionally keeps a validation-only workflow surface.
+This repository intentionally keeps a workflow surface focused on validation and public dev-edge verification.
 
 - `validate.yml`
   Repository validation for workflows, shell scripts, Hermes Agent syntax, YAML, and GitOps manifest render checks.
+- `smoke-dev-public.yml`
+  Public dev-edge smoke validation for the active control-plane runtime at `https://portfolio.eseosadevbox.com`.
 - child workload repositories
   `swiftpay`, `opensis`, `foodpulse`, `memflip`, and `observability-stack` own their own image-publish and promotion workflows.
 
-That separation is deliberate. This repository is the coordination and GitOps layer, so forcing a Docker image publishing lane into it would be the wrong boundary. The full rationale is documented in [CI-CD-WORKFLOW.md](CI-CD-WORKFLOW.md).
+That separation is deliberate. This repository is the coordination and GitOps layer, so forcing a Docker image publishing lane into it would be the wrong boundary. Public smoke is still appropriate here because the control plane itself is part of the active runtime contract. The full rationale is documented in [CI-CD-WORKFLOW.md](CI-CD-WORKFLOW.md).
 
 ## Active Runtime And Release Posture
 
@@ -28,7 +30,7 @@ The current platform posture is deliberately dev-first.
 
 - the active live runtime truth is the public `dev` path for the owned workload repos
 - Docker Hub is the primary image registry path for the current public runtime story
-- public `dev` smoke validation now exists repo by repo in the child workload repositories
+- public `dev` smoke validation now exists across the active workload repos and the control-plane repo
 - `prod` remains a held promotion contract and must not be described as continuously active runtime truth
 
 Child repository workflow posture now follows one consistent model:

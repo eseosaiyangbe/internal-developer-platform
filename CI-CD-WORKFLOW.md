@@ -18,8 +18,9 @@ This central repository owns:
 - GitOps root and environment manifests
 - platform bootstrap and recovery automation
 - Hermes Agent read-only operator tooling
+- the public control-plane runtime contract
 
-That means the correct CI/CD contract here is repository validation, not image publication.
+That means the correct CI/CD contract here is repository validation plus public dev-edge smoke verification, not image publication.
 
 ## Active Lane
 
@@ -30,6 +31,10 @@ That means the correct CI/CD contract here is repository validation, not image p
   - lints YAML
   - renders GitOps and platform manifests
   - performs client-side dry runs for the root application contracts
+- `smoke-dev-public.yml`
+  - verifies `https://portfolio.eseosadevbox.com`
+  - verifies `https://portfolio.eseosadevbox.com/api/health`
+  - asserts the active control-plane dev contract without mutating cluster state
 
 ## Promotion Boundary
 
