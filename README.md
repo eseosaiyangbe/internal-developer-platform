@@ -215,8 +215,8 @@ Vault browser access for the local platform:
 - URL: `http://vault.devops.local/ui/`
 - normal operator login method: `Username`
 - local operator users seeded by the platform bootstrap:
-  - `admin` / `Admin@123`
-  - `readonly` / `readonly`
+  - `admin` (password held in the local secrets store, not printed here)
+  - `readonly` (password held in the local secrets store, not printed here)
 - break-glass admin remains available through the root token stored in:
   - `~/.config/internal-developer-platform/k3s-vault-init.json`
 
