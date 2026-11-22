@@ -11,6 +11,12 @@ This is not a collection of unrelated demo repos. It is a deliberately mixed env
 
 The center of that experience is `Obervability-Stack`, which acts as the operator control plane for health, probes, alerts, logs, runbooks, and incident evidence.
 
+## Platform Architecture
+
+![Platform architecture: k3s Kubernetes platform with GitOps, secrets, observability, and operator workflows](docs/architecture/idp-platform-architecture.png)
+
+One platform, not five unrelated applications. Operator and public traffic enter through Cloudflare Tunnel and Traefik ingress into a Kubernetes on k3s runtime that hosts four managed workloads (SwiftPay, Secure OpenSIS, FoodPulse, MemFlip), Vault based secrets delivery matched to each workload, and a shared Prometheus, Loki, Grafana, and Alertmanager observability stack feeding the control plane application. Git is the delivery record; Argo CD is the declared GitOps standard, and its live activation was rolled back, which the diagram states openly. The full design, including the editable Mermaid source for this image, lives in [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md).
+
 ## CI/CD Workflow Model
 
 This repository intentionally keeps a workflow surface focused on validation and public dev-edge verification.
@@ -147,8 +153,8 @@ These are the four visuals I recommend as the root portfolio surface because the
 
 | Architecture Direction | Control-Plane Dashboard |
 |---|---|
-| <img src="output/playwright/phase7/phase7-12-architecture-diagram.png" alt="Workspace architecture diagram" width="100%"> | <img src="output/playwright/phase7/phase7-02-dashboard.png" alt="Control-plane dashboard" width="100%"> |
-| Repo-native architecture map generated from the Phase 7 Mermaid source. | The live operator dashboard that anchors the platform story. |
+| <img src="docs/architecture/idp-platform-architecture.png" alt="Platform architecture diagram" width="100%"> | <img src="output/playwright/phase7/phase7-02-dashboard.png" alt="Control-plane dashboard" width="100%"> |
+| The current platform architecture, rendered from the Mermaid source in docs/architecture/ARCHITECTURE.md. It supersedes the Phase 7 architecture screenshot as the design of record. | The live operator dashboard that anchors the platform story. |
 
 | App Operator Handoff | Incident Drill Evidence |
 |---|---|
