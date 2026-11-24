@@ -40,6 +40,9 @@ so the evidence set reads as a deliberate pack rather than tool output.
   references.
 - All images were losslessly recompressed on 2026-11-24. Pixel content
   is unchanged.
+- Capture 02 (dashboard) was replaced on 2026-11-24 with a fresh live
+  capture (1900 x 930), so it post-dates the shared capture baseline
+  above and reflects the platform's current state.
 - New raw captures still land in `output/playwright/` (gitignored).
   Promote only the selected set here, in capture order, using the
   `NN-name.png` naming convention.
