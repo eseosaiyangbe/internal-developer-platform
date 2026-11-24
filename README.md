@@ -153,12 +153,12 @@ These are the four visuals I recommend as the root portfolio surface because the
 
 | Architecture Direction | Control-Plane Dashboard |
 |---|---|
-| <img src="docs/architecture/idp-platform-architecture.png" alt="Platform architecture diagram" width="100%"> | <img src="output/playwright/phase7/phase7-02-dashboard.png" alt="Control-plane dashboard" width="100%"> |
+| <img src="docs/architecture/idp-platform-architecture.png" alt="Platform architecture diagram" width="100%"> | <img src="docs/evidence/phase7/02-dashboard.png" alt="Control-plane dashboard" width="100%"> |
 | The current platform architecture, rendered from the Mermaid source in docs/architecture/ARCHITECTURE.md. It supersedes the Phase 7 architecture screenshot as the design of record. | The live operator dashboard that anchors the platform story. |
 
 | App Operator Handoff | Incident Drill Evidence |
 |---|---|
-| <img src="output/playwright/phase7/phase7-05-opensis-app-page.png" alt="OpenSIS app detail page" width="100%"> | <img src="output/playwright/phase7/phase7-11-incident-drills-doc-cropped.png" alt="Incident drill catalog" width="100%"> |
+| <img src="docs/evidence/phase7/05-opensis-app-page.png" alt="OpenSIS app detail page" width="100%"> | <img src="docs/evidence/phase7/11-incident-drills-doc.png" alt="Incident drill catalog" width="100%"> |
 | The app detail page proves the handoff from inventory to real operator context. | The drill catalog makes incident practice part of the product story instead of an afterthought. |
 
 The broader six-visual pack remains available through [PHASE7-VISUAL-CAPTURE-LOG.md](PHASE7-VISUAL-CAPTURE-LOG.md) and [VISUAL-EVIDENCE-PACK.md](VISUAL-EVIDENCE-PACK.md).

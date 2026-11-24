@@ -242,21 +242,24 @@ Expected state:
 
 ## Suggested File Naming
 
-Use a simple, reviewable naming convention:
+Curated evidence lives in `docs/evidence/phase7/` (moved from
+`output/playwright/phase7/` on 2026-11-24). Raw captures still land in
+`output/playwright/`; only the selected set is promoted, using this
+naming convention:
 
 ```text
-phase7-01-landing-page.png
-phase7-02-dashboard.png
-phase7-03-services.png
-phase7-04-compare.png
-phase7-05-opensis-app-page.png
-phase7-06-alerts.png
-phase7-07-notifications.png
-phase7-08-demo-center.png
-phase7-09-swiftpay-ui.png
-phase7-10-incident-drill.png
-phase7-11-architecture-system.png
-phase7-12-architecture-workload-mapping.png
+01-landing-page.png
+02-dashboard.png
+03-services.png
+04-compare.png
+05-opensis-app-page.png
+06-alerts.png
+07-notifications.png
+08-demo-center.png
+09-swiftpay-ui.png
+10-foodpulse-ui.png
+11-incident-drills-doc.png
+12-architecture-diagram.png
 ```
 
 ## Capture Standards

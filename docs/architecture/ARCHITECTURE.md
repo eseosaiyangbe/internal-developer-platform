@@ -2,7 +2,7 @@
 
 ![Platform architecture: k3s Kubernetes platform with GitOps, secrets, observability, and operator workflows](idp-platform-architecture.png)
 
-This document is the architecture design of record for the Internal Developer Platform. The image above is rendered from the Mermaid source in this file, so the picture and the source never drift apart. It supersedes the Phase 7 architecture screenshot (`output/playwright/phase7/phase7-12-architecture-diagram.png`) as the current design record.
+This document is the architecture design of record for the Internal Developer Platform. The image above is rendered from the Mermaid source in this file, so the picture and the source never drift apart. It supersedes the Phase 7 architecture screenshot (`docs/evidence/phase7/12-architecture-diagram.png`) as the current design record.
 
 ## The design in one paragraph
 

@@ -35,22 +35,27 @@ Validated result before capture:
 Stored under:
 
 ```text
-output/playwright/phase7/
+docs/evidence/phase7/
 ```
+
+Relocated here from `output/playwright/phase7/` on 2026-11-24, with the
+`phase7-` filename prefix dropped and the set indexed in that folder's
+README. Raw captures still land in `output/playwright/`; only the
+selected set is promoted.
 
 ## Capture Pass 1: Core Control-Plane Story
 
 Artifacts captured:
 
-1. `phase7-01-landing-page.png`
-2. `phase7-02-dashboard.png`
-3. `phase7-03-services.png`
-4. `phase7-04-compare.png`
-5. `phase7-05-opensis-app-page.png`
-6. `phase7-06-alerts.png`
-7. `phase7-07-notifications.png`
-8. `phase7-08-demo-center.png`
-9. `phase7-09-swiftpay-ui.png`
+1. `01-landing-page.png`
+2. `02-dashboard.png`
+3. `03-services.png`
+4. `04-compare.png`
+5. `05-opensis-app-page.png`
+6. `06-alerts.png`
+7. `07-notifications.png`
+8. `08-demo-center.png`
+9. `09-swiftpay-ui.png`
 
 What this pass covers:
 
@@ -68,10 +73,10 @@ What this pass covers:
 
 Artifacts captured:
 
-10. `phase7-10-foodpulse-ui.png`
-11. `phase7-11-incident-drills-doc.png`
-12. `phase7-12-architecture-diagram.png`
-13. `phase7-11-incident-drills-doc-cropped.png`
+10. `10-foodpulse-ui.png`
+11. `11-incident-drills-doc.png`
+12. `12-architecture-diagram.png`
+13. `11-incident-drills-doc.png`
 
 What this pass adds:
 
