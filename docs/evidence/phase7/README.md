@@ -41,9 +41,10 @@ so the evidence set reads as a deliberate pack rather than tool output.
 - All images were losslessly recompressed on 2026-11-24. Pixel content
   is unchanged.
 - Captures 02 (dashboard, 1900 x 930), 03 (services, 1600 x 1796),
-  and 04 (compare, 1600 x 2524) were replaced on 2026-11-24 with fresh
-  live captures, so those three post-date the shared capture baseline
-  above and reflect the platform's current state.
+  04 (compare, 1600 x 2524), and 05 (OpenSIS app page, 1600 x 2463)
+  were replaced on 2026-11-24 with fresh live captures, so those four
+  post-date the shared capture baseline above and reflect the
+  platform's current state.
 - New raw captures still land in `output/playwright/` (gitignored).
   Promote only the selected set here, in capture order, using the
   `NN-name.png` naming convention.
