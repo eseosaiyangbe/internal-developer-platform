@@ -14,3 +14,30 @@ node_modules
 .playwright-cli/
 **/.playwright-cli/
 output/playwright/
+
+# Repo hygiene additions
+# Environment variants (example files stay tracked)
+.env.*
+!.env.example
+
+# Vault raft snapshots and backup outputs (never commit: a snapshot carries Vault storage)
+*.snap
+vault-raft-snapshots/
+*.dump
+*.sql.gz
+*.tgz
+*.tar.gz
+backups/
+
+# Logs and local tooling state
+*.log
+logs/
+kubeconfig
+*.kubeconfig
+
+# OS and editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
