@@ -41,3 +41,7 @@ kubeconfig
 *~
 .idea/
 .vscode/
+
+# Local dev secrets for the Vault bootstrap script (never commit)
+scripts/bootstrap-secrets.local.env
+*.local.env

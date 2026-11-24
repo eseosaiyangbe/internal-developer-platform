@@ -276,37 +276,41 @@ vault_exec_with_token "vault write auth/kubernetes/role/observability-prod bound
 vault_exec_with_token "vault write auth/userpass/users/admin password='Admin@123' policies='local-admin' >/dev/null"
 vault_exec_with_token "vault write auth/userpass/users/readonly password='readonly' policies='local-readonly' >/dev/null"
 
-MEMFLIP_DEV_DB_PASSWORD="gamepass123"
-MEMFLIP_DEV_REDIS_PASSWORD="gamepass123"
-MEMFLIP_DEV_JWT_SECRET="memflip-dev-jwt-change-before-shared-dev"
+# Dev app credentials are NOT stored in this repo. They live in a local,
+# gitignored secrets file. Create it from bootstrap-secrets.local.env.example
+# (see that file for a one-line way to extract the values from git history).
+DEV_SECRETS_FILE="${IDP_DEV_SECRETS_FILE:-${SCRIPT_DIR}/bootstrap-secrets.local.env}"
+if [[ ! -f "${DEV_SECRETS_FILE}" ]]; then
+  echo "ERROR: Dev secrets file not found: ${DEV_SECRETS_FILE}" >&2
+  echo "Create it from scripts/bootstrap-secrets.local.env.example before running this script." >&2
+  exit 1
+fi
+set -a
+source "${DEV_SECRETS_FILE}"
+set +a
+
+for dev_var in MEMFLIP_DEV_DB_PASSWORD MEMFLIP_DEV_REDIS_PASSWORD MEMFLIP_DEV_JWT_SECRET SWIFTPAY_DEV_DB_PASSWORD SWIFTPAY_DEV_RABBITMQ_PASSWORD SWIFTPAY_DEV_JWT_SECRET FOODPULSE_DEV_DB_PASSWORD FOODPULSE_DEV_REDIS_PASSWORD FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD OPENSIS_DEV_DB_PASSWORD OPENSIS_DEV_DB_ROOT_PASSWORD OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD OBSERVABILITY_DEV_DB_PASSWORD OBSERVABILITY_DEV_NEXTAUTH_SECRET OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD; do
+  if [[ -z "${!dev_var:-}" ]]; then
+    echo "ERROR: ${dev_var} is not set in ${DEV_SECRETS_FILE}" >&2
+    exit 1
+  fi
+done
 
 SWIFTPAY_DEV_DB_USER="swiftpay"
-SWIFTPAY_DEV_DB_PASSWORD="swiftpay123"
 SWIFTPAY_DEV_DB_HOST="postgres"
 SWIFTPAY_DEV_DB_PORT="5432"
 SWIFTPAY_DEV_REDIS_URL="redis://redis:6379"
 SWIFTPAY_DEV_RABBITMQ_USER="swiftpay"
-SWIFTPAY_DEV_RABBITMQ_PASSWORD="swiftpay123"
-SWIFTPAY_DEV_RABBITMQ_URL="amqp://swiftpay:swiftpay123@rabbitmq:5672"
-SWIFTPAY_DEV_JWT_SECRET="J8vmoWX/NIIcBunMHhkMmok7ZViKS/OaQovGmp9ETm2+puxFEL/lt+egqTNRLM3J"
+SWIFTPAY_DEV_RABBITMQ_URL="amqp://${SWIFTPAY_DEV_RABBITMQ_USER}:${SWIFTPAY_DEV_RABBITMQ_PASSWORD}@rabbitmq:5672"
 FOODPULSE_DEV_DB_USER="foodpulse"
-FOODPULSE_DEV_DB_PASSWORD="change-me"
-FOODPULSE_DEV_REDIS_PASSWORD="admin"
-FOODPULSE_DEV_REDIS_SENTINEL_PASSWORD="admin"
 OPENSIS_DEV_DB_HOST="opensis-db"
 OPENSIS_DEV_DB_PORT="3306"
 OPENSIS_DEV_DB_NAME="opensis"
 OPENSIS_DEV_DB_USER="opensis"
-OPENSIS_DEV_DB_PASSWORD="opensis123"
-OPENSIS_DEV_DB_ROOT_PASSWORD="opensis-root-123"
 OPENSIS_DEV_MYSQL_EXPORTER_USER="opensis_exporter"
-OPENSIS_DEV_MYSQL_EXPORTER_PASSWORD="opensis-exporter-123"
 OBSERVABILITY_DEV_DB_USER="observability_app"
-OBSERVABILITY_DEV_DB_PASSWORD="observability_dev_password"
 OBSERVABILITY_DEV_DB_NAME="observability_dev"
-OBSERVABILITY_DEV_NEXTAUTH_SECRET="observability-dev-nextauth-change-before-shared-dev"
 OBSERVABILITY_DEV_GRAFANA_ADMIN_USER="admin"
-OBSERVABILITY_DEV_GRAFANA_ADMIN_PASSWORD="admin"
 
 MEMFLIP_PROD_DB_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
 MEMFLIP_PROD_REDIS_PASSWORD="$(openssl rand -base64 24 | tr -d '\n')"
