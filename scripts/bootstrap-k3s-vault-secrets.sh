@@ -18,12 +18,12 @@ EOF
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/platform-identity.sh"
 
 export HOME="${HOME:-$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | awk '{print $2}' | head -n1)}"
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 
-STATE_DIR="${IDP_STATE_DIR}"
 VAULT_INIT_FILE="$(idp_resolve_state_file "k3s-vault-init.json")"
 VALUES_FILE="${ROOT_DIR}/scripts/vault-k3s-values.yaml"
 MIGRATION_SCRIPT="${SCRIPT_DIR}/migrate-k3s-vault-file-to-raft.sh"
@@ -240,6 +240,8 @@ echo "[vault-bootstrap] Enabling Vault engines and Kubernetes auth"
 vault_exec_with_token "vault secrets enable -path=kv kv-v2 >/dev/null 2>&1 || true"
 vault_exec_with_token "vault auth enable kubernetes >/dev/null 2>&1 || true"
 vault_exec_with_token "vault auth enable userpass >/dev/null 2>&1 || true"
+# The single quotes are intentional: $KUBERNETES_SERVICE_HOST expands inside the Vault pod, not locally.
+# shellcheck disable=SC2016
 vault_exec_with_token 'vault write auth/kubernetes/config kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT" >/dev/null'
 
 write_policy "local-admin" 'path "*" { capabilities = ["create", "read", "update", "delete", "list", "patch", "sudo"] }'
@@ -286,6 +288,7 @@ if [[ ! -f "${DEV_SECRETS_FILE}" ]]; then
   exit 1
 fi
 set -a
+# shellcheck source=/dev/null
 source "${DEV_SECRETS_FILE}"
 set +a
 
